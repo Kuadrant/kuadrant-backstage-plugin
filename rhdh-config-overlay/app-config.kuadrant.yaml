@@ -1,0 +1,32 @@
+dynamicPlugins:
+  frontend:
+    internal.plugin-kuadrant:
+      dynamicRoutes:
+        - path: /kuadrant
+          importName: KuadrantPage
+          menuItem:
+            text: Kuadrant
+            icon: category
+      mountPoints:
+        - mountPoint: entity.page.overview/cards
+          importName: ApiAccessCard
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 4"
+                md: "span 6"
+                xs: "span 12"
+            if:
+              allOf:
+                - isKind: api
+        - mountPoint: entity.page.overview/cards
+          importName: ApiKeyManagementTab
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 8"
+                md: "span 12"
+                xs: "span 12"
+            if:
+              allOf:
+                - isKind: api

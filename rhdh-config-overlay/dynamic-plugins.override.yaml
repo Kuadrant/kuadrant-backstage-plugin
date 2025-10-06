@@ -1,0 +1,62 @@
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  - package: ./local-plugins/kuadrant
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          internal.plugin-kuadrant:
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  text: Kuadrant
+                  icon: category
+            mountPoints:
+              - mountPoint: entity.page.overview/cards
+                importName: EntityKuadrantApiAccessCard
+                config:
+                  layout:
+                    gridColumnEnd:
+                      lg: "span 4"
+                      md: "span 6"
+                      xs: "span 12"
+                  if:
+                    allOf:
+                      - isKind: api
+              - mountPoint: entity.page.api-keys/cards
+                importName: EntityKuadrantApiKeysContent
+                config:
+                  if:
+                    allOf:
+                      - isKind: api
+            entityTabs:
+              - path: /api-keys
+                title: API Keys
+                mountPoint: entity.page.api-keys
+                if:
+                  allOf:
+                    - isKind: api
+  - package: ./local-plugins/kuadrant-backend
+    disabled: false
+  - package: ./dynamic-plugins/dist/backstage-community-plugin-rbac
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          backstage-community.plugin-rbac:
+            appIcons:
+              - name: rbacIcon
+                importName: RbacIcon
+            dynamicRoutes:
+              - path: /rbac
+                importName: RbacPage
+                menuItem:
+                  icon: rbacIcon
+                  text: RBAC
+            menuItems:
+              rbac:
+                parent: admin
+                icon: rbacIcon

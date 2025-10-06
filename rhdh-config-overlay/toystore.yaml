@@ -1,0 +1,105 @@
+---
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-system
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: examples
+spec:
+  owner: guests
+---
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-component
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: example-website
+  annotations:
+    backstage.io/kubernetes-id: example-website
+    backstage.io/kubernetes-namespace: default
+spec:
+  type: website
+  lifecycle: experimental
+  owner: guests
+  system: examples
+  providesApis: [example-grpc-api]
+---
+# https://backstage.io/docs/features/software-catalog/descriptor-format#kind-api
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: example-grpc-api
+spec:
+  type: grpc
+  lifecycle: experimental
+  owner: guests
+  system: examples
+  definition: |
+    syntax = "proto3";
+
+    service Exampler {
+      rpc Example (ExampleMessage) returns (ExampleMessage) {};
+    }
+
+    message ExampleMessage {
+      string example = 1;
+    };
+---
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: toystore
+  annotations:
+    backstage.io/kubernetes-id: toystore
+    backstage.io/kubernetes-namespace: toystore
+spec:
+  type: service
+  lifecycle: experimental
+  owner: guests
+  system: examples
+  providesApis: [toystore-api]
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: toystore-api
+  annotations:
+    # kuadrant gateway api mapping
+    kuadrant.io/httproute: toystore
+    kuadrant.io/namespace: toystore
+    kuadrant.io/gateway: external
+spec:
+  type: openapi
+  lifecycle: experimental
+  owner: guests
+  system: examples
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: toystore api
+      version: 1.0.0
+      description: simple toy store api for demonstration
+    servers:
+      - url: http://api.toystore.com
+        description: toystore api gateway
+    paths:
+      /:
+        get:
+          summary: list all toys
+          operationId: listToys
+          tags:
+            - toys
+          responses:
+            '200':
+              description: successful response with list of toys
+              content:
+                application/json:
+                  schema:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        name:
+                          type: string
+                        price:
+                          type: number

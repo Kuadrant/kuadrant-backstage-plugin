@@ -1,0 +1,25 @@
+app:
+  title: Red Hat Developer Hub - Kuadrant
+  baseUrl: http://localhost:7008
+
+backend:
+  baseUrl: http://localhost:7008
+  listen:
+    port: 7007
+
+catalog:
+  locations:
+    - type: file
+      target: /opt/app-root/src/configs/catalog-entities/toystore.yaml
+      rules:
+        - allow: [Component, API]
+
+dynamicPlugins:
+  frontend:
+    internal.plugin-kuadrant:
+      dynamicRoutes:
+        - path: /kuadrant
+          importName: KuadrantPage
+          menuItem:
+            text: Kuadrant
+            icon: category
