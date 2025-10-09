@@ -235,6 +235,13 @@ rhdh-setup:
 # generate kubeconfig for rhdh with service account token
 rhdh-kubeconfig:
 	@echo "generating kubeconfig for rhdh service account..."
+	@if [ ! -f "$(RHDH_LOCAL)/compose.yaml" ]; then \
+		echo "rhdh-local submodule not initialised, initialising now..."; \
+		git submodule update --init --recursive; \
+		echo ""; \
+		echo "applying customisations..."; \
+		$(MAKE) rhdh-setup-partial; \
+	fi
 	@RHDH_TOKEN=$$(kubectl create token rhdh -n default --duration=999999h) && \
 	CA_DATA=$$(kubectl config view --minify --raw -o jsonpath='{.clusters[0].cluster.certificate-authority-data}') && \
 	printf "apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    certificate-authority-data: %s\n    server: https://local-cluster-control-plane:6443\n  name: kind-local-cluster\ncontexts:\n- context:\n    cluster: kind-local-cluster\n    user: rhdh\n  name: kind-local-cluster\ncurrent-context: kind-local-cluster\nusers:\n- name: rhdh\n  user:\n    token: %s\n" "$$CA_DATA" "$$RHDH_TOKEN" > $(RHDH_OVERLAY)/kubeconfig.yaml && \
@@ -246,6 +253,21 @@ rhdh-kubeconfig:
 		cp $(RHDH_OVERLAY)/.env.example $(RHDH_LOCAL)/.env; \
 	fi && \
 	echo "kubeconfig generated and copied to rhdh-local/configs/extra-files/.kube/config"
+
+# partial setup without kubeconfig (called before kubeconfig is generated)
+rhdh-setup-partial:
+	@mkdir -p $(RHDH_LOCAL)/configs/app-config
+	@mkdir -p $(RHDH_LOCAL)/configs/dynamic-plugins
+	@mkdir -p $(RHDH_LOCAL)/configs/catalog-entities
+	@cp $(RHDH_OVERLAY)/app-config.local.yaml $(RHDH_LOCAL)/configs/app-config/
+	@cp $(RHDH_OVERLAY)/dynamic-plugins.override.yaml $(RHDH_LOCAL)/configs/dynamic-plugins/
+	@cp $(RHDH_OVERLAY)/toystore.yaml $(RHDH_LOCAL)/configs/catalog-entities/
+	@if [ -f "$(RHDH_OVERLAY)/.env" ]; then \
+		cp $(RHDH_OVERLAY)/.env $(RHDH_LOCAL)/; \
+	else \
+		cp $(RHDH_OVERLAY)/.env.example $(RHDH_LOCAL)/.env; \
+	fi
+	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 
 # install kuadrant on existing cluster
 kuadrant-install:
