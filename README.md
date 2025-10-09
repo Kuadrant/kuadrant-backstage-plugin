@@ -24,6 +24,28 @@ Access RHDH at http://localhost:7008
 - Kuadrant plugin: http://localhost:7008/kuadrant
 - Toystore API demo: http://localhost:7008/catalog/default/api/toystore-api
 
+### First-Time Setup
+
+For new users:
+
+1. **Clone and setup**:
+   ```bash
+   git clone <repo-url>
+   cd kuadrant-backstage-plugin
+   git submodule update --init --recursive
+   make rhdh-setup
+   ```
+
+2. **(Optional) Configure GitHub auth**:
+   - Edit `rhdh-config-overlay/.env` with GitHub OAuth credentials
+   - See [Authentication](#authentication) section for details
+
+3. **Create cluster and start RHDH**:
+   ```bash
+   make kind-create
+   make dev
+   ```
+
 ## What Gets Installed
 
 - Kubernetes cluster (kind)
@@ -118,9 +140,98 @@ curl -H 'Host: api.toystore.com' \
 ### RHDH Setup
 Configuration managed via `rhdh-config-overlay/`:
 - `app-config.local.yaml` - RHDH app config overrides
-- `.env` - Environment variables (kubeconfig path)
+- `.env` - Environment variables (kubeconfig path, GitHub credentials)
 - `kubeconfig.yaml` - Auto-generated Kubernetes credentials
 - `toystore.yaml` - Catalog entities
+
+### Authentication
+
+By default, RHDH uses **guest authentication** for easy local development. To enable GitHub authentication with org/team ingestion for RBAC:
+
+#### 1. Create GitHub OAuth App
+
+Visit https://github.com/settings/developers and create a new OAuth app:
+- **Application name**: `RHDH Local Dev` (or your choice)
+- **Homepage URL**: `http://localhost:7008`
+- **Callback URL**: `http://localhost:7008/api/auth/github/handler/frame`
+
+Save the **Client ID** and generate a **Client Secret**.
+
+#### 2. Create GitHub Personal Access Token
+
+Visit https://github.com/settings/tokens and create a new token with scopes:
+- `read:org` - Read org and team membership
+- `read:user` - Read user profile data
+- `user:email` - Read user email addresses
+
+#### 3. Configure Environment Variables
+
+Edit `rhdh-config-overlay/.env`:
+
+```bash
+# github oauth (optional - for github auth provider)
+AUTH_GITHUB_CLIENT_ID=your_client_id_here
+AUTH_GITHUB_CLIENT_SECRET=your_client_secret_here
+
+# github integration (optional - for catalog ingestion and rbac)
+GITHUB_TOKEN=ghp_your_token_here
+
+# github organisation ingestion (optional)
+GITHUB_ORG_URL=https://github.com/your-org-name
+```
+
+**Note**: The `.env` file is gitignored. Use `.env.example` as a template.
+
+#### 4. Enable GitHub Auth in Config
+
+The GitHub auth configuration is already present in `rhdh-config-overlay/app-config.local.yaml`. When you fill in the `.env` file and run `make dev`, GitHub authentication will be automatically enabled.
+
+The setup includes:
+- **GitHub OAuth** - Sign in with GitHub
+- **GitHub Org Provider** - Imports users and teams from your org
+- **RBAC** - Admin permissions configured via `permission.rbac.admin.users`
+
+#### 5. Deploy with GitHub Auth
+
+```bash
+# after configuring .env
+make dev
+```
+
+The `.env` file will be automatically copied to `rhdh-local/` during startup. RHDH will:
+- Enable GitHub sign-in alongside guest auth
+- Import users and teams from your GitHub org every 60 minutes
+- Grant admin permissions to configured users
+
+#### Switching Between Guest and GitHub Auth
+
+**Guest auth (default)**:
+- Leave `.env` GitHub credentials empty
+- Quick setup for testing
+- No user/team management
+
+**GitHub auth (production-like)**:
+- Fill in `.env` with GitHub credentials
+- Real user identities
+- Team-based RBAC
+- Org membership sync
+
+#### Customising Admin Users
+
+To grant admin permissions to specific users, edit `rhdh-config-overlay/app-config.local.yaml`:
+
+```yaml
+permission:
+  enabled: true
+  rbac:
+    admin:
+      users:
+        - name: user:default/your-github-username
+      superUsers:
+        - name: user:default/your-github-username
+```
+
+Replace `your-github-username` with the GitHub username(s) you want to grant admin access.
 
 ### Kubernetes Access
 - **Local dev**: Uses kubeconfig in `configs/extra-files/.kube/config`
@@ -144,9 +255,23 @@ Configuration managed via `rhdh-config-overlay/`:
 ## Troubleshooting
 
 Common issues:
+
+### Kubernetes Access
 - **401 errors**: Check kubeconfig path in RHDH logs
 - **Stale token**: Regenerate with `make rhdh-kubeconfig`
 - **Plugins not loading**: Check `docker logs rhdh`
+
+### GitHub Authentication
+- **GitHub auth not working**: Check `.env` file was copied to `rhdh-local/`:
+  ```bash
+  cat rhdh-local/.env | grep GITHUB
+  ```
+- **Container crashes with "Missing required config"**: GitHub auth is enabled in `app-config.local.yaml` but `.env` credentials are empty - either fill in credentials or comment out GitHub config
+- **Org ingestion fails**: Check GitHub token has `read:org` scope and GITHUB_ORG_URL format is correct (e.g., `https://github.com/kuadrant`)
+- **Users not showing up**: Wait up to 60 minutes for initial org sync, or check logs:
+  ```bash
+  docker logs rhdh 2>&1 | grep -i "github.*users"
+  ```
 
 ## References
 

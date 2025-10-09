@@ -2,6 +2,9 @@ includes:
   - dynamic-plugins.default.yaml
 
 plugins:
+  # disable github org ingestion by default (enable by setting disabled: false and adding config to app-config.local.yaml)
+  - package: ./dynamic-plugins/dist/backstage-plugin-catalog-backend-module-github-org-dynamic
+    disabled: true
   - package: ./local-plugins/kuadrant
     disabled: false
     pluginConfig:

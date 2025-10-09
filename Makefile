@@ -192,7 +192,13 @@ rhdh-setup:
 	@cp $(RHDH_OVERLAY)/app-config.local.yaml $(RHDH_LOCAL)/configs/app-config/
 	@cp $(RHDH_OVERLAY)/dynamic-plugins.override.yaml $(RHDH_LOCAL)/configs/dynamic-plugins/
 	@cp $(RHDH_OVERLAY)/toystore.yaml $(RHDH_LOCAL)/configs/catalog-entities/
-	@cp $(RHDH_OVERLAY)/.env $(RHDH_LOCAL)/
+	@if [ -f "$(RHDH_OVERLAY)/.env" ]; then \
+		cp $(RHDH_OVERLAY)/.env $(RHDH_LOCAL)/; \
+	else \
+		cp $(RHDH_OVERLAY)/.env.example $(RHDH_LOCAL)/.env; \
+		echo ""; \
+		echo "note: copied .env.example to .env - fill in github oauth credentials if needed"; \
+	fi
 	@echo "patching compose.yaml..."
 	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 	@echo ""
@@ -206,7 +212,11 @@ rhdh-kubeconfig:
 	printf "apiVersion: v1\nkind: Config\nclusters:\n- cluster:\n    certificate-authority-data: %s\n    server: https://local-cluster-control-plane:6443\n  name: kind-local-cluster\ncontexts:\n- context:\n    cluster: kind-local-cluster\n    user: rhdh\n  name: kind-local-cluster\ncurrent-context: kind-local-cluster\nusers:\n- name: rhdh\n  user:\n    token: %s\n" "$$CA_DATA" "$$RHDH_TOKEN" > $(RHDH_OVERLAY)/kubeconfig.yaml && \
 	mkdir -p $(RHDH_LOCAL)/configs/extra-files/.kube && \
 	cp $(RHDH_OVERLAY)/kubeconfig.yaml $(RHDH_LOCAL)/configs/extra-files/.kube/config && \
-	cp $(RHDH_OVERLAY)/.env $(RHDH_LOCAL)/ && \
+	if [ -f "$(RHDH_OVERLAY)/.env" ]; then \
+		cp $(RHDH_OVERLAY)/.env $(RHDH_LOCAL)/; \
+	else \
+		cp $(RHDH_OVERLAY)/.env.example $(RHDH_LOCAL)/.env; \
+	fi && \
 	echo "kubeconfig generated and copied to rhdh-local/configs/extra-files/.kube/config"
 
 # install kuadrant on existing cluster

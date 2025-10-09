@@ -1,0 +1,93 @@
+app:
+  title: Red Hat Developer Hub - Kuadrant
+  baseUrl: http://localhost:7008
+
+backend:
+  baseUrl: http://localhost:7008
+  listen:
+    port: 7007
+
+extensions:
+  installation:
+    enabled: true
+    saveToSingleFile:
+      file: /opt/app-root/src/configs/dynamic-plugins/dynamic-plugins.override.yaml
+
+permission:
+  enabled: false
+  # uncomment to enable rbac with github auth
+  # rbac:
+  #   admin:
+  #     users:
+  #       - name: user:default/your-github-username
+  #     superUsers:
+  #       - name: user:default/your-github-username
+
+auth:
+  environment: development
+  # uncomment to enable github auth (requires oauth app credentials in .env)
+  # providers:
+  #   github:
+  #     development:
+  #       clientId: ${AUTH_GITHUB_CLIENT_ID}
+  #       clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+  #       signIn:
+  #         resolvers:
+  #           - resolver: usernameMatchingUserEntityName
+
+# uncomment to enable github integration (requires GITHUB_TOKEN in .env)
+# integrations:
+#   github:
+#     - host: github.com
+#       token: ${GITHUB_TOKEN}
+
+catalog:
+  # uncomment to enable github org ingestion (requires GITHUB_ORG_URL in .env)
+  # note: extract org name from GITHUB_ORG_URL (e.g. 'kuadrant' from 'https://github.com/kuadrant')
+  # providers:
+  #   githubOrg:
+  #     - id: production
+  #       githubUrl: https://github.com
+  #       orgs: ['your-org-name']
+  #       schedule:
+  #         frequency:
+  #           minutes: 60
+  #         timeout:
+  #           minutes: 15
+  locations:
+    - type: file
+      target: /opt/app-root/src/configs/catalog-entities/toystore.yaml
+      rules:
+        - allow: [Component, API]
+
+dynamicPlugins:
+  frontend:
+    internal.plugin-kuadrant:
+      dynamicRoutes:
+        - path: /kuadrant
+          importName: KuadrantPage
+          menuItem:
+            text: Kuadrant
+            icon: category
+      entityTabs:
+        - path: /api-keys
+          title: API Keys
+          mountPoint: entity.page.api-keys
+          if:
+            allOf:
+              - isKind: api
+      mountPoints:
+        - mountPoint: entity.page.overview/cards
+          importName: EntityKuadrantApiAccessCard
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 4"
+                md: "span 6"
+                xs: "span 12"
+        - mountPoint: entity.page.api-keys/cards
+          importName: EntityKuadrantApiKeysContent
+          config:
+            if:
+              allOf:
+                - isKind: api
