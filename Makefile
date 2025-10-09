@@ -212,7 +212,11 @@ rhdh-setup:
 	@mkdir -p $(RHDH_LOCAL)/configs/app-config
 	@mkdir -p $(RHDH_LOCAL)/configs/dynamic-plugins
 	@mkdir -p $(RHDH_LOCAL)/configs/catalog-entities
-	@cp $(RHDH_OVERLAY)/kubeconfig.yaml $(RHDH_LOCAL)/configs/extra-files/.kube/config
+	@if [ -f "$(RHDH_OVERLAY)/kubeconfig.yaml" ]; then \
+		cp $(RHDH_OVERLAY)/kubeconfig.yaml $(RHDH_LOCAL)/configs/extra-files/.kube/config; \
+	else \
+		echo "note: kubeconfig.yaml not found - will be generated when cluster is created"; \
+	fi
 	@cp $(RHDH_OVERLAY)/app-config.local.yaml $(RHDH_LOCAL)/configs/app-config/
 	@cp $(RHDH_OVERLAY)/dynamic-plugins.override.yaml $(RHDH_LOCAL)/configs/dynamic-plugins/
 	@cp $(RHDH_OVERLAY)/toystore.yaml $(RHDH_LOCAL)/configs/catalog-entities/
