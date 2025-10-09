@@ -46,6 +46,8 @@ For new users:
    make dev
    ```
 
+   Note: On first run, `make dev` automatically installs all dependencies and builds the plugins before starting RHDH. This may take a few minutes.
+
 ## What Gets Installed
 
 - Kubernetes cluster (kind)
@@ -255,6 +257,11 @@ Replace `your-github-username` with the GitHub username(s) you want to grant adm
 ## Troubleshooting
 
 Common issues:
+
+### First-Time Setup
+- **"node_modules state file" error**: Dependencies not installed. Run `make install` or just run `make dev` which will install them automatically
+- **TypeScript compilation errors**: Run `cd kuadrant-backstage && yarn tsc` to check for errors, or let `make build` handle it automatically
+- **Plugins not building**: Make sure you're using Node 20 or 22 (not 24), check with `node --version`
 
 ### Kubernetes Access
 - **401 errors**: Check kubeconfig path in RHDH logs

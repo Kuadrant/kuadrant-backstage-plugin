@@ -40,6 +40,9 @@ help:
 
 # install plugin dependencies
 install:
+	@echo "installing workspace dependencies..."
+	@cd kuadrant-backstage && yarn install
+	@echo ""
 	@echo "installing frontend plugin dependencies..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && yarn install
 	@echo ""
@@ -50,6 +53,12 @@ install:
 
 # build both plugins
 build:
+	@echo "checking if dependencies are installed..."
+	@if [ ! -d "kuadrant-backstage/node_modules" ]; then \
+		echo "dependencies not installed, installing now..."; \
+		$(MAKE) install; \
+	fi
+	@echo ""
 	@echo "generating typescript declarations..."
 	@cd kuadrant-backstage && yarn tsc
 	@echo ""
