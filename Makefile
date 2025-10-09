@@ -125,6 +125,15 @@ dev-update: export
 dev:
 	@echo "starting rhdh development environment..."
 	@echo ""
+	@echo "checking if rhdh-local submodule is initialised..."
+	@if [ ! -f "$(RHDH_LOCAL)/compose.yaml" ]; then \
+		echo "rhdh-local submodule not initialised, initialising now..."; \
+		git submodule update --init --recursive; \
+		echo ""; \
+		echo "applying customisations..."; \
+		$(MAKE) rhdh-setup; \
+	fi
+	@echo ""
 	@echo "checking if cluster exists..."
 	@if kind get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then \
 		echo "cluster exists, regenerating kubeconfig..."; \
@@ -200,6 +209,9 @@ rhdh-submodule-init:
 rhdh-setup:
 	@echo "applying customisations to rhdh-local..."
 	@mkdir -p $(RHDH_LOCAL)/configs/extra-files/.kube
+	@mkdir -p $(RHDH_LOCAL)/configs/app-config
+	@mkdir -p $(RHDH_LOCAL)/configs/dynamic-plugins
+	@mkdir -p $(RHDH_LOCAL)/configs/catalog-entities
 	@cp $(RHDH_OVERLAY)/kubeconfig.yaml $(RHDH_LOCAL)/configs/extra-files/.kube/config
 	@cp $(RHDH_OVERLAY)/app-config.local.yaml $(RHDH_LOCAL)/configs/app-config/
 	@cp $(RHDH_OVERLAY)/dynamic-plugins.override.yaml $(RHDH_LOCAL)/configs/dynamic-plugins/

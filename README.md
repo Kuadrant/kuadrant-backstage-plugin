@@ -28,12 +28,10 @@ Access RHDH at http://localhost:7008
 
 For new users:
 
-1. **Clone and setup**:
+1. **Clone the repository**:
    ```bash
    git clone <repo-url>
    cd kuadrant-backstage-plugin
-   git submodule update --init --recursive
-   make rhdh-setup
    ```
 
 2. **(Optional) Configure GitHub auth**:
@@ -46,7 +44,13 @@ For new users:
    make dev
    ```
 
-   Note: On first run, `make dev` automatically installs all dependencies and builds the plugins before starting RHDH. This may take a few minutes.
+   Note: On first run, `make dev` automatically:
+   - Initialises the rhdh-local git submodule
+   - Applies configuration customisations
+   - Installs all dependencies
+   - Builds the plugins
+
+   This may take a few minutes.
 
 ## What Gets Installed
 
