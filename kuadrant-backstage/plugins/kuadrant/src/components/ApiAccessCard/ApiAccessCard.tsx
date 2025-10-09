@@ -57,7 +57,7 @@ interface ApiKey {
   };
 }
 
-interface ApiAccessCardProps {
+export interface ApiAccessCardProps {
   // deprecated: use entity annotations instead
   apiName?: string;
   namespace?: string;

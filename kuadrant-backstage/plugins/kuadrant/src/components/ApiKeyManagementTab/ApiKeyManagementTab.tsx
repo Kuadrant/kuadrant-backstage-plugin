@@ -36,7 +36,7 @@ interface Secret {
   };
 }
 
-interface ApiKeyManagementTabProps {
+export interface ApiKeyManagementTabProps {
   // deprecated: use entity annotations instead
   namespace?: string;
 }

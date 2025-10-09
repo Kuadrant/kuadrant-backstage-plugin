@@ -50,6 +50,9 @@ install:
 
 # build both plugins
 build:
+	@echo "generating typescript declarations..."
+	@cd kuadrant-backstage && yarn tsc
+	@echo ""
 	@echo "building frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && yarn build
 	@echo ""
