@@ -65,7 +65,6 @@ make rhdh-setup  # Re-apply customisations
 - Docker and Docker Compose
 - kind (for local Kubernetes cluster)
 - kubectl
-- Helm
 
 ## Quick Start
 

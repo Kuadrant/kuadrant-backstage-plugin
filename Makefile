@@ -281,17 +281,17 @@ kuadrant-install:
 	@kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
 	@echo ""
 	@echo "installing istio..."
-	@helm repo add istio https://istio-release.storage.googleapis.com/charts || true
-	@helm repo update
+	@$(HELM_V_BINARY) repo add istio https://istio-release.storage.googleapis.com/charts || true
+	@$(HELM_V_BINARY) repo update
 	@kubectl create namespace istio-system --dry-run=client -o yaml | kubectl apply -f -
-	@helm upgrade --install istio-base istio/base -n istio-system --wait
-	@helm upgrade --install istiod istio/istiod -n istio-system --wait
+	@$(HELM_V_BINARY) upgrade --install istio-base istio/base -n istio-system --wait
+	@$(HELM_V_BINARY) upgrade --install istiod istio/istiod -n istio-system --wait
 	@echo ""
 	@echo "installing kuadrant operator v1.3.0-rc2 (with extensions enabled)..."
 	@kubectl create namespace kuadrant-system --dry-run=client -o yaml | kubectl apply -f -
-	@helm repo add kuadrant https://kuadrant.io/helm-charts/ 2>/dev/null || true
-	@helm repo update kuadrant
-	@helm upgrade --install kuadrant-operator kuadrant/kuadrant-operator \
+	@$(HELM_V_BINARY) repo add kuadrant https://kuadrant.io/helm-charts/ 2>/dev/null || true
+	@$(HELM_V_BINARY) repo update kuadrant
+	@$(HELM_V_BINARY) upgrade --install kuadrant-operator kuadrant/kuadrant-operator \
 		--version 1.3.0-rc2 \
 		--devel \
 		-n kuadrant-system \
@@ -316,10 +316,10 @@ kuadrant-install:
 kuadrant-uninstall:
 	@echo "uninstalling kuadrant..."
 	@kubectl delete -f kuadrant-instance.yaml || true
-	@helm uninstall kuadrant-operator -n kuadrant-system || true
+	@$(HELM_V_BINARY) uninstall kuadrant-operator -n kuadrant-system || true
 	@kubectl delete namespace kuadrant-system || true
-	@helm uninstall istiod -n istio-system || true
-	@helm uninstall istio-base -n istio-system || true
+	@$(HELM_V_BINARY) uninstall istiod -n istio-system || true
+	@$(HELM_V_BINARY) uninstall istio-base -n istio-system || true
 	@kubectl delete namespace istio-system || true
 	@kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml || true
 	@echo "kuadrant uninstalled"
