@@ -15,6 +15,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import { Routes, Route, Link as RouterLink } from 'react-router-dom';
 import { ResourceDetailPage } from '../ResourceDetailPage';
+import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { useState } from 'react';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
@@ -259,6 +260,9 @@ export const ResourceList = () => {
                   {renderResources(planPolicies?.items, 'planpolicies')}
                 </Box>
               </InfoCard>
+            </Grid>
+            <Grid item>
+              <ApprovalQueueCard />
             </Grid>
             <Grid item>
               <InfoCard title="API Keys">

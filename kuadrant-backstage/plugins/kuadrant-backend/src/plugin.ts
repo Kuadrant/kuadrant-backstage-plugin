@@ -56,6 +56,22 @@ export const kuadrantPlugin = createBackendPlugin({
           path: '/:kind/:namespace/:name',
           allow: 'unauthenticated',
         });
+        httpRouter.addAuthPolicy({
+          path: '/requests',
+          allow: 'unauthenticated',
+        });
+        httpRouter.addAuthPolicy({
+          path: '/requests/my',
+          allow: 'unauthenticated',
+        });
+        httpRouter.addAuthPolicy({
+          path: '/requests/:id/approve',
+          allow: 'unauthenticated',
+        });
+        httpRouter.addAuthPolicy({
+          path: '/requests/:id/reject',
+          allow: 'unauthenticated',
+        });
 
         httpRouter.use(
           await createRouter({
