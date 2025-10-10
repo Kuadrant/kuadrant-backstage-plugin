@@ -265,7 +265,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     },
     {
       title: 'Plan Tier',
-      field: 'metadata.annotations',
+      field: 'planTier',
       render: (row: Secret) => (
         <Chip
           label={row.metadata.annotations?.['secret.kuadrant.io/plan-id'] || 'Unknown'}
@@ -273,6 +273,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           size="small"
         />
       ),
+      customFilterAndSearch: (filter: string, row: Secret) => {
+        const planTier = row.metadata.annotations?.['secret.kuadrant.io/plan-id'] || 'Unknown';
+        return planTier.toLowerCase().includes(filter.toLowerCase());
+      },
     },
     {
       title: 'Created',
@@ -286,6 +290,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     {
       title: 'API Key',
       field: 'data.api_key',
+      searchable: false,
       render: (row: Secret) => {
         const isVisible = visibleKeys.has(row.metadata.name);
         const apiKey = row.data?.api_key
@@ -316,6 +321,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     {
       title: 'Actions',
       field: 'actions',
+      searchable: false,
       render: (row: Secret) => (
         <IconButton
           size="small"
