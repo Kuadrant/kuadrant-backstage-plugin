@@ -61,3 +61,5 @@ rhdh-config-overlay/kubeconfig.yaml
 
 # github credentials (use .env.example as template)
 rhdh-config-overlay/.env
+
+/bin
