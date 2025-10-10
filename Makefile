@@ -1,4 +1,4 @@
-.PHONY: help dev dev-rhdh install build export deploy clean kind-create kind-delete kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init
+.PHONY: help dev dev-rhdh install build export deploy clean kind-create kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init
 
 CLUSTER_NAME ?= local-cluster
 PLUGIN_DIR := kuadrant-backstage/plugins
@@ -6,6 +6,12 @@ RHDH_LOCAL := rhdh-local
 RHDH_OVERLAY := rhdh-config-overlay
 FRONTEND_PLUGIN := kuadrant
 BACKEND_PLUGIN := kuadrant-backend
+
+
+## Location to install dependencies to
+LOCALBIN ?= $(shell pwd)/bin
+$(LOCALBIN):
+	mkdir -p $(LOCALBIN)
 
 help:
 	@echo "kuadrant backstage plugin - development"
@@ -25,7 +31,7 @@ help:
 	@echo ""
 	@echo "kubernetes cluster (required):"
 	@echo "  make kind-create         - create kind cluster with kuadrant v1.3.0-alpha2"
-	@echo "  make kind-delete         - delete kind cluster"
+	@echo "  make kind-delete-cluster - delete kind cluster"
 	@echo "  make kuadrant-install    - install kuadrant v1.3.0-alpha2 on existing cluster"
 	@echo "  make kuadrant-uninstall  - uninstall kuadrant"
 	@echo "  make demo-install        - install toystore demo resources"
@@ -135,7 +141,7 @@ dev:
 	fi
 	@echo ""
 	@echo "checking if cluster exists..."
-	@if kind get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then \
+	@if $(KIND_V_BINARY) get clusters 2>/dev/null | grep -q "^$(CLUSTER_NAME)$$"; then \
 		echo "cluster exists, regenerating kubeconfig..."; \
 		$(MAKE) rhdh-kubeconfig; \
 	else \
@@ -178,7 +184,7 @@ dev:
 # create kind cluster with kuadrant
 kind-create:
 	@echo "creating kind cluster: $(CLUSTER_NAME)"
-	@printf 'kind: Cluster\napiVersion: kind.x-k8s.io/v1alpha4\nnodes:\n- role: control-plane\n  extraPortMappings:\n  - containerPort: 30007\n    hostPort: 7007\n    protocol: TCP\n' | kind create cluster --name $(CLUSTER_NAME) --config=- || true
+	@$(MAKE) kind-create-cluster
 	@kubectl cluster-info --context kind-$(CLUSTER_NAME)
 	@echo ""
 	@echo "creating rhdh service account and rbac..."
@@ -318,11 +324,6 @@ kuadrant-uninstall:
 	@kubectl delete -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml || true
 	@echo "kuadrant uninstalled"
 
-# delete kind cluster
-kind-delete:
-	@echo "deleting kind cluster: $(CLUSTER_NAME)"
-	@kind delete cluster --name $(CLUSTER_NAME)
-
 # install demo resources
 demo-install:
 	@echo "installing toystore demo resources (gateway, httproute, authpolicy, planpolicy, secrets)..."
@@ -367,8 +368,9 @@ clean:
 	@echo "stopping rhdh..."
 	@cd $(RHDH_LOCAL) && docker compose down || true
 	@echo ""
-	@$(MAKE) kind-delete
+	@$(MAKE) kind-delete-cluster
 	@echo ""
 	@echo "cleanup complete"
 
-
+# Include last to avoid changing MAKEFILE_LIST used above
+include ./make/*.mk

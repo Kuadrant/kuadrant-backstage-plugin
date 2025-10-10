@@ -251,7 +251,6 @@ Replace `your-github-username` with the GitHub username(s) you want to grant adm
 - Docker/OrbStack
 - kubectl
 - Helm
-- kind
 
 ## Known Limitations
 
