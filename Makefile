@@ -128,7 +128,7 @@ dev-update: export
 	@echo "hard refresh browser (cmd+shift+r) to see changes"
 
 # start rhdh with plugins
-dev:
+dev: kind
 	@echo "starting rhdh development environment..."
 	@echo ""
 	@echo "checking if rhdh-local submodule is initialised..."
@@ -276,7 +276,7 @@ rhdh-setup-partial:
 	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 
 # install kuadrant on existing cluster
-kuadrant-install:
+kuadrant-install: helm
 	@echo "installing gateway api crds..."
 	@kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
 	@echo ""
@@ -313,7 +313,7 @@ kuadrant-install:
 	@echo "  kubectl get crd planpolicies.extensions.kuadrant.io"
 
 # uninstall kuadrant
-kuadrant-uninstall:
+kuadrant-uninstall: helm
 	@echo "uninstalling kuadrant..."
 	@kubectl delete -f kuadrant-instance.yaml || true
 	@$(HELM_V_BINARY) uninstall kuadrant-operator -n kuadrant-system || true
