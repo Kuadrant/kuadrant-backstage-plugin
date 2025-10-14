@@ -9,13 +9,21 @@ KIND_V_BINARY := $(LOCALBIN)/kind-$(KIND_VERSION)
 kind: $(KIND_V_BINARY)
 
 $(KIND_V_BINARY): $(LOCALBIN)  ## Installs kind in $PROJECT_DIR/bin
-# For AMD64 / x86_64
-ifeq ($(shell uname -p),x86_64)
-	curl -Lo $@ https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-linux-amd64
-endif
-# For ARM64
-ifeq ($(shell uname -p),aarch64)
+# Download kind binary depending on architecture and OS
+ifeq ($(shell uname -s),Darwin)
+  # macOS
+  ifeq ($(shell uname -m),arm64)
+	curl -Lo $@ https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-darwin-arm64
+  else
+	curl -Lo $@ https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-darwin-amd64
+  endif
+else
+  # Linux
+  ifeq ($(shell uname -m),aarch64)
 	curl -Lo $@ https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-linux-arm64
+  else
+	curl -Lo $@ https://kind.sigs.k8s.io/dl/$(KIND_VERSION)/kind-linux-amd64
+  endif
 endif
 	chmod +x $@
 
