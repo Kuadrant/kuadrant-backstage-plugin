@@ -84,18 +84,32 @@ export: build
 	@rm -rf $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic
 	@rm -rf $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic
 	@rm -rf $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
-	@rm -rf $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
+	@rm -rf $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main
+	@rm -rf $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module
 	@echo ""
 	@echo "exporting frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
 	@echo ""
-	@echo "exporting backend plugin..."
-	@cd $(PLUGIN_DIR)/$(BACKEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
+	@echo "building backend plugin..."
+	@cd $(PLUGIN_DIR)/$(BACKEND_PLUGIN) && yarn build
 	@echo ""
-	@echo "copying plugins to rhdh-local..."
+	@echo "copying frontend plugin to rhdh-local..."
 	@cp -r $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
-	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
+	@echo ""
+	@echo "deploying backend as two separate packages..."
+	@mkdir -p $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/dist
+	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist/* $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/dist/
+	@printf '{\n  "name": "@internal/plugin-kuadrant-backend-dynamic",\n  "version": "0.1.0",\n  "main": "./dist/index.cjs.js",\n  "backstage": {\n    "role": "backend-plugin",\n    "pluginId": "kuadrant"\n  }\n}' > $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/package.json
+	@echo ""
+	@echo "deploying catalog module as separate package..."
+	@mkdir -p $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/dist
+	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist/* $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/dist/
+	@printf '{\n  "name": "@internal/plugin-kuadrant-catalog-module",\n  "version": "0.1.0",\n  "main": "./dist/module.cjs.js",\n  "backstage": {\n    "role": "backend-plugin-module",\n    "pluginId": "catalog",\n    "pluginPackage": "@backstage/plugin-catalog-backend"\n  }\n}' > $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/package.json
+	@echo ""
 	@echo "plugins exported to $(RHDH_LOCAL)/local-plugins/"
+	@echo "  - kuadrant (frontend)"
+	@echo "  - kuadrant-backend-main (http routes)"
+	@echo "  - kuadrant-catalog-module (entity provider)"
 
 # build, export, and restart rhdh (full deployment)
 deploy: export

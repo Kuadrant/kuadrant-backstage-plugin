@@ -44,7 +44,7 @@ export const ResourceList = () => {
 
   const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
-      return <Typography variant="body2" color="textSecondary">no resources found</Typography>;
+      return <Typography variant="body2" color="textSecondary">No resources found</Typography>;
     }
     return (
       <Box>
@@ -74,14 +74,14 @@ export const ResourceList = () => {
 
   return (
     <Page themeId="tool">
-      <Header title="Kuadrant" subtitle="api management for kubernetes">
-        <SupportButton>manage api products and access requests</SupportButton>
+      <Header title="Kuadrant" subtitle="API Management for Kubernetes">
+        <SupportButton>Manage API products and access requests</SupportButton>
       </Header>
       <Content>
-        <ContentHeader title="api products">
+        <ContentHeader title="API Products">
           {userInfo && (
             <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-              <Typography variant="body2">viewing as:</Typography>
+              <Typography variant="body2">Viewing as:</Typography>
               <Chip label={userInfo.userId} color="primary" size="small" />
               <Chip
                 label={getRoleLabel(userInfo.role).label}
@@ -98,7 +98,7 @@ export const ResourceList = () => {
             <Grid item>
               <InfoCard title="API Products">
                 <Typography variant="body1" gutterBottom>
-                  published apis with plan tiers and rate limits
+                  Published APIs with plan tiers and rate limits
                 </Typography>
                 <Box mt={2}>
                   {renderResources(apiProducts?.items)}

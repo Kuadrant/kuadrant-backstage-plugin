@@ -12,6 +12,7 @@ import { createRouter } from './router';
 export const kuadrantPlugin = createBackendPlugin({
   pluginId: 'kuadrant',
   register(env) {
+    // register http router
     env.registerInit({
       deps: {
         httpAuth: coreServices.httpAuth,

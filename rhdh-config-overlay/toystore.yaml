@@ -57,52 +57,8 @@ spec:
   system: examples
   providesApis: [toystore-api]
 ---
-apiVersion: backstage.io/v1alpha1
-kind: API
-metadata:
-  name: toystore-api
-  annotations:
-    # kuadrant gateway api mapping
-    kuadrant.io/httproute: toystore
-    kuadrant.io/namespace: toystore
-    kuadrant.io/gateway: external
-spec:
-  type: openapi
-  lifecycle: experimental
-  owner: guests
-  system: examples
-  definition: |
-    openapi: 3.0.0
-    info:
-      title: toystore api
-      version: 1.0.0
-      description: simple toy store api for demonstration
-    servers:
-      - url: http://api.toystore.com
-        description: toystore api gateway
-    paths:
-      /:
-        get:
-          summary: list all toys
-          operationId: listToys
-          tags:
-            - toys
-          responses:
-            '200':
-              description: successful response with list of toys
-              content:
-                application/json:
-                  schema:
-                    type: array
-                    items:
-                      type: object
-                      properties:
-                        id:
-                          type: string
-                        name:
-                          type: string
-                        price:
-                          type: number
+# toystore-api is now auto-synced from the kubernetes apiproduct cr
+# by the apiproduct entity provider - no need to define it manually
 ---
 # groups for rbac
 apiVersion: backstage.io/v1alpha1

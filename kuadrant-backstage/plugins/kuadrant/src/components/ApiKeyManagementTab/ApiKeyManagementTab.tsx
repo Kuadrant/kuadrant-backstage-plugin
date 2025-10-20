@@ -51,7 +51,7 @@ interface Secret {
   };
 }
 
-interface PlanPolicy {
+interface APIProduct {
   metadata: {
     name: string;
     namespace: string;
@@ -59,6 +59,7 @@ interface PlanPolicy {
   spec: {
     plans?: Array<{
       tier: string;
+      description?: string;
       limits?: any;
     }>;
   };
@@ -126,19 +127,20 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     );
   }, [userId, apiName, namespace, refresh, fetchApi]);
 
-  const { value: planPolicy, loading: plansLoading, error: plansError } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+  const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
     if (!response.ok) {
-      throw new Error('failed to fetch plan policies');
+      throw new Error('failed to fetch api products');
     }
     const data = await response.json();
 
-    const policy = data.items?.find((p: PlanPolicy) =>
-      p.metadata.namespace === namespace
+    const product = data.items?.find((p: APIProduct) =>
+      p.metadata.namespace === namespace &&
+      (p.metadata.name === apiName || p.metadata.name === `${apiName}-api`)
     );
 
-    return policy;
-  }, [namespace, fetchApi]);
+    return product;
+  }, [namespace, apiName, fetchApi]);
 
   const handleDelete = async (name: string) => {
     try {
@@ -234,7 +236,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
   const secrets = (apiKeys || []) as Secret[];
   const myRequests = (requests || []) as APIKeyRequest[];
-  const plans = (planPolicy?.spec?.plans || []) as Plan[];
+  const plans = (apiProduct?.spec?.plans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
@@ -465,7 +467,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
               onClick={() => setOpen(true)}
               disabled={plans.length === 0}
             >
-              request api access
+              Request API Access
             </Button>
           </Box>
         </Grid>
@@ -521,7 +523,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             emptyContent={
               <Box p={4}>
                 <Typography align="center">
-                  no api keys found
+                  No API keys found
                 </Typography>
               </Box>
             }
@@ -530,7 +532,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>request api access</DialogTitle>
+        <DialogTitle>Request API Access</DialogTitle>
         <DialogContent>
           {createError && (
             <Box mb={2} p={2} bgcolor="error.main" color="error.contrastText" borderRadius={1}>
@@ -538,7 +540,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             </Box>
           )}
           <FormControl fullWidth margin="normal">
-            <InputLabel>select plan tier</InputLabel>
+            <InputLabel>Select Plan Tier</InputLabel>
             <Select
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as string)}
@@ -556,25 +558,25 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             </Select>
           </FormControl>
           <TextField
-            label="use case (optional)"
-            placeholder="describe how you plan to use this api"
+            label="Use Case (optional)"
+            placeholder="Describe how you plan to use this API"
             multiline
             rows={3}
             fullWidth
             margin="normal"
             value={useCase}
             onChange={(e) => setUseCase(e.target.value)}
-            helperText="explain your intended use of this api for admin review"
+            helperText="Explain your intended use of this API for admin review"
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>cancel</Button>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button
             onClick={handleRequestAccess}
             color="primary"
             disabled={!selectedPlan || creating}
           >
-            {creating ? 'submitting...' : 'submit request'}
+            {creating ? 'Submitting...' : 'Submit Request'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -44,6 +44,10 @@ plugins:
                     - isKind: api
   - package: ./local-plugins/kuadrant-backend
     disabled: false
+    pluginConfig: {}
+  - package: ./local-plugins/kuadrant-backend/alpha
+    disabled: false
+    pluginConfig: {}
   - package: ./dynamic-plugins/dist/backstage-community-plugin-rbac
     disabled: false
     pluginConfig:
