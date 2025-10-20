@@ -67,68 +67,6 @@ export async function createRouter({
 
   const k8sClient = new KuadrantK8sClient(config);
 
-  // kuadrant resource endpoints
-  router.get('/authpolicies', async (_req, res) => {
-    try {
-      const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'authpolicies');
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching authpolicies:', error);
-      res.status(500).json({ error: 'failed to fetch authpolicies' });
-    }
-  });
-
-  router.get('/ratelimitpolicies', async (_req, res) => {
-    try {
-      const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'ratelimitpolicies');
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching ratelimitpolicies:', error);
-      res.status(500).json({ error: 'failed to fetch ratelimitpolicies' });
-    }
-  });
-
-  router.get('/dnspolicies', async (_req, res) => {
-    try {
-      const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'dnspolicies');
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching dnspolicies:', error);
-      res.status(500).json({ error: 'failed to fetch dnspolicies' });
-    }
-  });
-
-  router.get('/tlspolicies', async (_req, res) => {
-    try {
-      const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'tlspolicies');
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching tlspolicies:', error);
-      res.status(500).json({ error: 'failed to fetch tlspolicies' });
-    }
-  });
-
-  router.get('/planpolicies', async (_req, res) => {
-    try {
-      const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'planpolicies');
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching planpolicies:', error);
-      res.status(500).json({ error: 'failed to fetch planpolicies' });
-    }
-  });
-
-  router.get('/planpolicies/:namespace/:name', async (req, res) => {
-    try {
-      const { namespace, name } = req.params;
-      const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'planpolicies', name);
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching planpolicy:', error);
-      res.status(500).json({ error: 'failed to fetch planpolicy' });
-    }
-  });
-
   // apiproduct endpoints
   router.get('/apiproducts', async (_req, res) => {
     try {
@@ -610,18 +548,6 @@ export async function createRouter({
     } catch (error) {
       console.error('error updating api key request:', error);
       res.status(500).json({ error: 'failed to update api key request' });
-    }
-  });
-
-  // individual resource endpoints
-  router.get('/:kind/:namespace/:name', async (req, res) => {
-    try {
-      const { kind, namespace, name } = req.params;
-      const data = await k8sClient.getCustomResource('kuadrant.io', 'v1', namespace, kind, name);
-      res.json(data);
-    } catch (error) {
-      console.error('error fetching resource:', error);
-      res.status(500).json({ error: 'failed to fetch resource' });
     }
   });
 

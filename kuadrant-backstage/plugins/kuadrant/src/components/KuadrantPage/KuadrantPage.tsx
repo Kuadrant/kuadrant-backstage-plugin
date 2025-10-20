@@ -1,4 +1,4 @@
-import { Typography, Grid, Box, Chip, Link } from '@material-ui/core';
+import { Typography, Grid, Box, Chip } from '@material-ui/core';
 import {
   InfoCard,
   Header,
@@ -11,8 +11,6 @@ import {
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
-import { Routes, Route, Link as RouterLink } from 'react-router-dom';
-import { ResourceDetailPage } from '../ResourceDetailPage';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { PermissionGate } from '../PermissionGate';
 import { useUserRole } from '../../hooks/useUserRole';
@@ -41,19 +39,10 @@ export const ResourceList = () => {
     return await response.json();
   }, [backendUrl, fetchApi]);
 
-  // only fetch planpolicies for platform engineers
-  const { value: planPolicies, loading: planLoading, error: planError } = useAsync(async (): Promise<KuadrantList | null> => {
-    if (!userInfo?.isPlatformEngineer) {
-      return null;
-    }
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
-    return await response.json();
-  }, [backendUrl, userInfo, fetchApi]);
+  const loading = userLoading || apiProductsLoading;
+  const error = apiProductsError;
 
-  const loading = userLoading || apiProductsLoading || planLoading;
-  const error = apiProductsError || planError;
-
-  const renderResources = (resources: KuadrantResource[] | undefined, kind: string) => {
+  const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
       return <Typography variant="body2" color="textSecondary">no resources found</Typography>;
     }
@@ -61,15 +50,9 @@ export const ResourceList = () => {
       <Box>
         {resources.map((resource) => (
           <Box key={`${resource.metadata.namespace}/${resource.metadata.name}`} mb={1}>
-            <Link
-              component={RouterLink}
-              to={`/kuadrant/${kind}/${resource.metadata.namespace}/${resource.metadata.name}`}
-              underline="hover"
-            >
-              <Typography variant="body2">
-                <strong>{resource.metadata.name}</strong> ({resource.metadata.namespace})
-              </Typography>
-            </Link>
+            <Typography variant="body2">
+              <strong>{resource.metadata.name}</strong> ({resource.metadata.namespace})
+            </Typography>
           </Box>
         ))}
       </Box>
@@ -118,27 +101,15 @@ export const ResourceList = () => {
                   published apis with plan tiers and rate limits
                 </Typography>
                 <Box mt={2}>
-                  {renderResources(apiProducts?.items, 'apiproducts')}
+                  {renderResources(apiProducts?.items)}
                 </Box>
               </InfoCard>
             </Grid>
 
             {userInfo?.isPlatformEngineer && (
-              <>
-                <Grid item>
-                  <InfoCard title="Plan Policies">
-                    <Typography variant="body1" gutterBottom>
-                      platform-level plan definitions (platform engineers only)
-                    </Typography>
-                    <Box mt={2}>
-                      {renderResources(planPolicies?.items, 'planpolicies')}
-                    </Box>
-                  </InfoCard>
-                </Grid>
-                <Grid item>
-                  <ApprovalQueueCard />
-                </Grid>
-              </>
+              <Grid item>
+                <ApprovalQueueCard />
+              </Grid>
             )}
           </Grid>
         )}
@@ -150,10 +121,7 @@ export const ResourceList = () => {
 export const KuadrantPage = () => {
   return (
     <PermissionGate requireAnyRole={['platform-engineer', 'app-developer']}>
-      <Routes>
-        <Route path="/" element={<ResourceList />} />
-        <Route path="/:kind/:namespace/:name" element={<ResourceDetailPage />} />
-      </Routes>
+      <ResourceList />
     </PermissionGate>
   );
 };
