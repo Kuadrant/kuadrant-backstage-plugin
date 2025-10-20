@@ -5,20 +5,20 @@
 USER=$1
 
 if [ -z "$USER" ]; then
-  echo "usage: ./switch-user.sh [admin|developer|consumer]"
+  echo "usage: ./switch-user.sh [platform-engineer|api-owner|api-consumer]"
   echo ""
   echo "users:"
-  echo "  admin     - platform engineer (can approve requests, view plan policies, see kuadrant page)"
-  echo "  developer - app developer (can view api products, see kuadrant page, manage own keys)"
-  echo "  consumer  - api consumer (can only request and manage own api keys)"
+  echo "  platform-engineer - manages infrastructure (planpolicy, gateways, httproutes)"
+  echo "  api-owner         - publishes apis, approves api key requests"
+  echo "  api-consumer      - browses apis, requests access to apis"
   echo ""
   echo "current user:"
   grep "AUTH_GUEST_USER" rhdh-local/.env 2>/dev/null || echo "  not configured"
   exit 1
 fi
 
-if [ "$USER" != "admin" ] && [ "$USER" != "developer" ] && [ "$USER" != "consumer" ]; then
-  echo "error: user must be admin, developer, or consumer"
+if [ "$USER" != "platform-engineer" ] && [ "$USER" != "api-owner" ] && [ "$USER" != "api-consumer" ]; then
+  echo "error: user must be platform-engineer, api-owner, or api-consumer"
   exit 1
 fi
 
@@ -46,7 +46,7 @@ cd rhdh-local
 docker compose up -d --force-recreate rhdh >/dev/null 2>&1
 
 echo ""
-echo "✓ switched to user: $USER"
+echo "✓ switched to user: $USER (backstage entity: user:default/$USER)"
 echo "✓ rhdh restarting at http://localhost:7008"
 echo ""
 echo "refresh your browser in 10 seconds"

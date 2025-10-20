@@ -18,15 +18,27 @@ function generateApiKey(): string {
   return randomBytes(32).toString('hex');
 }
 
-async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, userInfo: UserInfoService): Promise<{ userId: string; isAdmin: boolean }> {
+async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, userInfo: UserInfoService): Promise<{
+  userId: string;
+  isPlatformEngineer: boolean;
+  isApiOwner: boolean;
+  isApiConsumer: boolean;
+  groups: string[];
+}> {
   try {
     // allow both user credentials and unauthenticated (guest) access
     const credentials = await httpAuth.credentials(req, { allow: ['user', 'none'] });
 
     if (!credentials || !credentials.principal || credentials.principal.type === 'none') {
-      // no credentials or guest user
-      console.log('no user credentials, treating as guest user');
-      return { userId: 'guest', isAdmin: true }; // allow guest as admin in development
+      // no credentials or guest user - treat as api owner in development
+      console.log('no user credentials, treating as guest api owner');
+      return {
+        userId: 'guest',
+        isPlatformEngineer: false,
+        isApiOwner: true, // allow guest as api owner in development
+        isApiConsumer: true,
+        groups: []
+      };
     }
 
     // get user info from credentials
@@ -34,20 +46,36 @@ async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, 
 
     // extract userId from entity ref (format: "user:default/alice" -> "alice")
     const userId = info.userEntityRef.split('/')[1] || 'guest';
+    const groups = info.ownershipEntityRefs || [];
 
-    // check if user is admin (platform engineer or guest in development)
-    const isAdmin = userId === 'guest' || info.ownershipEntityRefs.some((ref: string) =>
+    // check user roles based on group membership
+    const isPlatformEngineer = userId === 'guest' || groups.some((ref: string) =>
       ref === 'group:default/platform-engineers' ||
       ref === 'group:default/platform-admins'
     );
 
-    console.log(`user identity resolved: userId=${userId}, isAdmin=${isAdmin}, groups=${info.ownershipEntityRefs.join(',')}`);
-    return { userId, isAdmin };
+    const isApiOwner = userId === 'guest' || groups.some((ref: string) =>
+      ref === 'group:default/api-owners' ||
+      ref === 'group:default/app-developers'
+    );
+
+    const isApiConsumer = groups.some((ref: string) =>
+      ref === 'group:default/api-consumers'
+    );
+
+    console.log(`user identity resolved: userId=${userId}, isPlatformEngineer=${isPlatformEngineer}, isApiOwner=${isApiOwner}, isApiConsumer=${isApiConsumer}, groups=${groups.join(',')}`);
+    return { userId, isPlatformEngineer, isApiOwner, isApiConsumer, groups };
   } catch (error) {
-    // if credentials fail to verify (e.g. JWT issues with guest auth), treat as guest admin
+    // if credentials fail to verify (e.g. JWT issues with guest auth), treat as guest api owner
     const errorMsg = error instanceof Error ? error.message : String(error);
-    console.warn(`failed to get user identity, defaulting to guest admin: ${errorMsg}`);
-    return { userId: 'guest', isAdmin: true }; // allow guest as admin in development
+    console.warn(`failed to get user identity, defaulting to guest api owner: ${errorMsg}`);
+    return {
+      userId: 'guest',
+      isPlatformEngineer: false,
+      isApiOwner: true, // allow guest as api owner in development
+      isApiConsumer: true,
+      groups: []
+    };
   }
 }
 
@@ -121,13 +149,14 @@ export async function createRouter({
 
   router.delete('/apikeys/:namespace/:name', async (req, res) => {
     try {
-      const { userId, isAdmin } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
       const secret = await k8sClient.getSecret(namespace, name);
       const secretUserId = secret.metadata?.annotations?.['secret.kuadrant.io/user-id'];
 
-      let canDeleteAll = isAdmin; // admin check based on group membership
+      // platform engineers and api owners can delete any keys
+      let canDeleteAll = isPlatformEngineer || isApiOwner;
 
       // if permissions are enabled, also check via permission framework
       if (!canDeleteAll) {
@@ -181,11 +210,12 @@ export async function createRouter({
     }
 
     try {
-      const { userId: authenticatedUserId, isAdmin } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userId: authenticatedUserId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
       const { apiName, apiNamespace, planTier, useCase, userId, userEmail, namespace } = parsed.data;
 
-      // validate userId matches authenticated user (admins can create on behalf of others)
-      if (!isAdmin && userId !== authenticatedUserId) {
+      // validate userId matches authenticated user (platform engineers and api owners can create on behalf of others)
+      const canCreateForOthers = isPlatformEngineer || isApiOwner;
+      if (!canCreateForOthers && userId !== authenticatedUserId) {
         throw new NotAllowedError('you can only create api key requests for yourself');
       }
       const timestamp = new Date().toISOString();
@@ -289,7 +319,6 @@ export async function createRouter({
 
   const approveRejectSchema = z.object({
     comment: z.string().optional(),
-    reviewedBy: z.string(),
   });
 
   router.post('/requests/:namespace/:name/approve', async (req, res) => {
@@ -299,8 +328,8 @@ export async function createRouter({
     }
 
     try {
-      const { isAdmin } = await getUserIdentity(req, httpAuth, userInfo);
-      let canApprove = isAdmin; // admin check based on group membership
+      const { userId, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
+      let canApprove = isApiOwner; // api owners can approve requests
 
       // if permissions are enabled, also check via permission framework
       if (!canApprove) {
@@ -324,7 +353,8 @@ export async function createRouter({
       }
 
       const { namespace, name } = req.params;
-      const { comment, reviewedBy } = parsed.data;
+      const { comment } = parsed.data;
+      const reviewedBy = `user:default/${userId}`;
 
       const request = await k8sClient.getCustomResource(
         'extensions.kuadrant.io',
@@ -437,8 +467,8 @@ export async function createRouter({
     }
 
     try {
-      const { isAdmin } = await getUserIdentity(req, httpAuth, userInfo);
-      let canReject = isAdmin; // admin check based on group membership
+      const { userId, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
+      let canReject = isApiOwner; // api owners can reject requests
 
       // if permissions are enabled, also check via permission framework
       if (!canReject) {
@@ -462,7 +492,8 @@ export async function createRouter({
       }
 
       const { namespace, name } = req.params;
-      const { comment, reviewedBy } = parsed.data;
+      const { comment } = parsed.data;
+      const reviewedBy = `user:default/${userId}`;
 
       const status = {
         phase: 'Rejected',
@@ -493,7 +524,7 @@ export async function createRouter({
 
   router.delete('/requests/:namespace/:name', async (req, res) => {
     try {
-      const { userId, isAdmin } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
       // get request to verify ownership
@@ -507,8 +538,9 @@ export async function createRouter({
 
       const requestUserId = request.spec?.requestedBy?.userId;
 
-      // only allow deletion if user owns the request or is admin
-      if (!isAdmin && requestUserId !== userId) {
+      // platform engineers and api owners can delete any request, consumers can only delete their own
+      const canDeleteAll = isPlatformEngineer || isApiOwner;
+      if (!canDeleteAll && requestUserId !== userId) {
         throw new NotAllowedError('you can only delete your own api key requests');
       }
 

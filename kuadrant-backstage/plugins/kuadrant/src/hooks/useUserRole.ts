@@ -1,13 +1,13 @@
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
 
-export type UserRole = 'platform-engineer' | 'app-developer' | 'api-consumer' | 'unknown';
+export type UserRole = 'platform-engineer' | 'api-owner' | 'api-consumer' | 'unknown';
 
 export interface UserInfo {
   userId: string;
   role: UserRole;
   isPlatformEngineer: boolean;
-  isAppDeveloper: boolean;
+  isApiOwner: boolean;
   isApiConsumer: boolean;
 }
 
@@ -19,22 +19,31 @@ export function useUserRole(): { userInfo: UserInfo | null; loading: boolean } {
     const userId = identity.userEntityRef.split('/')[1] || 'guest';
     const ownershipRefs = identity.ownershipEntityRefs || [];
 
-    let role: UserRole = 'unknown';
+    // determine roles based on group membership (not hierarchical)
+    const isPlatformEngineer = ownershipRefs.includes('group:default/platform-engineers') ||
+                               ownershipRefs.includes('group:default/platform-admins');
 
-    if (ownershipRefs.includes('group:default/platform-engineers')) {
+    const isApiOwner = ownershipRefs.includes('group:default/api-owners') ||
+                       ownershipRefs.includes('group:default/app-developers');
+
+    const isApiConsumer = ownershipRefs.includes('group:default/api-consumers');
+
+    // primary role (for display)
+    let role: UserRole = 'unknown';
+    if (isPlatformEngineer) {
       role = 'platform-engineer';
-    } else if (ownershipRefs.includes('group:default/app-developers')) {
-      role = 'app-developer';
-    } else if (ownershipRefs.includes('group:default/api-consumers')) {
+    } else if (isApiOwner) {
+      role = 'api-owner';
+    } else if (isApiConsumer) {
       role = 'api-consumer';
     }
 
     return {
       userId,
       role,
-      isPlatformEngineer: role === 'platform-engineer',
-      isAppDeveloper: role === 'app-developer' || role === 'platform-engineer',
-      isApiConsumer: role === 'api-consumer' || role === 'app-developer' || role === 'platform-engineer',
+      isPlatformEngineer,
+      isApiOwner,
+      isApiConsumer,
     };
   }, [identityApi]);
 

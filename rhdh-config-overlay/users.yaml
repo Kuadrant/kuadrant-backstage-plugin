@@ -2,31 +2,31 @@
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: admin
+  name: platform-engineer
 spec:
   profile:
     displayName: Platform Engineer
-    email: admin@example.com
+    email: platform-engineer@example.com
   memberOf: [platform-engineers]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: developer
+  name: api-owner
 spec:
   profile:
-    displayName: App Developer
-    email: developer@example.com
-  memberOf: [app-developers]
+    displayName: API Owner
+    email: api-owner@example.com
+  memberOf: [api-owners]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: consumer
+  name: api-consumer
 spec:
   profile:
     displayName: API Consumer
-    email: consumer@example.com
+    email: api-consumer@example.com
   memberOf: [api-consumers]
 ---
 apiVersion: backstage.io/v1alpha1
@@ -41,8 +41,8 @@ spec:
 apiVersion: backstage.io/v1alpha1
 kind: Group
 metadata:
-  name: app-developers
-  description: application developers who own apis
+  name: api-owners
+  description: api owners who publish apis and approve access requests
 spec:
   type: team
   children: []

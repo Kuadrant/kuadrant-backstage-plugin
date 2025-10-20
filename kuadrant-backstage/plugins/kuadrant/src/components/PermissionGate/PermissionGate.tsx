@@ -5,8 +5,8 @@ import { useUserRole } from '../../hooks/useUserRole';
 
 interface PermissionGateProps {
   children: React.ReactNode;
-  requireRole?: 'platform-engineer' | 'app-developer' | 'api-consumer';
-  requireAnyRole?: Array<'platform-engineer' | 'app-developer' | 'api-consumer'>;
+  requireRole?: 'platform-engineer' | 'api-owner' | 'api-consumer';
+  requireAnyRole?: Array<'platform-engineer' | 'api-owner' | 'api-consumer'>;
   fallback?: React.ReactNode;
 }
 

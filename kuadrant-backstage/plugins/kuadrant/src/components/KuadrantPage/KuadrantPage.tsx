@@ -63,8 +63,8 @@ export const ResourceList = () => {
     switch (role) {
       case 'platform-engineer':
         return { label: 'Platform Engineer', color: 'secondary' as const };
-      case 'app-developer':
-        return { label: 'App Developer', color: 'primary' as const };
+      case 'api-owner':
+        return { label: 'API Owner', color: 'primary' as const };
       case 'api-consumer':
         return { label: 'API Consumer', color: 'default' as const };
       default:
@@ -106,7 +106,7 @@ export const ResourceList = () => {
               </InfoCard>
             </Grid>
 
-            {userInfo?.isPlatformEngineer && (
+            {userInfo?.isApiOwner && (
               <Grid item>
                 <ApprovalQueueCard />
               </Grid>
@@ -120,7 +120,7 @@ export const ResourceList = () => {
 
 export const KuadrantPage = () => {
   return (
-    <PermissionGate requireAnyRole={['platform-engineer', 'app-developer']}>
+    <PermissionGate requireAnyRole={['platform-engineer', 'api-owner']}>
       <ResourceList />
     </PermissionGate>
   );

@@ -1,4 +1,4 @@
-.PHONY: help dev dev-rhdh install build export deploy clean kind-create kind-delete kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init rhdh-user-admin rhdh-user-developer rhdh-user-consumer
+.PHONY: help dev dev-rhdh install build export deploy clean kind-create kind-delete kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init rhdh-user-platform-engineer rhdh-user-api-owner rhdh-user-api-consumer
 
 CLUSTER_NAME ?= local-cluster
 PLUGIN_DIR := kuadrant-backstage/plugins
@@ -25,9 +25,9 @@ help:
 	@echo "  make deploy              - rebuild plugins and restart rhdh (use after code changes)"
 	@echo ""
 	@echo "rhdh user switching (for testing rbac):"
-	@echo "  make rhdh-user-admin     - switch to admin user (can approve requests)"
-	@echo "  make rhdh-user-developer - switch to developer user (cannot approve)"
-	@echo "  make rhdh-user-consumer  - switch to consumer user (api consumer)"
+	@echo "  make rhdh-user-platform-engineer - switch to platform engineer (manages infrastructure)"
+	@echo "  make rhdh-user-api-owner         - switch to api owner (approves requests)"
+	@echo "  make rhdh-user-api-consumer      - switch to api consumer (requests access)"
 	@echo ""
 	@echo "plugin development:"
 	@echo "  make install             - install plugin dependencies"
@@ -35,9 +35,9 @@ help:
 	@echo "  make export              - export plugins as dynamic plugins"
 	@echo ""
 	@echo "kubernetes cluster (required):"
-	@echo "  make kind-create         - create kind cluster with kuadrant v1.3.0-alpha2"
+	@echo "  make kind-create         - create kind cluster with kuadrant v1.3.0"
 	@echo "  make kind-delete-cluster - delete kind cluster"
-	@echo "  make kuadrant-install    - install kuadrant v1.3.0-alpha2 on existing cluster"
+	@echo "  make kuadrant-install    - install kuadrant v1.3.0 on existing cluster"
 	@echo "  make kuadrant-uninstall  - uninstall kuadrant"
 	@echo "  make demo-install        - install toystore demo resources"
 	@echo "  make demo-uninstall      - uninstall toystore demo resources"
@@ -292,14 +292,14 @@ rhdh-setup-partial:
 	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 
 # switch user for testing rbac
-rhdh-user-admin:
-	@./switch-user.sh admin
+rhdh-user-platform-engineer:
+	@./switch-user.sh platform-engineer
 
-rhdh-user-developer:
-	@./switch-user.sh developer
+rhdh-user-api-owner:
+	@./switch-user.sh api-owner
 
-rhdh-user-consumer:
-	@./switch-user.sh consumer
+rhdh-user-api-consumer:
+	@./switch-user.sh api-consumer
 
 # install kuadrant on existing cluster
 kuadrant-install: helm
@@ -313,13 +313,12 @@ kuadrant-install: helm
 	@$(HELM_V_BINARY) upgrade --install istio-base istio/base -n istio-system --wait
 	@$(HELM_V_BINARY) upgrade --install istiod istio/istiod -n istio-system --wait
 	@echo ""
-	@echo "installing kuadrant operator v1.3.0-rc2 (with extensions enabled)..."
+	@echo "installing kuadrant operator v1.3.0..."
 	@kubectl create namespace kuadrant-system --dry-run=client -o yaml | kubectl apply -f -
 	@$(HELM_V_BINARY) repo add kuadrant https://kuadrant.io/helm-charts/ 2>/dev/null || true
 	@$(HELM_V_BINARY) repo update kuadrant
 	@$(HELM_V_BINARY) upgrade --install kuadrant-operator kuadrant/kuadrant-operator \
-		--version 1.3.0-rc2 \
-		--devel \
+		--version 1.3.0 \
 		-n kuadrant-system \
 		--wait
 	@echo ""
