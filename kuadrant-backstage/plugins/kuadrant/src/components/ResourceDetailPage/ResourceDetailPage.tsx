@@ -9,7 +9,7 @@ import {
   CodeSnippet,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
-import { useApi, configApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import ArrowBackIcon from '@material-ui/icons/ArrowBack';
 
 type KuadrantResource = {
@@ -34,15 +34,16 @@ export const ResourceDetailPage = () => {
   }>();
   const navigate = useNavigate();
   const config = useApi(configApiRef);
+  const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
 
   const { value: resource, loading, error } = useAsync(async (): Promise<KuadrantResource> => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/${kind}/${namespace}/${name}`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/${kind}/${namespace}/${name}`);
     if (!response.ok) {
       throw new Error(`failed to fetch resource: ${response.status}`);
     }
     return await response.json();
-  }, [backendUrl, kind, namespace, name]);
+  }, [backendUrl, kind, namespace, name, fetchApi]);
 
   if (loading) {
     return (

@@ -119,6 +119,15 @@ export class KuadrantK8sClient {
     }
   }
 
+  async getSecret(namespace: string, name: string): Promise<K8sResource> {
+    try {
+      const response = await this.coreApi.readNamespacedSecret({ namespace, name }) as any;
+      return response as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to get secret: ${error.message}`);
+    }
+  }
+
   async deleteSecret(namespace: string, name: string): Promise<void> {
     try {
       await this.coreApi.deleteNamespacedSecret({ name, namespace });
@@ -174,4 +183,101 @@ export class KuadrantK8sClient {
       throw new Error(`failed to delete configmap: ${error.message}`);
     }
   }
+
+  async createCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    resource: K8sResource,
+  ): Promise<K8sResource> {
+    try {
+      const response = await this.customApi.createNamespacedCustomObject({
+        group,
+        version,
+        namespace,
+        plural,
+        body: resource as any,
+      });
+      return response as any as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to create ${plural}: ${error.message}`);
+    }
+  }
+
+  async deleteCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      await this.customApi.deleteNamespacedCustomObject({
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+      });
+    } catch (error: any) {
+      throw new Error(`failed to delete ${plural}/${name}: ${error.message}`);
+    }
+  }
+
+  async patchCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+    patch: any,
+  ): Promise<K8sResource> {
+    try {
+      const response = await this.customApi.patchNamespacedCustomObject({
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+        body: patch,
+      });
+      return response as any as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to patch ${plural}/${name}: ${error.message}`);
+    }
+  }
+
+  async patchCustomResourceStatus(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+    status: any,
+  ): Promise<K8sResource> {
+    try {
+      // get the existing resource first
+      const existing = await this.getCustomResource(group, version, namespace, plural, name);
+
+      // replace the entire resource with updated status
+      const updated = {
+        ...existing,
+        status,
+      };
+
+      const response = await this.customApi.replaceNamespacedCustomObjectStatus({
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+        body: updated,
+      });
+      return response as any as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to patch ${plural}/${name} status: ${error.message}`);
+    }
+  }
 }
+

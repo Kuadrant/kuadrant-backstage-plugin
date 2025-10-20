@@ -12,7 +12,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
-import { useApi, configApiRef, identityApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Routes, Route, Link as RouterLink } from 'react-router-dom';
 import { ResourceDetailPage } from '../ResourceDetailPage';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
@@ -55,6 +55,7 @@ type ApiKeySecret = {
 export const ResourceList = () => {
   const config = useApi(configApiRef);
   const identityApi = useApi(identityApiRef);
+  const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
@@ -67,32 +68,32 @@ export const ResourceList = () => {
   }, [identityApi]);
 
   const { value: authPolicies, loading: authLoading, error: authError } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/authpolicies`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/authpolicies`);
     return await response.json();
-  }, [backendUrl]);
+  }, [backendUrl, fetchApi]);
 
   const { value: rateLimitPolicies, loading: rlLoading, error: rlError } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
     return await response.json();
-  }, [backendUrl]);
+  }, [backendUrl, fetchApi]);
 
   const { value: planPolicies, loading: planLoading, error: planError } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
     return await response.json();
-  }, [backendUrl]);
+  }, [backendUrl, fetchApi]);
 
   const { value: apiKeysData, loading: apiKeysLoading, error: apiKeysError } = useAsync(async () => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/apikeys?namespace=toystore`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apikeys?namespace=toystore`);
     const data = await response.json();
     return data.items || [];
-  }, [backendUrl, refresh]);
+  }, [backendUrl, refresh, fetchApi]);
 
   const loading = authLoading || rlLoading || planLoading || apiKeysLoading;
   const error = authError || rlError || planError || apiKeysError;
 
   const handleDeleteApiKey = async (namespace: string, name: string) => {
     try {
-      const response = await fetch(
+      const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/apikeys/${namespace}/${name}`,
         { method: 'DELETE' }
       );

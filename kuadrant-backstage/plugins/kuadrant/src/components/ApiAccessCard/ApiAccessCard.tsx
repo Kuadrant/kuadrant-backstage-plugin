@@ -10,7 +10,7 @@ import {
   Box,
   Chip,
 } from '@material-ui/core';
-import { useApi, configApiRef, identityApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 
 interface ApiKey {
@@ -36,6 +36,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   const { entity } = useEntity();
   const config = useApi(configApiRef);
   const identityApi = useApi(identityApiRef);
+  const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [userId, setUserId] = useState<string>('guest');
 
@@ -49,13 +50,13 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   }, [identityApi]);
 
   const { value: apiKeys, loading: keysLoading, error: keysError } = useAsync(async () => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/apikeys?namespace=${namespace}&userId=${userId}`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apikeys?namespace=${namespace}&userId=${userId}`);
     if (!response.ok) {
       throw new Error('failed to fetch api keys');
     }
     const data = await response.json();
     return data.items || [];
-  }, [namespace, userId, backendUrl]);
+  }, [namespace, userId, backendUrl, fetchApi]);
 
   if (keysLoading) {
     return <Progress />;

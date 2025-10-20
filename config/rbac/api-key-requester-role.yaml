@@ -1,0 +1,19 @@
+# role for regular users who can create and manage their own api key requests
+# this role should be bound to users in their own namespaces
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-key-requester
+  namespace: default
+rules:
+# can create and view their own apikeyrequests
+- apiGroups: ["extensions.kuadrant.io"]
+  resources: ["apikeyrequests"]
+  verbs: ["create", "get", "list", "watch", "delete", "update", "patch"]
+
+# can read status (which contains api keys after approval)
+- apiGroups: ["extensions.kuadrant.io"]
+  resources: ["apikeyrequests/status"]
+  verbs: ["get", "list"]
+
+# note: users cannot update status - only admins can approve/reject

@@ -256,6 +256,85 @@ Replace `your-github-username` with the GitHub username(s) you want to grant adm
 - **Node 24**: Not supported due to isolated-vm compatibility
 - **PlanPolicy Status**: Controller creates RateLimitPolicy but may show enforcement errors until all operators are ready
 
+## RBAC and Permissions
+
+The plugin uses Backstage's permission framework with role-based access control.
+
+### User Roles
+
+**Platform Engineer (admin)**
+- Approve/reject API key requests
+- View and manage all API keys across all namespaces
+- Create and manage plan policies
+- Full access to Kuadrant resources page
+
+**App Developer**
+- View API products and plan policies
+- Request API keys for own use
+- View and manage only own API keys
+- Access to Kuadrant resources page
+
+**API Consumer**
+- Request API keys for APIs
+- View and manage only own API keys
+- Limited catalog access
+
+### Groups and Permissions
+
+**Groups** (defined in `rhdh-config-overlay/toystore.yaml`):
+- `platform-engineers` - Admin group
+- `app-developers` - Developer group
+- `api-consumers` - Consumer group
+
+**Permissions** (defined in backend):
+- `kuadrant.apikey.create` - Create API keys
+- `kuadrant.apikey.read.own` - Read own API keys
+- `kuadrant.apikey.read.all` - Read all API keys (admin)
+- `kuadrant.apikey.delete.own` - Delete own API keys
+- `kuadrant.apikey.delete.all` - Delete any API key (admin)
+- `kuadrant.policy.read` - View policies
+- `kuadrant.policy.write` - Create/update policies (admin)
+- `kuadrant.request.approve` - Approve API key requests (admin)
+
+**RBAC Policy** (`rhdh-config-overlay/rbac-policy.csv`):
+- Maps roles to permissions using Casbin policy format
+- Assigns users to roles via group membership
+
+### Testing with Different Users
+
+Switch between test users to verify RBAC behaviour:
+
+```bash
+# makefile targets
+make rhdh-user-admin      # platform engineer (can approve requests)
+make rhdh-user-developer  # app developer (cannot approve)
+make rhdh-user-consumer   # api consumer (limited access)
+
+# or use script directly
+./switch-user.sh admin
+```
+
+**Test users** (defined in `rhdh-config-overlay/users.yaml`):
+- `admin` - member of platform-engineers group
+- `developer` - member of app-developers group
+- `consumer` - member of api-consumers group
+
+After switching:
+1. Wait ~10 seconds for RHDH to restart
+2. Hard refresh browser (cmd+shift+r)
+3. You're now authenticated as the selected user
+
+This uses guest authentication with environment-based user switching for local testing.
+
+### Kubernetes RBAC
+
+The `config/rbac/` directory contains Kubernetes RBAC manifests for production deployments:
+
+- `api-key-requester-role.yaml` - Namespace-scoped role for users who can request API keys
+- `api-key-approver-clusterrole.yaml` - Cluster-scoped role for admins who can approve requests
+
+When deploying Backstage to Kubernetes/OpenShift, bind these roles to the Backstage service account. See `config/rbac/README.md` for detailed documentation.
+
 ## Troubleshooting
 
 Common issues:

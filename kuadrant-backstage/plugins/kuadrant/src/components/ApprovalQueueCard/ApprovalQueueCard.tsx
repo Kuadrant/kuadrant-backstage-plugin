@@ -21,26 +21,11 @@ import {
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
-
-interface ApiKeyRequest {
-  metadata: {
-    name: string;
-    creationTimestamp: string;
-  };
-  data: {
-    userId: string;
-    userEmail: string;
-    apiName: string;
-    apiNamespace: string;
-    planTier: string;
-    useCase: string;
-    requestedAt: string;
-  };
-}
+import { APIKeyRequest } from '../../types/api-management';
 
 interface ApprovalDialogProps {
   open: boolean;
-  request: ApiKeyRequest | null;
+  request: APIKeyRequest | null;
   action: 'approve' | 'reject';
   onClose: () => void;
   onConfirm: (comment: string) => void;
@@ -62,10 +47,10 @@ const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalD
       <DialogContent>
         {request && (
           <>
-            <p><strong>User:</strong> {request.data.userId}</p>
-            <p><strong>API:</strong> {request.data.apiName}</p>
-            <p><strong>Plan:</strong> {request.data.planTier}</p>
-            <p><strong>Use Case:</strong> {request.data.useCase}</p>
+            <p><strong>User:</strong> {request.spec.requestedBy.userId}</p>
+            <p><strong>API:</strong> {request.spec.apiName}</p>
+            <p><strong>Plan:</strong> {request.spec.planTier}</p>
+            <p><strong>Use Case:</strong> {request.spec.useCase || '-'}</p>
             <TextField
               label="Comment (optional)"
               multiline
@@ -98,7 +83,7 @@ export const ApprovalQueueCard = () => {
   const [refresh, setRefresh] = useState(0);
   const [dialogState, setDialogState] = useState<{
     open: boolean;
-    request: ApiKeyRequest | null;
+    request: APIKeyRequest | null;
     action: 'approve' | 'reject';
   }>({
     open: false,
@@ -111,7 +96,7 @@ export const ApprovalQueueCard = () => {
     const reviewedBy = identity.userEntityRef;
 
     const response = await fetchApi.fetch(
-      '/api/kuadrant/requests?status=pending'
+      '/api/kuadrant/requests?status=Pending'
     );
     if (!response.ok) {
       throw new Error('failed to fetch pending requests');
@@ -120,11 +105,11 @@ export const ApprovalQueueCard = () => {
     return { requests: data.items || [], reviewedBy };
   }, [refresh]);
 
-  const handleApprove = (request: ApiKeyRequest) => {
+  const handleApprove = (request: APIKeyRequest) => {
     setDialogState({ open: true, request, action: 'approve' });
   };
 
-  const handleReject = (request: ApiKeyRequest) => {
+  const handleReject = (request: APIKeyRequest) => {
     setDialogState({ open: true, request, action: 'reject' });
   };
 
@@ -132,8 +117,8 @@ export const ApprovalQueueCard = () => {
     if (!dialogState.request || !value) return;
 
     const endpoint = dialogState.action === 'approve'
-      ? `/api/kuadrant/requests/${dialogState.request.metadata.name}/approve`
-      : `/api/kuadrant/requests/${dialogState.request.metadata.name}/reject`;
+      ? `/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/approve`
+      : `/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/reject`;
 
     try {
       const response = await fetchApi.fetch(endpoint, {
@@ -166,45 +151,42 @@ export const ApprovalQueueCard = () => {
 
   const requests = value?.requests || [];
 
-  const columns: TableColumn<ApiKeyRequest>[] = [
+  const columns: TableColumn<APIKeyRequest>[] = [
     {
       title: 'User',
-      field: 'data.userId',
-      render: (row) => row.data.userId,
+      field: 'spec.requestedBy.userId',
+      render: (row) => row.spec.requestedBy.userId,
     },
     {
       title: 'API',
-      field: 'data.apiName',
-      render: (row) => row.data.apiName,
+      field: 'spec.apiName',
+      render: (row) => row.spec.apiName,
     },
     {
       title: 'Namespace',
-      field: 'data.apiNamespace',
-      render: (row) => row.data.apiNamespace,
+      field: 'spec.apiNamespace',
+      render: (row) => row.spec.apiNamespace,
     },
     {
       title: 'Plan',
-      field: 'data.planTier',
+      field: 'spec.planTier',
       render: (row) => (
         <Chip
-          label={row.data.planTier}
+          label={row.spec.planTier}
           size="small"
-          color={
-            row.data.planTier === 'gold' ? 'primary' :
-            row.data.planTier === 'silver' ? 'default' : 'secondary'
-          }
+          color="primary"
         />
       ),
     },
     {
       title: 'Use Case',
-      field: 'data.useCase',
-      render: (row) => row.data.useCase,
+      field: 'spec.useCase',
+      render: (row) => row.spec.useCase || '-',
     },
     {
       title: 'Requested',
-      field: 'data.requestedAt',
-      render: (row) => new Date(row.data.requestedAt).toLocaleString(),
+      field: 'spec.requestedAt',
+      render: (row) => row.spec.requestedAt ? new Date(row.spec.requestedAt).toLocaleString() : '-',
     },
     {
       title: 'Actions',

@@ -1,4 +1,4 @@
-.PHONY: help dev dev-rhdh install build export deploy clean kind-create kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init
+.PHONY: help dev dev-rhdh install build export deploy clean kind-create kind-delete kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init rhdh-user-admin rhdh-user-developer rhdh-user-consumer
 
 CLUSTER_NAME ?= local-cluster
 PLUGIN_DIR := kuadrant-backstage/plugins
@@ -23,6 +23,11 @@ help:
 	@echo "rhdh development:"
 	@echo "  make dev                 - start rhdh with plugins"
 	@echo "  make deploy              - rebuild plugins and restart rhdh (use after code changes)"
+	@echo ""
+	@echo "rhdh user switching (for testing rbac):"
+	@echo "  make rhdh-user-admin     - switch to admin user (can approve requests)"
+	@echo "  make rhdh-user-developer - switch to developer user (cannot approve)"
+	@echo "  make rhdh-user-consumer  - switch to consumer user (api consumer)"
 	@echo ""
 	@echo "plugin development:"
 	@echo "  make install             - install plugin dependencies"
@@ -65,9 +70,6 @@ build:
 		$(MAKE) install; \
 	fi
 	@echo ""
-	@echo "generating typescript declarations..."
-	@cd kuadrant-backstage && yarn tsc
-	@echo ""
 	@echo "building frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && yarn build
 	@echo ""
@@ -78,6 +80,12 @@ build:
 
 # export plugins as dynamic plugins
 export: build
+	@echo "cleaning old plugin exports..."
+	@rm -rf $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic
+	@rm -rf $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic
+	@rm -rf $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
+	@rm -rf $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
+	@echo ""
 	@echo "exporting frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
 	@echo ""
@@ -85,23 +93,17 @@ export: build
 	@cd $(PLUGIN_DIR)/$(BACKEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
 	@echo ""
 	@echo "copying plugins to rhdh-local..."
-	@rm -rf $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
-	@rm -rf $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
 	@cp -r $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
 	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
 	@echo "plugins exported to $(RHDH_LOCAL)/local-plugins/"
 
 # build, export, and restart rhdh (full deployment)
 deploy: export
-	@echo "removing old plugin installations to force refresh..."
-	@rm -rf $(RHDH_LOCAL)/dynamic-plugins-root/internal-plugin-kuadrant-dynamic-0.1.0 || true
-	@rm -rf $(RHDH_LOCAL)/dynamic-plugins-root/internal-plugin-kuadrant-backend-dynamic-0.1.0 || true
+	@echo "stopping rhdh and removing plugin cache..."
+	@cd $(RHDH_LOCAL) && docker compose down -v
 	@echo ""
-	@echo "installing dynamic plugins..."
-	@cd $(RHDH_LOCAL) && docker compose run --rm install-dynamic-plugins
-	@echo ""
-	@echo "restarting rhdh..."
-	@cd $(RHDH_LOCAL) && docker compose down && docker compose up -d
+	@echo "starting rhdh with fresh plugin installation..."
+	@cd $(RHDH_LOCAL) && docker compose up -d
 	@echo ""
 	@echo "rhdh restarted at http://localhost:7008"
 	@echo "waiting for rhdh to start..."
@@ -275,6 +277,16 @@ rhdh-setup-partial:
 	fi
 	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 
+# switch user for testing rbac
+rhdh-user-admin:
+	@./switch-user.sh admin
+
+rhdh-user-developer:
+	@./switch-user.sh developer
+
+rhdh-user-consumer:
+	@./switch-user.sh consumer
+
 # install kuadrant on existing cluster
 kuadrant-install: helm
 	@echo "installing gateway api crds..."
@@ -300,7 +312,9 @@ kuadrant-install: helm
 	@echo "creating kuadrant instance..."
 	@kubectl apply -f kuadrant-instance.yaml
 	@echo ""
-	@echo "installing planpolicy crd (alpha feature)..."
+	@echo "installing extension crds (apikeyrequest, apiproduct, planpolicy)..."
+	@kubectl apply -f config/crd/extensions.kuadrant.io_apikeyrequest.yaml
+	@kubectl apply -f config/crd/extensions.kuadrant.io_apiproduct.yaml
 	@kubectl apply -f https://raw.githubusercontent.com/Kuadrant/kuadrant-operator/main/config/crd/bases/extensions.kuadrant.io_planpolicies.yaml
 	@echo ""
 	@echo "creating rhdh service account and rbac..."

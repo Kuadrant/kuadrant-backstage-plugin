@@ -1,0 +1,57 @@
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: admin
+spec:
+  profile:
+    displayName: Platform Engineer
+    email: admin@example.com
+  memberOf: [platform-engineers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: developer
+spec:
+  profile:
+    displayName: App Developer
+    email: developer@example.com
+  memberOf: [app-developers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: consumer
+spec:
+  profile:
+    displayName: API Consumer
+    email: consumer@example.com
+  memberOf: [api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform-engineers
+  description: platform administrators who manage infrastructure and policies
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: app-developers
+  description: application developers who own apis
+spec:
+  type: team
+  children: []
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: api-consumers
+  description: developers who consume apis
+spec:
+  type: team
+  children: []

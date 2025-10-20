@@ -53,5 +53,9 @@
       "prettier --write"
     ]
   },
-  "packageManager": "yarn@4.4.1"
+  "packageManager": "yarn@4.4.1",
+  "dependencies": {
+    "@types/passport-local": "^1.0.38",
+    "passport-local": "^1.0.0"
+  }
 }

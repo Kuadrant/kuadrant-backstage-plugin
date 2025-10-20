@@ -1,0 +1,26 @@
+p, role:default/platform-engineer, kuadrant.apikey.create, create, allow
+p, role:default/platform-engineer, kuadrant.apikey.read.own, read, allow
+p, role:default/platform-engineer, kuadrant.apikey.read.all, read, allow
+p, role:default/platform-engineer, kuadrant.apikey.delete.own, delete, allow
+p, role:default/platform-engineer, kuadrant.apikey.delete.all, delete, allow
+p, role:default/platform-engineer, kuadrant.policy.read, read, allow
+p, role:default/platform-engineer, kuadrant.policy.write, update, allow
+p, role:default/platform-engineer, kuadrant.request.approve, update, allow
+p, role:default/platform-engineer, kuadrant.request.reject, update, allow
+
+p, role:default/app-developer, kuadrant.apikey.create, create, allow
+p, role:default/app-developer, kuadrant.apikey.read.own, read, allow
+p, role:default/app-developer, kuadrant.apikey.delete.own, delete, allow
+p, role:default/app-developer, kuadrant.policy.read, read, allow
+
+p, role:default/api-consumer, kuadrant.apikey.create, create, allow
+p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
+p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
+
+g, group:default/platform-engineers, role:default/platform-engineer
+g, group:default/app-developers, role:default/app-developer
+g, group:default/api-consumers, role:default/api-consumer
+
+# assign users to roles (for development with guest auth)
+g, user:default/admin, role:default/platform-engineer
+g, user:default/guest, role:default/platform-engineer
