@@ -1,4 +1,4 @@
-.PHONY: help dev dev-rhdh install build export deploy clean kind-create kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init
+.PHONY: help dev dev-rhdh install build export deploy clean kind-create kind-delete kuadrant-install kuadrant-uninstall demo-install demo-uninstall rhdh-setup rhdh-submodule-init rhdh-user-platform-engineer rhdh-user-api-owner rhdh-user-api-consumer
 
 CLUSTER_NAME ?= local-cluster
 PLUGIN_DIR := kuadrant-backstage/plugins
@@ -24,15 +24,20 @@ help:
 	@echo "  make dev                 - start rhdh with plugins"
 	@echo "  make deploy              - rebuild plugins and restart rhdh (use after code changes)"
 	@echo ""
+	@echo "rhdh user switching (for testing rbac):"
+	@echo "  make rhdh-user-platform-engineer - switch to platform engineer (manages infrastructure)"
+	@echo "  make rhdh-user-api-owner         - switch to api owner (approves requests)"
+	@echo "  make rhdh-user-api-consumer      - switch to api consumer (requests access)"
+	@echo ""
 	@echo "plugin development:"
 	@echo "  make install             - install plugin dependencies"
 	@echo "  make build               - build both plugins"
 	@echo "  make export              - export plugins as dynamic plugins"
 	@echo ""
 	@echo "kubernetes cluster (required):"
-	@echo "  make kind-create         - create kind cluster with kuadrant v1.3.0-alpha2"
+	@echo "  make kind-create         - create kind cluster with kuadrant v1.3.0"
 	@echo "  make kind-delete-cluster - delete kind cluster"
-	@echo "  make kuadrant-install    - install kuadrant v1.3.0-alpha2 on existing cluster"
+	@echo "  make kuadrant-install    - install kuadrant v1.3.0 on existing cluster"
 	@echo "  make kuadrant-uninstall  - uninstall kuadrant"
 	@echo "  make demo-install        - install toystore demo resources"
 	@echo "  make demo-uninstall      - uninstall toystore demo resources"
@@ -65,9 +70,6 @@ build:
 		$(MAKE) install; \
 	fi
 	@echo ""
-	@echo "generating typescript declarations..."
-	@cd kuadrant-backstage && yarn tsc
-	@echo ""
 	@echo "building frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && yarn build
 	@echo ""
@@ -78,30 +80,44 @@ build:
 
 # export plugins as dynamic plugins
 export: build
+	@echo "cleaning old plugin exports..."
+	@rm -rf $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic
+	@rm -rf $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic
+	@rm -rf $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
+	@rm -rf $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main
+	@rm -rf $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module
+	@echo ""
 	@echo "exporting frontend plugin..."
 	@cd $(PLUGIN_DIR)/$(FRONTEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
 	@echo ""
-	@echo "exporting backend plugin..."
-	@cd $(PLUGIN_DIR)/$(BACKEND_PLUGIN) && npx @red-hat-developer-hub/cli@latest plugin export
+	@echo "building backend plugin..."
+	@cd $(PLUGIN_DIR)/$(BACKEND_PLUGIN) && yarn build
 	@echo ""
-	@echo "copying plugins to rhdh-local..."
-	@rm -rf $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
-	@rm -rf $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
+	@echo "copying frontend plugin to rhdh-local..."
 	@cp -r $(PLUGIN_DIR)/$(FRONTEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(FRONTEND_PLUGIN)
-	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist-dynamic $(RHDH_LOCAL)/local-plugins/$(BACKEND_PLUGIN)
+	@echo ""
+	@echo "deploying backend as two separate packages..."
+	@mkdir -p $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/dist
+	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist/* $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/dist/
+	@printf '{\n  "name": "@internal/plugin-kuadrant-backend-dynamic",\n  "version": "0.1.0",\n  "main": "./dist/index.cjs.js",\n  "backstage": {\n    "role": "backend-plugin",\n    "pluginId": "kuadrant"\n  }\n}' > $(RHDH_LOCAL)/local-plugins/kuadrant-backend-main/package.json
+	@echo ""
+	@echo "deploying catalog module as separate package..."
+	@mkdir -p $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/dist
+	@cp -r $(PLUGIN_DIR)/$(BACKEND_PLUGIN)/dist/* $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/dist/
+	@printf '{\n  "name": "@internal/plugin-kuadrant-catalog-module",\n  "version": "0.1.0",\n  "main": "./dist/module.cjs.js",\n  "backstage": {\n    "role": "backend-plugin-module",\n    "pluginId": "catalog",\n    "pluginPackage": "@backstage/plugin-catalog-backend"\n  }\n}' > $(RHDH_LOCAL)/local-plugins/kuadrant-catalog-module/package.json
+	@echo ""
 	@echo "plugins exported to $(RHDH_LOCAL)/local-plugins/"
+	@echo "  - kuadrant (frontend)"
+	@echo "  - kuadrant-backend-main (http routes)"
+	@echo "  - kuadrant-catalog-module (entity provider)"
 
 # build, export, and restart rhdh (full deployment)
 deploy: export
-	@echo "removing old plugin installations to force refresh..."
-	@rm -rf $(RHDH_LOCAL)/dynamic-plugins-root/internal-plugin-kuadrant-dynamic-0.1.0 || true
-	@rm -rf $(RHDH_LOCAL)/dynamic-plugins-root/internal-plugin-kuadrant-backend-dynamic-0.1.0 || true
+	@echo "stopping rhdh and removing plugin cache..."
+	@cd $(RHDH_LOCAL) && docker compose down -v
 	@echo ""
-	@echo "installing dynamic plugins..."
-	@cd $(RHDH_LOCAL) && docker compose run --rm install-dynamic-plugins
-	@echo ""
-	@echo "restarting rhdh..."
-	@cd $(RHDH_LOCAL) && docker compose down && docker compose up -d
+	@echo "starting rhdh with fresh plugin installation..."
+	@cd $(RHDH_LOCAL) && docker compose up -d
 	@echo ""
 	@echo "rhdh restarted at http://localhost:7008"
 	@echo "waiting for rhdh to start..."
@@ -275,6 +291,16 @@ rhdh-setup-partial:
 	fi
 	@$(RHDH_OVERLAY)/patch-compose.sh $(RHDH_LOCAL)/compose.yaml
 
+# switch user for testing rbac
+rhdh-user-platform-engineer:
+	@./switch-user.sh platform-engineer
+
+rhdh-user-api-owner:
+	@./switch-user.sh api-owner
+
+rhdh-user-api-consumer:
+	@./switch-user.sh api-consumer
+
 # install kuadrant on existing cluster
 kuadrant-install: helm
 	@echo "installing gateway api crds..."
@@ -287,20 +313,21 @@ kuadrant-install: helm
 	@$(HELM_V_BINARY) upgrade --install istio-base istio/base -n istio-system --wait
 	@$(HELM_V_BINARY) upgrade --install istiod istio/istiod -n istio-system --wait
 	@echo ""
-	@echo "installing kuadrant operator v1.3.0-rc2 (with extensions enabled)..."
+	@echo "installing kuadrant operator v1.3.0..."
 	@kubectl create namespace kuadrant-system --dry-run=client -o yaml | kubectl apply -f -
 	@$(HELM_V_BINARY) repo add kuadrant https://kuadrant.io/helm-charts/ 2>/dev/null || true
 	@$(HELM_V_BINARY) repo update kuadrant
 	@$(HELM_V_BINARY) upgrade --install kuadrant-operator kuadrant/kuadrant-operator \
-		--version 1.3.0-rc2 \
-		--devel \
+		--version 1.3.0 \
 		-n kuadrant-system \
 		--wait
 	@echo ""
 	@echo "creating kuadrant instance..."
 	@kubectl apply -f kuadrant-instance.yaml
 	@echo ""
-	@echo "installing planpolicy crd (alpha feature)..."
+	@echo "installing extension crds (apikeyrequest, apiproduct, planpolicy)..."
+	@kubectl apply -f config/crd/extensions.kuadrant.io_apikeyrequest.yaml
+	@kubectl apply -f config/crd/extensions.kuadrant.io_apiproduct.yaml
 	@kubectl apply -f https://raw.githubusercontent.com/Kuadrant/kuadrant-operator/main/config/crd/bases/extensions.kuadrant.io_planpolicies.yaml
 	@echo ""
 	@echo "creating rhdh service account and rbac..."

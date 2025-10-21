@@ -4,9 +4,11 @@ Backstage plugin for managing Kuadrant API access - enables self-service API key
 
 ## Features
 
-- **API Access Management** - Request and manage API keys for catalog APIs
+- **API Product Management** - Browse published APIs with plan tiers and rate limits
+- **API Access Requests** - Self-service API key request and approval workflow
 - **Plan-Based Rate Limiting** - Gold/Silver/Bronze tier support via Kuadrant PlanPolicy
-- **Kuadrant Resource Visibility** - View AuthPolicies, RateLimitPolicies, PlanPolicies, and API keys
+- **API Key Management** - View, manage, and delete API keys with show/hide functionality
+- **Admin Approval Queue** - Platform admins can review and approve access requests
 - **Kubernetes Integration** - Automatic cluster access via service account or local kubeconfig
 
 ## Quick Start
@@ -58,7 +60,7 @@ For new users:
 - Gateway API v1.2.0
 - Istio (gateway implementation)
 - Kuadrant Operator v1.3.0-rc2 (with extensions enabled)
-- Demo resources: Toystore API with AuthPolicy and PlanPolicy
+- Demo resources: Toystore API with APIProduct, AuthPolicy, and PlanPolicy
 
 ## Architecture
 
@@ -123,23 +125,30 @@ curl -H 'Host: api.toystore.com' \
 
 ## Plugin Capabilities
 
-### API Access Card
-- Displays available plan tiers (Gold/Silver/Bronze)
-- Shows rate limits per tier
-- Request API key button
-- Integrated on API entity pages
+### API Products Page (Kuadrant)
+- Browse published APIProduct resources
+- View API products with plan information
+- Admin approval queue for pending access requests
+- Role-based access (platform engineers only)
 
-### API Key Management Tab
-- View user's API keys
-- Show/hide key values
-- Delete keys
-- Displays plan tier and creation date
+### API Access Card (on API entity pages)
+- View API product details and available plan tiers
+- See rate limits per tier (Gold/Silver/Bronze)
+- Link to API Keys tab for request management
+- Read-only summary of API access options
 
-### Kuadrant Resources Page
-- List all Kuadrant policies
-- View AuthPolicies, RateLimitPolicies, PlanPolicies
-- Filter by namespace
-- Detailed resource view
+### API Key Management Tab (on API entity pages)
+- Request API key with plan selection and use case
+- View user's pending, approved, and rejected requests
+- Show/hide API key values securely
+- Delete API keys
+- Displays plan tier, creation date, and request status
+
+### Admin Approval Queue (platform engineers)
+- Review pending API key requests
+- Approve or reject with comments
+- View request details (user, API, plan, use case)
+- Automatically creates secrets on approval
 
 ## Configuration
 
@@ -255,6 +264,87 @@ Replace `your-github-username` with the GitHub username(s) you want to grant adm
 
 - **Node 24**: Not supported due to isolated-vm compatibility
 - **PlanPolicy Status**: Controller creates RateLimitPolicy but may show enforcement errors until all operators are ready
+
+## RBAC and Permissions
+
+The plugin uses Backstage's permission framework with role-based access control.
+
+### User Roles
+
+**Platform Engineer (admin)**
+- Approve/reject API key requests
+- View and manage all API keys across all namespaces
+- Access to API products page with admin approval queue
+- Full visibility of all pending requests
+
+**App Developer**
+- View API products
+- Request API keys for own use
+- View and manage only own API keys
+- Access to API products page (view only)
+
+**API Consumer**
+- Request API keys for APIs
+- View and manage only own API keys
+- Limited catalog access
+
+### Groups and Permissions
+
+**Groups** (defined in `rhdh-config-overlay/toystore.yaml`):
+- `platform-engineers` - Admin group
+- `app-developers` - Developer group
+- `api-consumers` - Consumer group
+
+**Permissions** (defined in backend):
+- `kuadrant.apiproduct.read` - View API products
+- `kuadrant.request.create` - Create API key requests
+- `kuadrant.request.read.own` - Read own requests
+- `kuadrant.request.read.all` - Read all requests (admin)
+- `kuadrant.request.approve` - Approve API key requests (admin)
+- `kuadrant.request.reject` - Reject API key requests (admin)
+- `kuadrant.apikey.read.own` - Read own API keys
+- `kuadrant.apikey.read.all` - Read all API keys (admin)
+- `kuadrant.apikey.delete.own` - Delete own API keys
+- `kuadrant.apikey.delete.all` - Delete any API key (admin)
+
+**RBAC Policy** (`rhdh-config-overlay/rbac-policy.csv`):
+- Maps roles to permissions using Casbin policy format
+- Assigns users to roles via group membership
+
+### Testing with Different Users
+
+Switch between test users to verify RBAC behaviour:
+
+```bash
+# makefile targets
+make rhdh-user-admin      # platform engineer (can approve requests)
+make rhdh-user-developer  # app developer (cannot approve)
+make rhdh-user-consumer   # api consumer (limited access)
+
+# or use script directly
+./switch-user.sh admin
+```
+
+**Test users** (defined in `rhdh-config-overlay/users.yaml`):
+- `admin` - member of platform-engineers group
+- `developer` - member of app-developers group
+- `consumer` - member of api-consumers group
+
+After switching:
+1. Wait ~10 seconds for RHDH to restart
+2. Hard refresh browser (cmd+shift+r)
+3. You're now authenticated as the selected user
+
+This uses guest authentication with environment-based user switching for local testing.
+
+### Kubernetes RBAC
+
+The `config/rbac/` directory contains Kubernetes RBAC manifests for production deployments:
+
+- `api-key-requester-role.yaml` - Namespace-scoped role for users who can request API keys
+- `api-key-approver-clusterrole.yaml` - Cluster-scoped role for admins who can approve requests
+
+When deploying Backstage to Kubernetes/OpenShift, bind these roles to the Backstage service account. See `config/rbac/README.md` for detailed documentation.
 
 ## Troubleshooting
 

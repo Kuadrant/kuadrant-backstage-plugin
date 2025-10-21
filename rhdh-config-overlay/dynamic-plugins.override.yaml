@@ -32,18 +32,44 @@ plugins:
               - mountPoint: entity.page.api-keys/cards
                 importName: EntityKuadrantApiKeysContent
                 config:
+                  layout:
+                    gridColumnEnd:
+                      lg: "span 12"
+                      md: "span 12"
+                      xs: "span 12"
+                  if:
+                    allOf:
+                      - isKind: api
+              - mountPoint: entity.page.api-product/cards
+                importName: EntityKuadrantApiProductInfoContent
+                config:
+                  layout:
+                    gridColumnEnd:
+                      lg: "span 12"
+                      md: "span 12"
+                      xs: "span 12"
                   if:
                     allOf:
                       - isKind: api
             entityTabs:
+              - path: /api-product
+                title: API Product
+                mountPoint: entity.page.api-product
+                if:
+                  allOf:
+                    - isKind: api
               - path: /api-keys
                 title: API Keys
                 mountPoint: entity.page.api-keys
                 if:
                   allOf:
                     - isKind: api
-  - package: ./local-plugins/kuadrant-backend
+  - package: ./local-plugins/kuadrant-backend-main
     disabled: false
+    pluginConfig: {}
+  - package: ./local-plugins/kuadrant-catalog-module
+    disabled: false
+    pluginConfig: {}
   - package: ./dynamic-plugins/dist/backstage-community-plugin-rbac
     disabled: false
     pluginConfig:

@@ -6,6 +6,13 @@ backend:
   baseUrl: http://localhost:7008
   listen:
     port: 7007
+  auth:
+    keys:
+      - secret: ${BACKEND_SECRET:-'only-for-local-development-please-change-me'}
+  database:
+    client: better-sqlite3
+    connection:
+      directory: /opt/app-root/src/data
 
 extensions:
   installation:
@@ -14,26 +21,30 @@ extensions:
       file: /opt/app-root/src/configs/dynamic-plugins/dynamic-plugins.override.yaml
 
 permission:
-  enabled: false
-  # uncomment to enable rbac with github auth
-  # rbac:
-  #   admin:
-  #     users:
-  #       - name: user:default/your-github-username
-  #     superUsers:
-  #       - name: user:default/your-github-username
+  enabled: true
+  rbac:
+    policies-csv-file: /opt/app-root/src/configs/extra-files/rbac-policy.csv
+    admin:
+      users:
+        - name: user:default/admin
+        - name: user:default/guest  # allow guest user as admin in development
+      superUsers:
+        - name: user:default/admin
+        - name: user:default/guest  # allow guest user as superuser in development
 
 auth:
   environment: development
+  providers:
+    guest:
+      userEntityRef: user:default/${AUTH_GUEST_USER:-guest}
   # uncomment to enable github auth (requires oauth app credentials in .env)
-  # providers:
-  #   github:
-  #     development:
-  #       clientId: ${AUTH_GITHUB_CLIENT_ID}
-  #       clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
-  #       signIn:
-  #         resolvers:
-  #           - resolver: usernameMatchingUserEntityName
+  # github:
+  #   development:
+  #     clientId: ${AUTH_GITHUB_CLIENT_ID}
+  #     clientSecret: ${AUTH_GITHUB_CLIENT_SECRET}
+  #     signIn:
+  #       resolvers:
+  #         - resolver: usernameMatchingUserEntityName
 
 # uncomment to enable github integration (requires GITHUB_TOKEN in .env)
 # integrations:
@@ -59,6 +70,10 @@ catalog:
       target: /opt/app-root/src/configs/catalog-entities/toystore.yaml
       rules:
         - allow: [Component, API]
+    - type: file
+      target: /opt/app-root/src/configs/catalog-entities/users.yaml
+      rules:
+        - allow: [User, Group]
 
 dynamicPlugins:
   frontend:
@@ -70,6 +85,12 @@ dynamicPlugins:
             text: Kuadrant
             icon: category
       entityTabs:
+        - path: /api-product
+          title: API Product
+          mountPoint: entity.page.api-product
+          if:
+            allOf:
+              - isKind: api
         - path: /api-keys
           title: API Keys
           mountPoint: entity.page.api-keys
@@ -85,9 +106,25 @@ dynamicPlugins:
                 lg: "span 4"
                 md: "span 6"
                 xs: "span 12"
+        - mountPoint: entity.page.api-product/cards
+          importName: EntityKuadrantApiProductInfoContent
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 12"
+                md: "span 12"
+                xs: "span 12"
+            if:
+              allOf:
+                - isKind: api
         - mountPoint: entity.page.api-keys/cards
           importName: EntityKuadrantApiKeysContent
           config:
+            layout:
+              gridColumnEnd:
+                lg: "span 12"
+                md: "span 12"
+                xs: "span 12"
             if:
               allOf:
                 - isKind: api

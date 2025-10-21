@@ -71,10 +71,10 @@ export class KuadrantK8sClient {
   ): Promise<K8sList> {
     try {
       const response = namespace
-        ? await this.customApi.listNamespacedCustomObject({ group, version, namespace, plural })
-        : await this.customApi.listClusterCustomObject({ group, version, plural });
+        ? await this.customApi.listNamespacedCustomObject(group, version, namespace, plural)
+        : await this.customApi.listClusterCustomObject(group, version, plural);
 
-      return response as any as K8sList;
+      return response.body as K8sList;
     } catch (error: any) {
       throw new Error(`failed to list ${plural}: ${error.message}`);
     }
@@ -88,14 +88,14 @@ export class KuadrantK8sClient {
     name: string,
   ): Promise<K8sResource> {
     try {
-      const response = await this.customApi.getNamespacedCustomObject({
+      const response = await this.customApi.getNamespacedCustomObject(
         group,
         version,
         namespace,
         plural,
         name,
-      });
-      return response as any as K8sResource;
+      );
+      return response.body as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to get ${plural}/${name}: ${error.message}`);
     }
@@ -103,7 +103,7 @@ export class KuadrantK8sClient {
 
   async createSecret(namespace: string, secret: K8sResource): Promise<K8sResource> {
     try {
-      const response = await this.coreApi.createNamespacedSecret({ namespace, body: secret as k8s.V1Secret }) as any;
+      const response = await this.coreApi.createNamespacedSecret(namespace, secret as k8s.V1Secret);
       return response as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to create secret: ${error.message}`);
@@ -112,16 +112,25 @@ export class KuadrantK8sClient {
 
   async listSecrets(namespace: string): Promise<K8sList> {
     try {
-      const response = await this.coreApi.listNamespacedSecret({ namespace }) as any;
+      const response = await this.coreApi.listNamespacedSecret(namespace);
       return { items: (response.items || []) as unknown as K8sResource[] };
     } catch (error: any) {
       throw new Error(`failed to list secrets: ${error.message}`);
     }
   }
 
+  async getSecret(namespace: string, name: string): Promise<K8sResource> {
+    try {
+      const response = await this.coreApi.readNamespacedSecret(name, namespace);
+      return response as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to get secret: ${error.message}`);
+    }
+  }
+
   async deleteSecret(namespace: string, name: string): Promise<void> {
     try {
-      await this.coreApi.deleteNamespacedSecret({ name, namespace });
+      await this.coreApi.deleteNamespacedSecret(name, namespace);
     } catch (error: any) {
       throw new Error(`failed to delete secret: ${error.message}`);
     }
@@ -129,7 +138,7 @@ export class KuadrantK8sClient {
 
   async createConfigMap(namespace: string, configMap: K8sResource): Promise<K8sResource> {
     try {
-      const response = await this.coreApi.createNamespacedConfigMap({ namespace, body: configMap as k8s.V1ConfigMap }) as any;
+      const response = await this.coreApi.createNamespacedConfigMap(namespace, configMap as k8s.V1ConfigMap);
       return response as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to create configmap: ${error.message}`);
@@ -138,7 +147,7 @@ export class KuadrantK8sClient {
 
   async listConfigMaps(namespace: string, labelSelector?: string): Promise<K8sList> {
     try {
-      const response = await this.coreApi.listNamespacedConfigMap({ namespace, labelSelector }) as any;
+      const response = await this.coreApi.listNamespacedConfigMap(namespace, undefined, undefined, undefined, undefined, labelSelector);
       return { items: (response.items || []) as unknown as K8sResource[] };
     } catch (error: any) {
       throw new Error(`failed to list configmaps: ${error.message}`);
@@ -147,7 +156,7 @@ export class KuadrantK8sClient {
 
   async getConfigMap(namespace: string, name: string): Promise<K8sResource> {
     try {
-      const response = await this.coreApi.readNamespacedConfigMap({ namespace, name }) as any;
+      const response = await this.coreApi.readNamespacedConfigMap(name, namespace);
       return response as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to get configmap: ${error.message}`);
@@ -156,12 +165,8 @@ export class KuadrantK8sClient {
 
   async updateConfigMap(namespace: string, name: string, configMap: K8sResource): Promise<K8sResource> {
     try {
-      const response = await this.coreApi.replaceNamespacedConfigMap({
-        namespace,
-        name,
-        body: configMap as k8s.V1ConfigMap,
-      }) as any;
-      return response as K8sResource;
+      const response = await this.coreApi.replaceNamespacedConfigMap(name, namespace, configMap as k8s.V1ConfigMap);
+      return response.body as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to update configmap: ${error.message}`);
     }
@@ -169,9 +174,120 @@ export class KuadrantK8sClient {
 
   async deleteConfigMap(namespace: string, name: string): Promise<void> {
     try {
-      await this.coreApi.deleteNamespacedConfigMap({ name, namespace });
+      await this.coreApi.deleteNamespacedConfigMap(name, namespace);
     } catch (error: any) {
       throw new Error(`failed to delete configmap: ${error.message}`);
     }
   }
+
+  async createCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    resource: K8sResource,
+  ): Promise<K8sResource> {
+    try {
+      const response = await this.customApi.createNamespacedCustomObject(
+        group,
+        version,
+        namespace,
+        plural,
+        resource as any,
+      );
+      return response.body as K8sResource;
+    } catch (error: any) {
+      // extract detailed error from kubernetes api response
+      const statusCode = error.response?.statusCode || error.statusCode;
+      const body = error.response?.body || error.body;
+      const message = body?.message || error.message;
+      const reason = body?.reason;
+      const details = body?.details;
+
+      console.error(`failed to create ${plural}:`, {
+        statusCode,
+        message,
+        reason,
+        details: JSON.stringify(details),
+      });
+
+      throw new Error(`failed to create ${plural}: ${message}${reason ? ` (${reason})` : ''}`);
+    }
+  }
+
+  async deleteCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+  ): Promise<void> {
+    try {
+      await this.customApi.deleteNamespacedCustomObject(
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+      );
+    } catch (error: any) {
+      throw new Error(`failed to delete ${plural}/${name}: ${error.message}`);
+    }
+  }
+
+  async patchCustomResource(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+    patch: any,
+  ): Promise<K8sResource> {
+    try {
+      const response = await this.customApi.patchNamespacedCustomObject(
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+        patch,
+      );
+      return response.body as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to patch ${plural}/${name}: ${error.message}`);
+    }
+  }
+
+  async patchCustomResourceStatus(
+    group: string,
+    version: string,
+    namespace: string,
+    plural: string,
+    name: string,
+    status: any,
+  ): Promise<K8sResource> {
+    try {
+      // get the existing resource first
+      const existing = await this.getCustomResource(group, version, namespace, plural, name);
+
+      // replace the entire resource with updated status
+      const updated = {
+        ...existing,
+        status,
+      };
+
+      const response = await this.customApi.replaceNamespacedCustomObjectStatus(
+        group,
+        version,
+        namespace,
+        plural,
+        name,
+        updated,
+      );
+      return response.body as K8sResource;
+    } catch (error: any) {
+      throw new Error(`failed to patch ${plural}/${name} status: ${error.message}`);
+    }
+  }
 }
+

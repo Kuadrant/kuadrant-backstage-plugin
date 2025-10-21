@@ -1,0 +1,176 @@
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: apiproducts.extensions.kuadrant.io
+spec:
+  group: extensions.kuadrant.io
+  names:
+    kind: APIProduct
+    listKind: APIProductList
+    plural: apiproducts
+    singular: apiproduct
+    shortNames:
+    - apip
+  scope: Namespaced
+  versions:
+  - name: v1alpha1
+    served: true
+    storage: true
+    schema:
+      openAPIV3Schema:
+        type: object
+        properties:
+          spec:
+            type: object
+            required:
+            - displayName
+            - planPolicyRef
+            - plans
+            properties:
+              displayName:
+                type: string
+                description: human-readable name for the api product
+              description:
+                type: string
+                description: detailed description of the api product
+              version:
+                type: string
+                description: api version (e.g. v1, v2)
+              tags:
+                type: array
+                description: tags for categorisation and search
+                items:
+                  type: string
+              planPolicyRef:
+                type: object
+                description: reference to the planpolicy that defines rate limits
+                required:
+                - name
+                - namespace
+                properties:
+                  name:
+                    type: string
+                  namespace:
+                    type: string
+              plans:
+                type: array
+                description: cached plan information from planpolicy (visible to consumers)
+                minItems: 1
+                items:
+                  type: object
+                  required:
+                  - tier
+                  properties:
+                    tier:
+                      type: string
+                      enum: [gold, silver, bronze]
+                      description: plan tier name
+                    description:
+                      type: string
+                      description: human-readable description of this plan
+                    limits:
+                      type: object
+                      description: rate limit summary for this plan
+                      properties:
+                        daily:
+                          type: integer
+                          description: daily request limit
+                        weekly:
+                          type: integer
+                          description: weekly request limit
+                        monthly:
+                          type: integer
+                          description: monthly request limit
+                        custom:
+                          type: array
+                          description: custom rate limits
+                          items:
+                            type: object
+                            required:
+                            - limit
+                            - window
+                            properties:
+                              limit:
+                                type: integer
+                              window:
+                                type: string
+                                pattern: ^([0-9]{1,5}(h|m|s|ms)){1,4}$
+              documentation:
+                type: object
+                description: api documentation links
+                properties:
+                  openAPISpec:
+                    type: string
+                    description: url to openapi specification (json/yaml)
+                  swaggerUI:
+                    type: string
+                    description: url to swagger ui or similar interactive docs
+                  docsURL:
+                    type: string
+                    description: url to general documentation
+                  gitRepository:
+                    type: string
+                    description: url to git repository
+              contact:
+                type: object
+                description: contact information for api owners
+                properties:
+                  team:
+                    type: string
+                    description: team name
+                  email:
+                    type: string
+                    format: email
+                    description: contact email
+                  slack:
+                    type: string
+                    description: slack channel (e.g. #api-support)
+                  url:
+                    type: string
+                    description: url to team page or support portal
+          status:
+            type: object
+            properties:
+              conditions:
+                type: array
+                items:
+                  type: object
+                  required:
+                  - type
+                  - status
+                  properties:
+                    type:
+                      type: string
+                    status:
+                      type: string
+                      enum: ["True", "False", "Unknown"]
+                    reason:
+                      type: string
+                    message:
+                      type: string
+                    lastTransitionTime:
+                      type: string
+                      format: date-time
+              planPolicyStatus:
+                type: string
+                description: status of referenced planpolicy (Accepted/Enforced/etc)
+              lastSyncTime:
+                type: string
+                format: date-time
+                description: last time plan data was synced from planpolicy
+    additionalPrinterColumns:
+    - name: Display Name
+      type: string
+      jsonPath: .spec.displayName
+    - name: Version
+      type: string
+      jsonPath: .spec.version
+    - name: Plans
+      type: string
+      jsonPath: .spec.plans[*].tier
+      description: Available plan tiers
+    - name: Age
+      type: date
+      jsonPath: .metadata.creationTimestamp
+    subresources:
+      status: {}

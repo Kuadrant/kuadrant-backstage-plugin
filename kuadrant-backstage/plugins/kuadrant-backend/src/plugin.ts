@@ -12,71 +12,33 @@ import { createRouter } from './router';
 export const kuadrantPlugin = createBackendPlugin({
   pluginId: 'kuadrant',
   register(env) {
+    // register http router
     env.registerInit({
       deps: {
         httpAuth: coreServices.httpAuth,
+        userInfo: coreServices.userInfo,
         httpRouter: coreServices.httpRouter,
         config: coreServices.rootConfig,
+        permissions: coreServices.permissions,
       },
-      async init({ httpAuth, httpRouter, config }) {
-        // allow unauthenticated access to kuadrant resource endpoints
+      async init({ httpAuth, userInfo, httpRouter, config, permissions }) {
+        // allow unauthenticated access at HTTP router level
+        // authorization is enforced in the router via:
+        // 1. group-based checks (isAdmin from platform-engineers group)
+        // 2. permission framework checks (when credentials available)
+        // this allows the app to work in development mode with guest auth
+        // while still providing proper authorization
         httpRouter.addAuthPolicy({
-          path: '/authpolicies',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/ratelimitpolicies',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/dnspolicies',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/tlspolicies',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/planpolicies',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/planpolicies/:namespace/:name',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/apikeys',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/apikeys/:namespace/:name',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/:kind/:namespace/:name',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/requests',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/requests/my',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/requests/:id/approve',
-          allow: 'unauthenticated',
-        });
-        httpRouter.addAuthPolicy({
-          path: '/requests/:id/reject',
+          path: '/',
           allow: 'unauthenticated',
         });
 
         httpRouter.use(
           await createRouter({
             httpAuth,
+            userInfo,
             config,
+            permissions,
           }),
         );
       },

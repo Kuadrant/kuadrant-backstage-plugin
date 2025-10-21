@@ -23,7 +23,7 @@ import {
   FormControl,
   InputLabel,
 } from '@material-ui/core';
-import { useApi, configApiRef, identityApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
@@ -31,6 +31,7 @@ import DeleteIcon from '@material-ui/icons/Delete';
 import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
+import { APIKeyRequest } from '../../types/api-management';
 
 interface Secret {
   metadata: {
@@ -50,29 +51,7 @@ interface Secret {
   };
 }
 
-interface ApiKeyRequest {
-  metadata: {
-    name: string;
-    creationTimestamp: string;
-    labels?: {
-      'kuadrant.io/status'?: string;
-    };
-  };
-  data: {
-    userId: string;
-    userEmail: string;
-    apiName: string;
-    apiNamespace: string;
-    planTier: string;
-    useCase: string;
-    requestedAt: string;
-    reviewedBy?: string;
-    reviewedAt?: string;
-    reviewComment?: string;
-  };
-}
-
-interface PlanPolicy {
+interface APIProduct {
   metadata: {
     name: string;
     namespace: string;
@@ -80,6 +59,7 @@ interface PlanPolicy {
   spec: {
     plans?: Array<{
       tier: string;
+      description?: string;
       limits?: any;
     }>;
   };
@@ -91,7 +71,6 @@ interface Plan {
 }
 
 export interface ApiKeyManagementTabProps {
-  // deprecated: use entity annotations instead
   namespace?: string;
 }
 
@@ -99,6 +78,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const { entity } = useEntity();
   const config = useApi(configApiRef);
   const identityApi = useApi(identityApiRef);
+  const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
@@ -110,12 +90,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  // read from entity annotations, fallback to props for backwards compat
   const httproute = entity.metadata.annotations?.['kuadrant.io/httproute'] || entity.metadata.name;
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'] || propNamespace || 'default';
-  const apiName = httproute; // use httproute name as api name for filtering requests
+  const apiName = httproute;
 
-  // get current user identity
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
     const profile = await identityApi.getProfileInfo();
@@ -125,7 +103,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
   const { value: apiKeys, loading: keysLoading, error: keysError } = useAsync(async () => {
     if (!userId) return [];
-    const response = await fetch(
+    const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/apikeys?namespace=${namespace}&userId=${userId}`
     );
     if (!response.ok) {
@@ -133,41 +111,40 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     }
     const data = await response.json();
     return data.items || [];
-  }, [namespace, userId, refresh]);
+  }, [namespace, userId, refresh, fetchApi]);
 
   const { value: requests, loading: requestsLoading, error: requestsError } = useAsync(async () => {
     if (!userId) return [];
-    const response = await fetch(
-      `${backendUrl}/api/kuadrant/requests/my?userId=${userId}`
+    const response = await fetchApi.fetch(
+      `${backendUrl}/api/kuadrant/requests/my?userId=${userId}&namespace=${namespace}`
     );
     if (!response.ok) {
       throw new Error('failed to fetch requests');
     }
     const data = await response.json();
-    // filter for this api only
     return (data.items || []).filter(
-      (r: ApiKeyRequest) => r.data.apiName === apiName && r.data.apiNamespace === namespace
+      (r: APIKeyRequest) => r.spec.apiName === apiName && r.spec.apiNamespace === namespace
     );
-  }, [userId, apiName, namespace, refresh]);
+  }, [userId, apiName, namespace, refresh, fetchApi]);
 
-  const { value: planPolicy, loading: plansLoading, error: plansError } = useAsync(async () => {
-    const response = await fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+  const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
     if (!response.ok) {
-      throw new Error('failed to fetch plan policies');
+      throw new Error('failed to fetch api products');
     }
     const data = await response.json();
 
-    // find plan policy for this api
-    const policy = data.items?.find((p: PlanPolicy) =>
-      p.metadata.namespace === namespace
+    const product = data.items?.find((p: APIProduct) =>
+      p.metadata.namespace === namespace &&
+      (p.metadata.name === apiName || p.metadata.name === `${apiName}-api`)
     );
 
-    return policy;
-  }, [namespace]);
+    return product;
+  }, [namespace, apiName, fetchApi]);
 
   const handleDelete = async (name: string) => {
     try {
-      const response = await fetch(
+      const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/apikeys/${namespace}/${name}`,
         { method: 'DELETE' }
       );
@@ -177,6 +154,21 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       setRefresh(r => r + 1);
     } catch (err) {
       console.error('error deleting api key:', err);
+    }
+  };
+
+  const handleDeleteRequest = async (name: string) => {
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
+        { method: 'DELETE' }
+      );
+      if (!response.ok) {
+        throw new Error('failed to delete request');
+      }
+      setRefresh(r => r + 1);
+    } catch (err) {
+      console.error('error deleting request:', err);
     }
   };
 
@@ -193,12 +185,12 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   };
 
   const handleRequestAccess = async () => {
-    if (!selectedPlan || !useCase.trim()) return;
+    if (!selectedPlan) return;
 
     setCreating(true);
     setCreateError(null);
     try {
-      const response = await fetch(`${backendUrl}/api/kuadrant/requests`, {
+      const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/requests`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -209,7 +201,8 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           userId,
           userEmail,
           planTier: selectedPlan,
-          useCase: useCase.trim(),
+          useCase: useCase.trim() || '',
+          namespace,
         }),
       });
 
@@ -242,11 +235,12 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   }
 
   const secrets = (apiKeys || []) as Secret[];
-  const myRequests = (requests || []) as ApiKeyRequest[];
-  const plans = (planPolicy?.spec?.plans || []) as Plan[];
+  const myRequests = (requests || []) as APIKeyRequest[];
+  const plans = (apiProduct?.spec?.plans || []) as Plan[];
 
-  const pendingRequests = myRequests.filter(r => r.metadata.labels?.['kuadrant.io/status'] === 'pending');
-  const rejectedRequests = myRequests.filter(r => r.metadata.labels?.['kuadrant.io/status'] === 'rejected');
+  const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
+  const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
+  const rejectedRequests = myRequests.filter(r => r.status?.phase === 'Rejected');
 
   const columns: TableColumn<Secret>[] = [
     {
@@ -334,63 +328,130 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     },
   ];
 
-  const requestColumns: TableColumn<ApiKeyRequest>[] = [
+  const approvedColumns: TableColumn<APIKeyRequest>[] = [
+    {
+      title: 'Plan Tier',
+      field: 'spec.planTier',
+      render: (row: APIKeyRequest) => (
+        <Chip label={row.spec.planTier} color="primary" size="small" />
+      ),
+    },
+    {
+      title: 'Approved',
+      field: 'status.reviewedAt',
+      render: (row: APIKeyRequest) => (
+        <Typography variant="body2">
+          {row.status?.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '-'}
+        </Typography>
+      ),
+    },
+    {
+      title: 'API Key',
+      field: 'status.apiKey',
+      searchable: false,
+      render: (row: APIKeyRequest) => {
+        const isVisible = visibleKeys.has(row.metadata.name);
+        const apiKey = row.status?.apiKey || 'N/A';
+
+        return (
+          <Box display="flex" alignItems="center">
+            <Typography
+              variant="body2"
+              style={{
+                fontFamily: 'monospace',
+                marginRight: 8,
+              }}
+            >
+              {isVisible ? apiKey : '••••••••••••••••'}
+            </Typography>
+            <IconButton
+              size="small"
+              onClick={() => toggleVisibility(row.metadata.name)}
+            >
+              {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
+            </IconButton>
+          </Box>
+        );
+      },
+    },
+  ];
+
+  const requestColumns: TableColumn<APIKeyRequest>[] = [
     {
       title: 'Status',
-      field: 'metadata.labels',
-      render: (row: ApiKeyRequest) => {
-        const status = row.metadata.labels?.['kuadrant.io/status'] || 'unknown';
+      field: 'status.phase',
+      render: (row: APIKeyRequest) => {
+        const phase = row.status?.phase || 'Pending';
+        const isPending = phase === 'Pending';
         return (
           <Chip
-            label={status}
+            label={phase}
             size="small"
-            icon={status === 'pending' ? <HourglassEmptyIcon /> : <CancelIcon />}
-            color={status === 'pending' ? 'default' : 'secondary'}
+            icon={isPending ? <HourglassEmptyIcon /> : <CancelIcon />}
+            color={isPending ? 'default' : 'secondary'}
           />
         );
       },
     },
     {
       title: 'Plan Tier',
-      field: 'data.planTier',
-      render: (row: ApiKeyRequest) => (
-        <Chip label={row.data.planTier} color="primary" size="small" />
+      field: 'spec.planTier',
+      render: (row: APIKeyRequest) => (
+        <Chip label={row.spec.planTier} color="primary" size="small" />
       ),
     },
     {
       title: 'Use Case',
-      field: 'data.useCase',
-      render: (row: ApiKeyRequest) => (
-        <Typography variant="body2">{row.data.useCase}</Typography>
+      field: 'spec.useCase',
+      render: (row: APIKeyRequest) => (
+        <Typography variant="body2">{row.spec.useCase || '-'}</Typography>
       ),
     },
     {
       title: 'Requested',
-      field: 'data.requestedAt',
-      render: (row: ApiKeyRequest) => (
+      field: 'spec.requestedAt',
+      render: (row: APIKeyRequest) => (
         <Typography variant="body2">
-          {new Date(row.data.requestedAt).toLocaleDateString()}
+          {row.spec.requestedAt ? new Date(row.spec.requestedAt).toLocaleDateString() : '-'}
         </Typography>
       ),
     },
     {
       title: 'Reviewed',
-      field: 'data.reviewedAt',
-      render: (row: ApiKeyRequest) => {
-        if (!row.data.reviewedAt) return <Typography variant="body2">-</Typography>;
+      field: 'status.reviewedAt',
+      render: (row: APIKeyRequest) => {
+        if (!row.status?.reviewedAt) return <Typography variant="body2">-</Typography>;
         return (
           <Typography variant="body2">
-            {new Date(row.data.reviewedAt).toLocaleDateString()}
+            {new Date(row.status.reviewedAt).toLocaleDateString()}
           </Typography>
         );
       },
     },
     {
       title: 'Reason',
-      field: 'data.reviewComment',
-      render: (row: ApiKeyRequest) => (
-        <Typography variant="body2">{row.data.reviewComment || '-'}</Typography>
+      field: 'status.reason',
+      render: (row: APIKeyRequest) => (
+        <Typography variant="body2">{row.status?.reason || '-'}</Typography>
       ),
+    },
+    {
+      title: 'Actions',
+      field: 'actions',
+      searchable: false,
+      render: (row: APIKeyRequest) => {
+        const isPending = !row.status?.phase || row.status.phase === 'Pending';
+        if (!isPending) return null;
+        return (
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteRequest(row.metadata.name)}
+            color="secondary"
+          >
+            <DeleteIcon />
+          </IconButton>
+        );
+      },
     },
   ];
 
@@ -436,9 +497,22 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             />
           </Grid>
         )}
+        {approvedRequests.length > 0 && (
+          <Grid item>
+            <Table
+              title="Approved Requests"
+              options={{
+                paging: false,
+                search: false,
+              }}
+              columns={approvedColumns}
+              data={approvedRequests}
+            />
+          </Grid>
+        )}
         <Grid item>
           <Table
-            title="API Keys"
+            title="API Keys (from Secrets)"
             options={{
               paging: true,
               search: true,
@@ -449,7 +523,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             emptyContent={
               <Box p={4}>
                 <Typography align="center">
-                  No API keys found. Click "Request API Access" above to create one.
+                  No API keys found
                 </Typography>
               </Box>
             }
@@ -484,16 +558,15 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             </Select>
           </FormControl>
           <TextField
-            label="Use Case"
-            placeholder="describe how you plan to use this api"
+            label="Use Case (optional)"
+            placeholder="Describe how you plan to use this API"
             multiline
             rows={3}
             fullWidth
             margin="normal"
-            required
             value={useCase}
             onChange={(e) => setUseCase(e.target.value)}
-            helperText="explain your intended use of this api for admin review"
+            helperText="Explain your intended use of this API for admin review"
           />
         </DialogContent>
         <DialogActions>
@@ -501,9 +574,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           <Button
             onClick={handleRequestAccess}
             color="primary"
-            disabled={!selectedPlan || !useCase.trim() || creating}
+            disabled={!selectedPlan || creating}
           >
-            {creating ? 'submitting...' : 'submit request'}
+            {creating ? 'Submitting...' : 'Submit Request'}
           </Button>
         </DialogActions>
       </Dialog>
