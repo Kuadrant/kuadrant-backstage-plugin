@@ -85,6 +85,12 @@ dynamicPlugins:
             text: Kuadrant
             icon: category
       entityTabs:
+        - path: /api-product
+          title: API Product
+          mountPoint: entity.page.api-product
+          if:
+            allOf:
+              - isKind: api
         - path: /api-keys
           title: API Keys
           mountPoint: entity.page.api-keys
@@ -100,9 +106,25 @@ dynamicPlugins:
                 lg: "span 4"
                 md: "span 6"
                 xs: "span 12"
+        - mountPoint: entity.page.api-product/cards
+          importName: EntityKuadrantApiProductInfoContent
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 12"
+                md: "span 12"
+                xs: "span 12"
+            if:
+              allOf:
+                - isKind: api
         - mountPoint: entity.page.api-keys/cards
           importName: EntityKuadrantApiKeysContent
           config:
+            layout:
+              gridColumnEnd:
+                lg: "span 12"
+                md: "span 12"
+                xs: "span 12"
             if:
               allOf:
                 - isKind: api

@@ -1,4 +1,6 @@
-import { Typography, Grid, Box, Chip } from '@material-ui/core';
+import React, { useState } from 'react';
+import { Typography, Grid, Box, Chip, Button } from '@material-ui/core';
+import AddIcon from '@material-ui/icons/Add';
 import {
   InfoCard,
   Header,
@@ -8,12 +10,14 @@ import {
   SupportButton,
   Progress,
   ResponseErrorPanel,
+  Link,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { PermissionGate } from '../PermissionGate';
 import { useUserRole } from '../../hooks/useUserRole';
+import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 
 type KuadrantResource = {
   metadata: {
@@ -33,14 +37,20 @@ export const ResourceList = () => {
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const { userInfo, loading: userLoading } = useUserRole();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
 
   const { value: apiProducts, loading: apiProductsLoading, error: apiProductsError } = useAsync(async (): Promise<KuadrantList> => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
     return await response.json();
-  }, [backendUrl, fetchApi]);
+  }, [backendUrl, fetchApi, refreshTrigger]);
 
   const loading = userLoading || apiProductsLoading;
   const error = apiProductsError;
+
+  const handleCreateSuccess = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
 
   const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
@@ -51,7 +61,10 @@ export const ResourceList = () => {
         {resources.map((resource) => (
           <Box key={`${resource.metadata.namespace}/${resource.metadata.name}`} mb={1}>
             <Typography variant="body2">
-              <strong>{resource.metadata.name}</strong> ({resource.metadata.namespace})
+              <Link to={`/catalog/default/api/${resource.metadata.name}/api-product`}>
+                <strong>{resource.metadata.name}</strong>
+              </Link>
+              {' '}({resource.metadata.namespace})
             </Typography>
           </Box>
         ))}
@@ -79,17 +92,27 @@ export const ResourceList = () => {
       </Header>
       <Content>
         <ContentHeader title="API Products">
-          {userInfo && (
-            <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-              <Typography variant="body2">Viewing as:</Typography>
-              <Chip label={userInfo.userId} color="primary" size="small" />
-              <Chip
-                label={getRoleLabel(userInfo.role).label}
-                color={getRoleLabel(userInfo.role).color}
-                size="small"
-              />
-            </Box>
-          )}
+          <Box display="flex" alignItems="center" gap={2}>
+            {userInfo && (
+              <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+                <Typography variant="body2">Viewing as:</Typography>
+                <Chip label={userInfo.userId} color="primary" size="small" />
+                <Chip
+                  label={getRoleLabel(userInfo.role).label}
+                  color={getRoleLabel(userInfo.role).color}
+                  size="small"
+                />
+              </Box>
+            )}
+            <Button
+              variant="contained"
+              color="primary"
+              startIcon={<AddIcon />}
+              onClick={() => setCreateDialogOpen(true)}
+            >
+              Create API Product
+            </Button>
+          </Box>
         </ContentHeader>
         {loading && <Progress />}
         {error && <ResponseErrorPanel error={error} />}
@@ -113,6 +136,11 @@ export const ResourceList = () => {
             )}
           </Grid>
         )}
+        <CreateAPIProductDialog
+          open={createDialogOpen}
+          onClose={() => setCreateDialogOpen(false)}
+          onSuccess={handleCreateSuccess}
+        />
       </Content>
     </Page>
   );

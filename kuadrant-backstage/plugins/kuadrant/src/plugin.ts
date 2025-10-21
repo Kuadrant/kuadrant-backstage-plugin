@@ -63,3 +63,13 @@ export const KuadrantApprovalQueueCard = kuadrantPlugin.provide(
     },
   }),
 );
+
+export const EntityKuadrantApiProductInfoContent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'EntityKuadrantApiProductInfoContent',
+    component: {
+      lazy: () =>
+        import('./components/ApiProductInfoCard').then(m => m.ApiProductInfoCard),
+    },
+  }),
+);

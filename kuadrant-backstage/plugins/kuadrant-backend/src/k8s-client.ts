@@ -197,7 +197,21 @@ export class KuadrantK8sClient {
       );
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to create ${plural}: ${error.message}`);
+      // extract detailed error from kubernetes api response
+      const statusCode = error.response?.statusCode || error.statusCode;
+      const body = error.response?.body || error.body;
+      const message = body?.message || error.message;
+      const reason = body?.reason;
+      const details = body?.details;
+
+      console.error(`failed to create ${plural}:`, {
+        statusCode,
+        message,
+        reason,
+        details: JSON.stringify(details),
+      });
+
+      throw new Error(`failed to create ${plural}: ${message}${reason ? ` (${reason})` : ''}`);
     }
   }
 

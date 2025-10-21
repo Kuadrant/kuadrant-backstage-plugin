@@ -22,6 +22,7 @@
       "EntityKuadrantApiAccessCard": "./src/plugin.ts",
       "EntityKuadrantApiKeyManagementTab": "./src/plugin.ts",
       "EntityKuadrantApiKeysContent": "./src/plugin.ts",
+      "EntityKuadrantApiProductInfoContent": "./src/plugin.ts",
       "KuadrantApprovalQueueCard": "./src/plugin.ts"
     }
   },
@@ -38,6 +39,7 @@
   "dependencies": {
     "@backstage/core-components": "^0.18.0",
     "@backstage/core-plugin-api": "^1.11.0",
+    "@backstage/plugin-catalog-react": "^1.14.0",
     "@backstage/plugin-permission-common": "^0.9.2",
     "@backstage/plugin-permission-react": "^0.4.37",
     "@backstage/theme": "^0.6.8",

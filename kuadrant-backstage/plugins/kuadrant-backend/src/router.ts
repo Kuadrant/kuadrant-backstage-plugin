@@ -117,6 +117,103 @@ export async function createRouter({
     }
   });
 
+  router.post('/apiproducts', async (req, res) => {
+    try {
+      const { isApiOwner, isPlatformEngineer } = await getUserIdentity(req, httpAuth, userInfo);
+
+      // only api owners and platform engineers can create apiproducts
+      if (!isApiOwner && !isPlatformEngineer) {
+        throw new NotAllowedError('you do not have permission to create api products');
+      }
+
+      const apiProduct = req.body;
+      const namespace = apiProduct.metadata?.namespace;
+      const planPolicyRef = apiProduct.spec?.planPolicyRef;
+
+      if (!namespace) {
+        throw new InputError('namespace is required in metadata');
+      }
+
+      if (!planPolicyRef?.name || !planPolicyRef?.namespace) {
+        throw new InputError('planPolicyRef with name and namespace is required');
+      }
+
+      // fetch the planpolicy to get plan details
+      const planPolicy = await k8sClient.getCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        planPolicyRef.namespace,
+        'planpolicies',
+        planPolicyRef.name,
+      );
+
+      // extract plans from planpolicy
+      const plans = planPolicy.spec?.plans || [];
+
+      if (plans.length === 0) {
+        throw new InputError('selected planpolicy has no plans defined');
+      }
+
+      // inject plans into apiproduct spec
+      apiProduct.spec.plans = plans;
+
+      const created = await k8sClient.createCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apiproducts',
+        apiProduct,
+      );
+
+      res.status(201).json(created);
+    } catch (error) {
+      console.error('error creating apiproduct:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else if (error instanceof InputError) {
+        res.status(400).json({ error: error.message });
+      } else {
+        // pass the detailed error message to the frontend
+        res.status(500).json({ error: errorMessage });
+      }
+    }
+  });
+
+  // planpolicy endpoints
+  router.get('/planpolicies', async (_req, res) => {
+    try {
+      const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'planpolicies');
+
+      // filter to only return name and namespace to avoid leaking plan details
+      const filtered = {
+        items: (data.items || []).map((policy: any) => ({
+          metadata: {
+            name: policy.metadata.name,
+            namespace: policy.metadata.namespace,
+          },
+        })),
+      };
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('error fetching planpolicies:', error);
+      res.status(500).json({ error: 'failed to fetch planpolicies' });
+    }
+  });
+
+  router.get('/planpolicies/:namespace/:name', async (req, res) => {
+    try {
+      const { namespace, name } = req.params;
+      const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'planpolicies', name);
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching planpolicy:', error);
+      res.status(500).json({ error: 'failed to fetch planpolicy' });
+    }
+  });
+
   // api key secret management (for viewing existing keys)
   router.get('/apikeys', async (req, res) => {
     try {
