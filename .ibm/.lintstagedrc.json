@@ -1,4 +1,0 @@
-{
-  "**/*.sh": ["shellcheck --severity=warning --color=always"],
-  "**/*.{sh,md,yaml,yml}": ["prettier --write"]
-}
