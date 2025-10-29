@@ -1,8 +1,8 @@
 {
-  "name": "@internal/plugin-kuadrant-backend",
+  "name": "@kuadrant/plugin-kuadrant-backend",
   "version": "0.1.0",
   "license": "Apache-2.0",
-  "private": true,
+  "private": false,
   "main": "src/index.ts",
   "types": "src/index.ts",
   "publishConfig": {

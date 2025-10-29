@@ -1,0 +1,39 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Lint
+        run: yarn lint:all
+
+      - name: Type check
+        run: yarn tsc:full
+
+      - name: Build frontend plugin
+        run: yarn workspace @kuadrant/plugin-kuadrant build
+
+      - name: Build backend plugin
+        run: yarn workspace @kuadrant/plugin-kuadrant-backend build
+
+      - name: Verify bundles exist
+        run: |
+          test -f kuadrant-backstage/plugins/kuadrant/dist/index.esm.js
+          test -f kuadrant-backstage/plugins/kuadrant-backend/dist/index.cjs.js
