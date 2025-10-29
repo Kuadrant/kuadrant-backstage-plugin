@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# script to switch between users for testing
+# script to switch between users for testing rbac
 
 USER=$1
 
@@ -13,7 +13,7 @@ if [ -z "$USER" ]; then
   echo "  api-consumer      - browses apis, requests access to apis"
   echo ""
   echo "current user:"
-  grep "AUTH_GUEST_USER" rhdh-local/.env 2>/dev/null || echo "  not configured"
+  grep "BACKSTAGE_GUEST_USER" app-config.local.yaml 2>/dev/null | sed 's/.*: /  /' || echo "  not configured"
   exit 1
 fi
 
@@ -24,29 +24,16 @@ fi
 
 echo "switching to user: $USER"
 
-# update .env file
-if grep -q "AUTH_GUEST_USER" rhdh-local/.env 2>/dev/null; then
-  sed -i '' "s/AUTH_GUEST_USER=.*/AUTH_GUEST_USER=$USER/" rhdh-local/.env
+# update app-config.local.yaml
+if grep -q "userEntityRef:" app-config.local.yaml 2>/dev/null; then
+  sed -i '' "s|userEntityRef:.*|userEntityRef: user:default/$USER|" app-config.local.yaml
 else
-  echo "AUTH_GUEST_USER=$USER" >> rhdh-local/.env
+  echo "error: could not find userEntityRef in app-config.local.yaml"
+  exit 1
 fi
-
-# update app-config to use the env var
-cat > /tmp/guest-config.yaml <<EOF
-auth:
-  environment: development
-  providers:
-    guest:
-      userEntityRef: user:default/\${AUTH_GUEST_USER}
-EOF
-
-# restart rhdh (recreate container to reload .env file)
-echo "restarting rhdh..."
-cd rhdh-local
-docker compose up -d --force-recreate rhdh >/dev/null 2>&1
 
 echo ""
 echo "✓ switched to user: $USER (backstage entity: user:default/$USER)"
-echo "✓ rhdh restarting at http://localhost:7008"
+echo "✓ restart rhdh with: yarn dev"
 echo ""
-echo "refresh your browser in 10 seconds"
+echo "the backend will automatically reload and use the new user"

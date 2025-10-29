@@ -1,0 +1,64 @@
+{
+  "name": "root",
+  "version": "1.9.0",
+  "private": true,
+  "engines": {
+    "node": "22"
+  },
+  "scripts": {
+    "prepare": "husky install",
+    "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
+    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend --filter=app",
+    "build": "turbo run build",
+    "build:dockerfile": "bash ./scripts/update-Dockerfile.sh",
+    "tsc": "turbo run tsc",
+    "export-dynamic": "echo \"Command moved to dynamic-plugins/package.json\"",
+    "export-dynamic:clean": "echo \"Command moved to dynamic-plugins/package.json\"",
+    "copy-dynamic-plugins": "echo \"Command moved to dynamic-plugins/package.json\"",
+    "clean": "turbo run clean",
+    "test": "turbo run test",
+    "lint:check": "turbo run lint:check",
+    "lint:fix": "turbo run lint:fix",
+    "lint": "turbo run lint",
+    "monorepo:check": "sherif && manypkg check",
+    "monorepo:fix": "sherif --fix --no-install && manypkg fix && yarn dedupe",
+    "lint-staged": "lint-staged -p 10",
+    "prettier:check": "turbo run prettier:check",
+    "prettier:fix": "turbo run prettier:fix",
+    "new": "backstage-cli new --scope internal",
+    "repo:fix": "backstage-cli repo fix --publish",
+    "versions:metadata": "node ./scripts/update-metadata.mjs",
+    "versions:bump": "node ./scripts/update-backstage.mjs"
+  },
+  "workspaces": {
+    "packages": [
+      "packages/*",
+      "plugins/*"
+    ]
+  },
+  "devDependencies": {
+    "@backstage/cli": "0.34.1",
+    "@backstage/frontend-test-utils": "0.3.5",
+    "@ianvs/prettier-plugin-sort-imports": "4.7.0",
+    "@manypkg/cli": "0.25.1",
+    "glob": "11.0.3",
+    "husky": "8.0.3",
+    "jsdom": "^26.1.0",
+    "lint-staged": "15.5.2",
+    "node-gyp": "10.3.1",
+    "sherif": "1.7.0",
+    "turbo": "2.5.8"
+  },
+  "resolutions": {
+    "@types/react": "18.3.26",
+    "@types/react-dom": "18.3.7",
+    "@aws-sdk/util-utf8-browser": "npm:@smithy/util-utf8@~2",
+    "@kubernetes/client-node@npm:0.20.0/jsonpath-plus": "^10.3.0",
+    "@backstage/plugin-permission-backend": "0.7.3",
+    "@backstage/plugin-catalog-react": "1.20.1"
+  },
+  "jest": {
+    "testTimeout": 20000
+  },
+  "packageManager": "yarn@3.8.7"
+}

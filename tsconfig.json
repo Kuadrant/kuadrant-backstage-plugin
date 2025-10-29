@@ -1,0 +1,19 @@
+{
+  "extends": "@backstage/cli/config/tsconfig.json",
+  "include": [
+    "packages/*/src",
+    "plugins/*/src",
+    "plugins/*/dev",
+    "plugins/*/migrations",
+    "dynamic-plugins/wrappers/*/src",
+    "packages/plugin-utils/__tests__",
+    "packages/plugin-utils/setupTests.ts"
+  ],
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "outDir": "dist-types",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "jsx": "preserve"
+  }
+}
