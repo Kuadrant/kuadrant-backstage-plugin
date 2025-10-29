@@ -120,7 +120,9 @@ yarn showcase-auth-providers    # run authentication provider tests
 - `plugin-utils` - Shared utilities for plugins
 - `theme-wrapper` - Theme customisation
 
-**plugins/** - Custom RHDH plugins
+**plugins/** - Custom plugins
+- `kuadrant` - Frontend plugin for Kuadrant API key management UI
+- `kuadrant-backend` - Backend plugin for Kuadrant Kubernetes integration
 - `dynamic-plugins-info-backend` - Provides information about loaded dynamic plugins
 - `licensed-users-info-backend` - Tracks licensed user information
 - `scalprum-backend` - Frontend federation support for dynamic plugins
@@ -186,22 +188,13 @@ Set GNU versions as default to avoid script compatibility issues.
 
 ### Running Locally with Dynamic Plugins
 
-1. Copy `app-config.example.yaml` to `app-config.local.yaml`
-2. Run `yarn install`
-3. Run `yarn export-dynamic -- -- --dev` to export plugins to `dynamic-plugins-root/`
-4. Configure plugins in `app-config.local.yaml` under `dynamicPlugins` section
-5. Start with `yarn start` (backend only) or `yarn dev` (frontend + backend)
+The repository includes a pre-configured `app-config.local.yaml` with RBAC enabled and proper dev server ports.
 
-For `yarn dev`, update `app-config.local.yaml`:
-```yaml
-app:
-  baseUrl: http://localhost:3000
-backend:
-  baseUrl: http://localhost:7007
-  cors:
-    origin: http://localhost:3000
-    credentials: true
-```
+1. Run `yarn install`
+2. (Optional) Run `yarn export-dynamic -- -- --dev` to export dynamic plugins to `dynamic-plugins-root/`
+3. Start with `yarn dev` (frontend + backend with hot reload) or `yarn start` (backend only)
+
+**Note:** `yarn dev` doesn't load dynamic plugins but provides hot reload for Kuadrant plugin development. Use `yarn start` if you need dynamic plugins loaded.
 
 ### Extensions Catalog Workflow
 
@@ -241,21 +234,24 @@ kubernetes:
    - Default fallback - `loadFromDefault()` for in-cluster or local kubeconfig
 5. Create API clients: `CustomObjectsApi`, `CoreV1Api`, etc.
 
-**Example from scripts/rhdh-openshift-setup/resources/rhdh-configmap.yaml:**
+**Example configuration:**
 ```yaml
 kubernetes:
   clusterLocatorMethods:
     - clusters:
       - authProvider: serviceAccount
-        name: ${K8S_CLUSTER_NAME}
+        name: my-cluster
         serviceAccountToken: ${K8S_CLUSTER_TOKEN}
-        url: ${K8S_CLUSTER_URL}
+        url: https://kubernetes.default.svc
         skipTLSVerify: true
       type: config
   customResources:
-    - apiVersion: 'v1beta1'
-      group: 'tekton.dev'
-      plural: 'pipelines'
+    - apiVersion: 'v1'
+      group: 'extensions.kuadrant.io'
+      plural: 'apiproducts'
+    - apiVersion: 'v1'
+      group: 'extensions.kuadrant.io'
+      plural: 'apikeyrequests'
 ```
 
 This allows plugins to work in:
