@@ -5,20 +5,39 @@ This repository is a customised fork of [Red Hat Developer Hub (RHDH)](https://g
 ## Branching Strategy
 
 - **`main`** - Our development branch with Kuadrant plugins and customisations
-- **`rhdh-upstream`** - Tracks upstream RHDH (for pulling updates)
+- **`rhdh-upstream-main`** - Tracking branch for upstream RHDH main (reference only, do not commit here)
+- **`pre-migration-backup`** - Snapshot of old plugin structure before migration (backup only)
+
+### Repository Remotes
+
+This repository tracks three remotes:
+
+- **`origin`** - Your fork (e.g., jasonmadigan/kuadrant-backstage-plugin)
+- **`upstream`** - Kuadrant organisation repo (Kuadrant/kuadrant-backstage-plugin)
+- **`rhdh-upstream`** - Red Hat Developer Hub upstream (redhat-developer/rhdh)
 
 ### Pulling RHDH Updates
 
+To pull the latest changes from upstream RHDH and rebase our Kuadrant customisations:
+
 ```bash
-# Switch to upstream tracking branch
-git checkout rhdh-upstream
-git pull origin main              # Pull from redhat-developer/rhdh
+# fetch latest from rhdh upstream
+git fetch rhdh-upstream
 
-# Rebase our work on top of latest RHDH
+# update the tracking branch (optional, for reference)
+git checkout rhdh-upstream-main
+git reset --hard rhdh-upstream/main
+git push upstream rhdh-upstream-main
+
+# rebase our main branch on top of latest rhdh
 git checkout main
-git rebase rhdh-upstream
+git rebase rhdh-upstream/main
 
-# Resolve any conflicts (see below)
+# resolve any conflicts (see below)
+
+# force push to update upstream after rebase
+git push --force-with-lease upstream main
+git push --force-with-lease origin main
 ```
 
 ### Expected Merge Conflicts
@@ -285,5 +304,6 @@ See `kuadrant-dev-setup/rbac/rhdh-rbac.yaml` for the development cluster setup.
 ## Philosophy
 
 - **main is ours** - This is our development repo for Kuadrant plugins
-- **rhdh-upstream tracks upstream** - Periodically pull and rebase to stay current
+- **Track upstream RHDH** - Periodically rebase from rhdh-upstream to stay current with RHDH releases
 - **Customisations are minimal** - Keep changes focused on Kuadrant integration
+- **Clean history** - Use rebase workflow to maintain clean commit history
