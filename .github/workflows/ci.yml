@@ -7,16 +7,30 @@ on:
 jobs:
   build-validate:
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: kuadrant-backstage
+
     steps:
       - uses: actions/checkout@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
-      - uses: actions/setup-node@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: yarn
+
+          cache-dependency-path: kuadrant-backstage/yarn.lock
+
+      - name: Enable Corepack (Yarn v4)
+        run: corepack enable
+
+      - name: Activate Yarn 4.4.1
+        run: corepack prepare yarn@4.4.1 --activate
+
+      - name: Show Yarn version
+        run: yarn --version
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -35,5 +49,5 @@ jobs:
 
       - name: Verify bundles exist
         run: |
-          test -f kuadrant-backstage/plugins/kuadrant/dist/index.esm.js
-          test -f kuadrant-backstage/plugins/kuadrant-backend/dist/index.cjs.js
+          test -f plugins/kuadrant/dist/index.esm.js
+          test -f plugins/kuadrant-backend/dist/index.cjs.js
