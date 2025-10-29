@@ -197,7 +197,7 @@ spec:
     openAPISpec: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
-    team: platform-team
+    team: platform-engineers
     email: platform@example.com
     slack: "#api-support"
 ---
