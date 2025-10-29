@@ -194,38 +194,55 @@ make kind-create
 
 The Kuadrant plugins ship with a comprehensive permission system for access control.
 
-### User Roles
+### Three Reference Personas
 
-**Platform Engineer (admin)**
-- Approve/reject API key requests
-- View and manage all API keys across all namespaces
-- Read and write policies (PlanPolicy, RateLimitPolicy, etc.)
-- Full visibility of all pending requests
+These are example role configurations - permissions are composable, so you can create custom roles mixing these permissions however you want.
+
+**Platform Engineer**
+- **Can do**: Create/update PlanPolicy resources, read all resources for monitoring
+- **Cannot do**: Approve/reject API key requests, create APIProducts
+- **Use case**: Manages infrastructure (gateways, HTTPRoutes), defines rate limit tiers
 
 **API Owner**
-- Publish APIs and create API products
-- Approve/reject API key requests for their APIs
-- View and manage API keys for their APIs
-- Read policies
+- **Can do**: Create/update APIProduct, approve/reject requests for own APIs, read PlanPolicy (to reference)
+- **Cannot do**: Create/update PlanPolicy, approve requests for other owners' APIs
+- **Use case**: Publishes APIs, manages access to own APIs
 
 **API Consumer**
-- Request API keys for APIs
-- View and manage only own API keys
-- Limited catalog access
+- **Can do**: Read APIProducts, create APIKeyRequests, manage own API keys
+- **Cannot do**: Approve requests, create APIs, modify rate limits
+- **Use case**: Browses APIs, requests access, uses APIs within quotas
 
 ### Kuadrant Permissions
 
-The backend exports these permissions (defined in `plugins/kuadrant-backend/src/permissions.ts`):
+The backend exports these permissions (defined in `plugins/kuadrant-backend/src/permissions.ts`). These appear in the RBAC plugin UI and can be composed into custom roles.
 
-- `kuadrant.apikey.create` - Create API keys
+**PlanPolicy (rate limit tiers):**
+- `kuadrant.planpolicy.create` - Create PlanPolicy resources
+- `kuadrant.planpolicy.read` - Read PlanPolicy resources
+- `kuadrant.planpolicy.update` - Update PlanPolicy resources
+- `kuadrant.planpolicy.delete` - Delete PlanPolicy resources
+- `kuadrant.planpolicy.list` - List PlanPolicy resources
+
+**APIProduct (catalog entries):**
+- `kuadrant.apiproduct.create` - Create APIProduct resources
+- `kuadrant.apiproduct.read` - Read APIProduct resources
+- `kuadrant.apiproduct.update` - Update APIProduct resources
+- `kuadrant.apiproduct.delete` - Delete APIProduct resources
+- `kuadrant.apiproduct.list` - List APIProduct resources
+
+**APIKeyRequest (access requests):**
+- `kuadrant.apikeyrequest.create` - Create APIKeyRequest resources
+- `kuadrant.apikeyrequest.read.own` - Read own APIKeyRequest resources
+- `kuadrant.apikeyrequest.read.all` - Read all APIKeyRequest resources
+- `kuadrant.apikeyrequest.update` - Update APIKeyRequest (approve/reject)
+- `kuadrant.apikeyrequest.list` - List APIKeyRequest resources
+
+**API Keys (managed secrets):**
 - `kuadrant.apikey.read.own` - Read own API keys
-- `kuadrant.apikey.read.all` - Read all API keys (admin)
+- `kuadrant.apikey.read.all` - Read all API keys
 - `kuadrant.apikey.delete.own` - Delete own API keys
-- `kuadrant.apikey.delete.all` - Delete any API key (admin)
-- `kuadrant.policy.read` - Read Kuadrant policies
-- `kuadrant.policy.write` - Write Kuadrant policies (admin)
-- `kuadrant.request.approve` - Approve API key requests (admin)
-- `kuadrant.request.reject` - Reject API key requests (admin)
+- `kuadrant.apikey.delete.all` - Delete any API key
 
 ### Testing with Different Users
 

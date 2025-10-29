@@ -3,6 +3,7 @@ import {
   createBackendPlugin,
 } from '@backstage/backend-plugin-api';
 import { createRouter } from './router';
+import { createKuadrantPermissionIntegrationRouter } from './permissions-router';
 
 /**
  * kuadrantPlugin backend plugin
@@ -33,6 +34,10 @@ export const kuadrantPlugin = createBackendPlugin({
           allow: 'unauthenticated',
         });
 
+        // register permission integration router for rbac discovery
+        httpRouter.use(createKuadrantPermissionIntegrationRouter());
+
+        // register main api router
         httpRouter.use(
           await createRouter({
             httpAuth,

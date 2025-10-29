@@ -30,3 +30,4 @@ export const catalogModuleApiProductEntityProvider = createBackendModule({
 });
 
 export default catalogModuleApiProductEntityProvider;
+

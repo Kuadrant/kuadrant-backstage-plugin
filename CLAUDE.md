@@ -444,3 +444,146 @@ If menu items show `menuItem.key-name` instead of the actual title, remove the `
   to: 'your-plugin',
 }
 ```
+
+## archived session context (2025-10-29) - completed
+
+this section has been replaced by the detailed solution documentation in "making kuadrant permissions visible in rbac ui (2025-10-29)" below.
+
+## making kuadrant permissions visible in rbac ui (2025-10-29)
+
+### problem
+kuadrant permissions (19 permissions) were defined but not appearing in rbac ui plugin dropdown when creating roles. only "catalog", "scaffolder", and "permission" plugins were visible.
+
+### solution (completed)
+implemented two-part solution for rbac permission discovery:
+
+**1. permission integration router**
+- created `plugins/kuadrant-backend/src/permissions-router.ts` using `createPermissionIntegrationRouter` from `@backstage/plugin-permission-node`
+- registered router in plugin at `plugins/kuadrant-backend/src/plugin.ts`
+- exposes permissions at `/.well-known/backstage/permissions/metadata` endpoint
+- verified: `curl http://localhost:7007/api/kuadrant/.well-known/backstage/permissions/metadata` returns all 19 permissions
+
+**2. rbac plugin id provider**
+- created `plugins/kuadrant-backend/src/rbac-module.ts` as backend module
+- registers 'kuadrant' plugin id with rbac using `pluginIdProviderExtensionPoint` from `@backstage-community/plugin-rbac-node`
+- added `/rbac` export path in `package.json`
+- loaded in backend at `packages/backend/src/index.ts:174`
+
+### key learnings
+- rbac discovers plugins through two mechanisms:
+  1. permission integration router at `/.well-known/backstage/permissions/metadata` (provides permission definitions)
+  2. plugin id provider extension point (tells rbac which plugins have permissions)
+- **important**: use `@backstage-community/plugin-rbac-node` for `pluginIdProviderExtensionPoint`, not `@backstage-community/plugin-rbac-backend`
+- cannot use `.then()` approach for loading backend modules - must use separate export paths in `package.json`
+
+### files created/modified
+- `plugins/kuadrant-backend/src/permissions-router.ts` - permission integration router (new)
+- `plugins/kuadrant-backend/src/rbac-module.ts` - rbac plugin id provider (new)
+- `plugins/kuadrant-backend/src/plugin.ts` - register permission router
+- `plugins/kuadrant-backend/src/index.ts` - export rbac module
+- `plugins/kuadrant-backend/package.json` - add `/rbac` export path
+- `packages/backend/src/index.ts` - load rbac module
+
+### verification
+✅ backend starts without errors
+✅ plugin initialization complete with 'kuadrant' listed
+✅ permission integration endpoint working: returns all 19 permissions
+✅ rbac ui shows "kuadrant" in plugin dropdown
+✅ all 19 kuadrant permissions visible when creating roles
+
+### example rbac module pattern
+```typescript
+import { createBackendModule } from '@backstage/backend-plugin-api';
+import { pluginIdProviderExtensionPoint } from '@backstage-community/plugin-rbac-node';
+
+export const kuadrantRbacModule = createBackendModule({
+  pluginId: 'permission',
+  moduleId: 'kuadrant-rbac-provider',
+  register(env) {
+    env.registerInit({
+      deps: {
+        pluginIdProvider: pluginIdProviderExtensionPoint,
+      },
+      async init({ pluginIdProvider }) {
+        pluginIdProvider.addPluginIdProvider({
+          getPluginIds: () => ['kuadrant'],
+        });
+      },
+    });
+  },
+});
+```
+
+
+## next steps: enforcing kuadrant permissions (pending)
+
+### current state
+- ✅ 19 kuadrant permissions defined and documented
+- ✅ permissions visible in rbac ui for role creation
+- ✅ rbac policies configured in `rbac-policy.csv` for 3 roles (platform-engineer, api-owner, api-consumer)
+- ❌ permissions not yet enforced in plugin backend endpoints
+
+### work required
+need to add permission checks to kuadrant backend endpoints in `plugins/kuadrant-backend/src/router.ts`:
+
+**planpolicy endpoints** (rate limit tiers):
+- `POST /planpolicies` - require `kuadrant.planpolicy.create`
+- `GET /planpolicies` - require `kuadrant.planpolicy.list`
+- `GET /planpolicies/:name` - require `kuadrant.planpolicy.read`
+- `PUT /planpolicies/:name` - require `kuadrant.planpolicy.update`
+- `DELETE /planpolicies/:name` - require `kuadrant.planpolicy.delete`
+
+**apiproduct endpoints**:
+- `POST /apiproducts` - require `kuadrant.apiproduct.create`
+- `GET /apiproducts` - require `kuadrant.apiproduct.list`
+- `GET /apiproducts/:name` - require `kuadrant.apiproduct.read`
+- `PUT /apiproducts/:name` - require `kuadrant.apiproduct.update`
+- `DELETE /apiproducts/:name` - require `kuadrant.apiproduct.delete`
+
+**apikeyrequest endpoints** (access requests):
+- `POST /requests` - require `kuadrant.apikeyrequest.create`
+- `GET /requests` - require `kuadrant.apikeyrequest.list`
+- `GET /requests/:id` - require `kuadrant.apikeyrequest.read.own` or `kuadrant.apikeyrequest.read.all` (conditional)
+- `PUT /requests/:id` - require `kuadrant.apikeyrequest.update` (for approve/reject)
+
+**apikey endpoints** (secrets):
+- `GET /apikeys` - require `kuadrant.apikey.read.own` or `kuadrant.apikey.read.all` (conditional)
+- `DELETE /apikeys/:id` - require `kuadrant.apikey.delete.own` or `kuadrant.apikey.delete.all` (conditional)
+
+### implementation pattern
+use backstage permission framework in router:
+```typescript
+import { AuthorizeResult } from '@backstage/plugin-permission-common';
+import { kuadrantPlanPolicyCreatePermission } from './permissions';
+
+router.post('/planpolicies', async (req, res) => {
+  const credentials = await httpAuth.credentials(req);
+  
+  const decision = (await permissions.authorize([
+    { permission: kuadrantPlanPolicyCreatePermission },
+  ], { credentials }))[0];
+  
+  if (decision.result !== AuthorizeResult.ALLOW) {
+    throw new NotAllowedError('unauthorised');
+  }
+  
+  // proceed with creating planpolicy
+});
+```
+
+### conditional permissions (own vs all)
+for `.own` vs `.all` permissions, need resource ownership checks:
+```typescript
+// check if user owns the resource
+const userInfo = await userInfoService.getUserInfo(credentials);
+const userId = userInfo.userEntityRef.split('/')[1];
+const isOwner = resource.metadata.annotations?.['secret.kuadrant.io/user-id'] === userId;
+
+// authorize based on ownership
+const permission = isOwner 
+  ? kuadrantApiKeyReadOwnPermission 
+  : kuadrantApiKeyReadAllPermission;
+  
+const decision = (await permissions.authorize([{ permission }], { credentials }))[0];
+```
+
