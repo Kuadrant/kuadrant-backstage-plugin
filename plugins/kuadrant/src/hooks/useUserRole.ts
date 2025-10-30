@@ -43,19 +43,6 @@ export function useUserRole(): { userInfo: UserInfo | null; loading: boolean } {
 
       console.log('useUserRole result:', { role, isPlatformEngineer, isApiOwner, isApiConsumer });
 
-      // in dev mode without catalog backend, ownershipRefs will be empty
-      // fall back to granting platform-engineer role
-      if (role === 'unknown') {
-        console.log('role is unknown, falling back to platform-engineer for dev mode');
-        return {
-          userId,
-          role: 'platform-engineer',
-          isPlatformEngineer: true,
-          isApiOwner: true,
-          isApiConsumer: true,
-        };
-      }
-
       return {
         userId,
         role,
