@@ -173,6 +173,7 @@ spec:
   displayName: Toystore API
   description: simple toy store api for demonstration
   version: v1
+  approvalMode: manual
   tags:
     - demo
     - retail

@@ -1,4 +1,4 @@
-export type PlanTier = 'gold' | 'silver' | 'bronze';
+export type PlanTier = string; // custom tier names defined by api owners
 export type RequestPhase = 'Pending' | 'Approved' | 'Rejected';
 
 export interface PlanLimits {

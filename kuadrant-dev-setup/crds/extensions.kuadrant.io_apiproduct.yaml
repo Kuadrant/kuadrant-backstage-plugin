@@ -36,6 +36,11 @@ spec:
               version:
                 type: string
                 description: api version (e.g. v1, v2)
+              approvalMode:
+                type: string
+                enum: [automatic, manual]
+                default: manual
+                description: whether access requests are auto-approved or require manual review
               tags:
                 type: array
                 description: tags for categorisation and search
@@ -63,8 +68,7 @@ spec:
                   properties:
                     tier:
                       type: string
-                      enum: [gold, silver, bronze]
-                      description: plan tier name
+                      description: plan tier name (can be any custom name)
                     description:
                       type: string
                       description: human-readable description of this plan

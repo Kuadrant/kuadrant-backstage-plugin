@@ -259,6 +259,61 @@ This allows plugins to work in:
 - In-cluster (service account mounted at `/var/run/secrets/kubernetes.io/serviceaccount/`)
 - Local development (kubeconfig at `~/.kube/config`)
 
+### Kuadrant RBAC Architecture
+
+The Kuadrant plugin uses a two-layer RBAC model with clear separation of concerns:
+
+**Layer 1: Backstage RBAC (Portal Access Control)**
+- **Catalog visibility**: Who can see API entities in the catalog
+- **Request creation**: Who can request API keys (with per-APIProduct resource-based permissions)
+- **Approval**: Who can approve/reject access requests
+- **Management**: Who can create/delete APIProducts
+
+**Layer 2: Kuadrant/Gateway RBAC (Runtime Access Control)**
+- **API key validation**: Is this key valid? (AuthPolicy)
+- **Rate limiting**: What limits apply? (PlanPolicy predicate checks plan-id annotation on Secret)
+- **Authentication**: Does request have valid auth? (AuthPolicy validates bearer tokens)
+
+**No overlap** - Backstage controls who gets API keys, Kuadrant/Gateway enforces runtime limits.
+
+**Per-APIProduct Access Control:**
+
+The `kuadrant.apikeyrequest.create` permission supports resource references for fine-grained access control:
+
+```csv
+# Allow all consumers to request any API
+p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
+
+# Restrict specific APIs to specific roles
+p, role:default/partner, kuadrant.apikeyrequest.create, create, allow, apiproduct:toystore/toystore-api
+p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
+```
+
+Backend checks include the resource reference:
+```typescript
+const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
+const decision = await permissions.authorize([{
+  permission: kuadrantApiKeyRequestCreatePermission,
+  resourceRef,
+}], { credentials });
+```
+
+**Approval Mode:**
+
+APIProduct supports `approvalMode: automatic | manual` (defaults to manual):
+- **automatic**: Backstage immediately creates API key Secret when request is made
+- **manual**: API owner must approve request before key is created
+
+This is separate from per-APIProduct access control - approval mode controls workflow, RBAC controls who can even request access.
+
+**Plan Tier Names:**
+
+Plan tier names are **not hardcoded** (gold/silver/bronze) - they are arbitrary strings defined by API owners in the PlanPolicy. The APIProduct CRD syncs plan data (tier names, descriptions, limits) from the PlanPolicy for display in Backstage.
+
+**Why Not Sync PlanPolicy Predicates to Backstage?**
+
+PlanPolicy predicates (CEL expressions) are evaluated by the gateway at runtime, not by Backstage. Backstage should not duplicate Authorino's auth logic. Access control in Backstage is for portal UX (who can see/request APIs), not runtime enforcement (who can call APIs with which rate limits).
+
 ### Adding Custom Plugins
 
 To add custom plugins to the monorepo for local development:

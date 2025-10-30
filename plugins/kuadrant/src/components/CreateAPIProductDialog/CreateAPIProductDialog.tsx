@@ -32,6 +32,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('v1');
+  const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedPlanPolicy, setSelectedPlanPolicy] = useState('');
@@ -81,6 +82,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           displayName,
           description,
           version,
+          approvalMode,
           tags,
           planPolicyRef: {
             name: selectedPlanName,
@@ -130,6 +132,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setDisplayName('');
     setDescription('');
     setVersion('v1');
+    setApprovalMode('manual');
     setTags([]);
     setTagInput('');
     setSelectedPlanPolicy('');
@@ -195,6 +198,20 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               placeholder="v1"
               margin="normal"
             />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              select
+              label="Approval Mode"
+              value={approvalMode}
+              onChange={e => setApprovalMode(e.target.value as 'automatic' | 'manual')}
+              margin="normal"
+              helperText="Automatic: keys are created immediately. Manual: requires approval."
+            >
+              <MenuItem value="manual">Manual</MenuItem>
+              <MenuItem value="automatic">Automatic</MenuItem>
+            </TextField>
           </Grid>
           <Grid item xs={12}>
             <TextField
