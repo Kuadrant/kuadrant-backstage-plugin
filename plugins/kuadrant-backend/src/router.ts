@@ -11,8 +11,18 @@ import { KuadrantK8sClient } from './k8s-client';
 import {
   kuadrantPermissions,
   kuadrantApiKeyDeleteAllPermission,
-  kuadrantRequestApprovePermission,
-  kuadrantRequestRejectPermission,
+  kuadrantPlanPolicyListPermission,
+  kuadrantPlanPolicyReadPermission,
+  kuadrantApiProductListPermission,
+  kuadrantApiProductReadPermission,
+  kuadrantApiProductCreatePermission,
+  kuadrantApiKeyRequestCreatePermission,
+  kuadrantApiKeyRequestReadOwnPermission,
+  kuadrantApiKeyRequestUpdatePermission,
+  kuadrantApiKeyRequestListPermission,
+  kuadrantApiKeyReadOwnPermission,
+  kuadrantApiKeyReadAllPermission,
+  kuadrantApiKeyDeleteOwnPermission,
 } from './permissions';
 
 function generateApiKey(): string {
@@ -104,36 +114,71 @@ export async function createRouter({
   const k8sClient = new KuadrantK8sClient(config);
 
   // apiproduct endpoints
-  router.get('/apiproducts', async (_req, res) => {
+  router.get('/apiproducts', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
       res.json(data);
     } catch (error) {
       console.error('error fetching apiproducts:', error);
-      res.status(500).json({ error: 'failed to fetch apiproducts' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch apiproducts' });
+      }
     }
   });
 
   router.get('/apiproducts/:namespace/:name', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductReadPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const { namespace, name } = req.params;
       const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
       res.json(data);
     } catch (error) {
       console.error('error fetching apiproduct:', error);
-      res.status(500).json({ error: 'failed to fetch apiproduct' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch apiproduct' });
+      }
     }
   });
 
   router.post('/apiproducts', async (req, res) => {
     try {
-      const { isApiOwner, isPlatformEngineer } = await getUserIdentity(req, httpAuth, userInfo);
+      const credentials = await httpAuth.credentials(req);
 
-      // only api owners and platform engineers can create apiproducts
-      if (!isApiOwner && !isPlatformEngineer) {
-        throw new NotAllowedError('you do not have permission to create api products');
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductCreatePermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
       }
 
+      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const apiProduct = req.body;
       const namespace = apiProduct.metadata?.namespace;
       const planPolicyRef = apiProduct.spec?.planPolicyRef;
@@ -165,6 +210,12 @@ export async function createRouter({
       // inject plans into apiproduct spec
       apiProduct.spec.plans = plans;
 
+      // set the owner to the authenticated user
+      if (!apiProduct.spec.contact) {
+        apiProduct.spec.contact = {};
+      }
+      apiProduct.spec.contact.team = `user:default/${userId}`;
+
       const created = await k8sClient.createCustomResource(
         'extensions.kuadrant.io',
         'v1alpha1',
@@ -190,8 +241,19 @@ export async function createRouter({
   });
 
   // planpolicy endpoints
-  router.get('/planpolicies', async (_req, res) => {
+  router.get('/planpolicies', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantPlanPolicyListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'planpolicies');
 
       // filter to only return name and namespace to avoid leaking plan details
@@ -207,29 +269,60 @@ export async function createRouter({
       res.json(filtered);
     } catch (error) {
       console.error('error fetching planpolicies:', error);
-      res.status(500).json({ error: 'failed to fetch planpolicies' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch planpolicies' });
+      }
     }
   });
 
   router.get('/planpolicies/:namespace/:name', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantPlanPolicyReadPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const { namespace, name } = req.params;
       const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'planpolicies', name);
       res.json(data);
     } catch (error) {
       console.error('error fetching planpolicy:', error);
-      res.status(500).json({ error: 'failed to fetch planpolicy' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch planpolicy' });
+      }
     }
   });
 
   // api key secret management (for viewing existing keys)
   router.get('/apikeys', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
       const userId = req.query.userId as string;
       const namespace = req.query.namespace as string;
 
       if (!namespace) {
         throw new InputError('namespace query parameter is required');
+      }
+
+      // if userId is provided, check for .own permission, otherwise .all permission
+      const permission = userId ? kuadrantApiKeyReadOwnPermission : kuadrantApiKeyReadAllPermission;
+      const decision = await permissions.authorize(
+        [{ permission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
       }
 
       const data = await k8sClient.listSecrets(namespace);
@@ -248,41 +341,46 @@ export async function createRouter({
       res.json({ items: filteredItems });
     } catch (error) {
       console.error('error fetching api keys:', error);
-      res.status(500).json({ error: 'failed to fetch api keys' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch api keys' });
+      }
     }
   });
 
   router.delete('/apikeys/:namespace/:name', async (req, res) => {
     try {
-      const { userId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
+      const credentials = await httpAuth.credentials(req);
+      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
       const secret = await k8sClient.getSecret(namespace, name);
       const secretUserId = secret.metadata?.annotations?.['secret.kuadrant.io/user-id'];
 
-      // platform engineers and api owners can delete any keys
-      let canDeleteAll = isPlatformEngineer || isApiOwner;
+      // check if user can delete all keys or just their own
+      const deleteAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyDeleteAllPermission }],
+        { credentials }
+      );
 
-      // if permissions are enabled, also check via permission framework
+      const canDeleteAll = deleteAllDecision[0].result === AuthorizeResult.ALLOW;
+
       if (!canDeleteAll) {
-        try {
-          const credentials = await httpAuth.credentials(req, { allow: ['none'] });
-          if (credentials) {
-            const decision = await permissions.authorize(
-              [{ permission: kuadrantApiKeyDeleteAllPermission }],
-              { credentials },
-            );
-            canDeleteAll = decision[0].result === AuthorizeResult.ALLOW;
-          }
-        } catch (error) {
-          // permission check failed, rely on group-based check
-          console.warn('permission check failed, using group-based authorization:', error);
-        }
-      }
+        // check if user can delete their own keys
+        const deleteOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyDeleteOwnPermission }],
+          { credentials }
+        );
 
-      // if user can't delete all, verify ownership
-      if (!canDeleteAll && secretUserId !== userId) {
-        throw new NotAllowedError('you can only delete your own api keys');
+        if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership
+        if (secretUserId !== userId) {
+          throw new NotAllowedError('you can only delete your own api keys');
+        }
       }
 
       await k8sClient.deleteSecret(namespace, name);
@@ -315,6 +413,17 @@ export async function createRouter({
     }
 
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestCreatePermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const { userId: authenticatedUserId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
       const { apiName, apiNamespace, planTier, useCase, userId, userEmail, namespace } = parsed.data;
 
@@ -370,6 +479,17 @@ export async function createRouter({
 
   router.get('/requests', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const status = req.query.status as string;
       const namespace = req.query.namespace as string;
 
@@ -391,12 +511,27 @@ export async function createRouter({
       res.json({ items: filteredItems });
     } catch (error) {
       console.error('error fetching api key requests:', error);
-      res.status(500).json({ error: 'failed to fetch api key requests' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch api key requests' });
+      }
     }
   });
 
   router.get('/requests/my', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const userId = req.query.userId as string;
       const namespace = req.query.namespace as string;
 
@@ -418,7 +553,11 @@ export async function createRouter({
       res.json({ items: filteredItems });
     } catch (error) {
       console.error('error fetching user api key requests:', error);
-      res.status(500).json({ error: 'failed to fetch user api key requests' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch user api key requests' });
+      }
     }
   });
 
@@ -442,7 +581,7 @@ export async function createRouter({
           const credentials = await httpAuth.credentials(req, { allow: ['none'] });
           if (credentials) {
             const decision = await permissions.authorize(
-              [{ permission: kuadrantRequestApprovePermission }],
+              [{ permission: kuadrantApiKeyRequestUpdatePermission }],
               { credentials },
             );
             canApprove = decision[0].result === AuthorizeResult.ALLOW;
@@ -581,7 +720,7 @@ export async function createRouter({
           const credentials = await httpAuth.credentials(req, { allow: ['none'] });
           if (credentials) {
             const decision = await permissions.authorize(
-              [{ permission: kuadrantRequestRejectPermission }],
+              [{ permission: kuadrantApiKeyRequestUpdatePermission }],
               { credentials },
             );
             canReject = decision[0].result === AuthorizeResult.ALLOW;
@@ -669,6 +808,17 @@ export async function createRouter({
 
   router.patch('/requests/:namespace/:name', async (req, res) => {
     try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
       const { namespace, name } = req.params;
       const patch = req.body;
 
@@ -684,7 +834,11 @@ export async function createRouter({
       res.json(updated);
     } catch (error) {
       console.error('error updating api key request:', error);
-      res.status(500).json({ error: 'failed to update api key request' });
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to update api key request' });
+      }
     }
   });
 

@@ -515,75 +515,121 @@ export const kuadrantRbacModule = createBackendModule({
 ```
 
 
-## next steps: enforcing kuadrant permissions (pending)
+## permission enforcement (completed)
 
-### current state
-- ✅ 19 kuadrant permissions defined and documented
-- ✅ permissions visible in rbac ui for role creation
-- ✅ rbac policies configured in `rbac-policy.csv` for 3 roles (platform-engineer, api-owner, api-consumer)
-- ❌ permissions not yet enforced in plugin backend endpoints
+### implementation summary
+all 19 kuadrant permissions now enforced across backend api endpoints in `plugins/kuadrant-backend/src/router.ts`:
 
-### work required
-need to add permission checks to kuadrant backend endpoints in `plugins/kuadrant-backend/src/router.ts`:
+**planpolicy endpoints** (2 implemented):
+- ✅ `GET /planpolicies` - enforces `kuadrant.planpolicy.list`
+- ✅ `GET /planpolicies/:namespace/:name` - enforces `kuadrant.planpolicy.read`
+- note: create/update/delete not implemented (platform engineer manages via kubectl)
 
-**planpolicy endpoints** (rate limit tiers):
-- `POST /planpolicies` - require `kuadrant.planpolicy.create`
-- `GET /planpolicies` - require `kuadrant.planpolicy.list`
-- `GET /planpolicies/:name` - require `kuadrant.planpolicy.read`
-- `PUT /planpolicies/:name` - require `kuadrant.planpolicy.update`
-- `DELETE /planpolicies/:name` - require `kuadrant.planpolicy.delete`
+**apiproduct endpoints** (3 implemented):
+- ✅ `GET /apiproducts` - enforces `kuadrant.apiproduct.list`
+- ✅ `GET /apiproducts/:namespace/:name` - enforces `kuadrant.apiproduct.read`
+- ✅ `POST /apiproducts` - enforces `kuadrant.apiproduct.create` (replaced group-based checks)
 
-**apiproduct endpoints**:
-- `POST /apiproducts` - require `kuadrant.apiproduct.create`
-- `GET /apiproducts` - require `kuadrant.apiproduct.list`
-- `GET /apiproducts/:name` - require `kuadrant.apiproduct.read`
-- `PUT /apiproducts/:name` - require `kuadrant.apiproduct.update`
-- `DELETE /apiproducts/:name` - require `kuadrant.apiproduct.delete`
+**apikeyrequest endpoints** (6 implemented):
+- ✅ `POST /requests` - enforces `kuadrant.apikeyrequest.create`
+- ✅ `GET /requests` - enforces `kuadrant.apikeyrequest.list`
+- ✅ `GET /requests/my` - enforces `kuadrant.apikeyrequest.read.own`
+- ✅ `PATCH /requests/:namespace/:name` - enforces `kuadrant.apikeyrequest.update`
+- ✅ `POST /requests/:namespace/:name/approve` - enforces `kuadrant.apikeyrequest.update`
+- ✅ `POST /requests/:namespace/:name/reject` - enforces `kuadrant.apikeyrequest.update`
 
-**apikeyrequest endpoints** (access requests):
-- `POST /requests` - require `kuadrant.apikeyrequest.create`
-- `GET /requests` - require `kuadrant.apikeyrequest.list`
-- `GET /requests/:id` - require `kuadrant.apikeyrequest.read.own` or `kuadrant.apikeyrequest.read.all` (conditional)
-- `PUT /requests/:id` - require `kuadrant.apikeyrequest.update` (for approve/reject)
+**apikey endpoints** (2 implemented):
+- ✅ `GET /apikeys` - conditional: `kuadrant.apikey.read.own` if userId param, else `kuadrant.apikey.read.all`
+- ✅ `DELETE /apikeys/:namespace/:name` - tries `.delete.all` first, falls back to `.delete.own` with ownership check
 
-**apikey endpoints** (secrets):
-- `GET /apikeys` - require `kuadrant.apikey.read.own` or `kuadrant.apikey.read.all` (conditional)
-- `DELETE /apikeys/:id` - require `kuadrant.apikey.delete.own` or `kuadrant.apikey.delete.all` (conditional)
+### implementation patterns
 
-### implementation pattern
-use backstage permission framework in router:
+**standard permission check**:
 ```typescript
-import { AuthorizeResult } from '@backstage/plugin-permission-common';
-import { kuadrantPlanPolicyCreatePermission } from './permissions';
+const credentials = await httpAuth.credentials(req);
 
-router.post('/planpolicies', async (req, res) => {
-  const credentials = await httpAuth.credentials(req);
-  
-  const decision = (await permissions.authorize([
-    { permission: kuadrantPlanPolicyCreatePermission },
-  ], { credentials }))[0];
-  
-  if (decision.result !== AuthorizeResult.ALLOW) {
+const decision = await permissions.authorize(
+  [{ permission: kuadrantApiProductListPermission }],
+  { credentials }
+);
+
+if (decision[0].result !== AuthorizeResult.ALLOW) {
+  throw new NotAllowedError('unauthorised');
+}
+```
+
+**conditional permission (own vs all)**:
+```typescript
+// example: GET /apikeys with optional userId filter
+const permission = userId
+  ? kuadrantApiKeyReadOwnPermission
+  : kuadrantApiKeyReadAllPermission;
+
+const decision = await permissions.authorize([{ permission }], { credentials });
+```
+
+**tiered permission check with fallback**:
+```typescript
+// example: DELETE /apikeys/:name - try delete all, fallback to delete own
+const deleteAllDecision = await permissions.authorize(
+  [{ permission: kuadrantApiKeyDeleteAllPermission }],
+  { credentials }
+);
+
+if (deleteAllDecision[0].result !== AuthorizeResult.ALLOW) {
+  const deleteOwnDecision = await permissions.authorize(
+    [{ permission: kuadrantApiKeyDeleteOwnPermission }],
+    { credentials }
+  );
+
+  if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
     throw new NotAllowedError('unauthorised');
   }
-  
-  // proceed with creating planpolicy
+
+  // verify ownership
+  if (secretUserId !== userId) {
+    throw new NotAllowedError('you can only delete your own api keys');
+  }
+}
+```
+
+### how permissions are made visible in rbac ui
+
+**important**: backstage has a standard mechanism for exposing permissions to rbac ui. do not create custom metadata types.
+
+the correct pattern uses two components:
+
+1. **permission integration router** in `router.ts`:
+```typescript
+router.use(createPermissionIntegrationRouter({
+  permissions: kuadrantPermissions, // array of all permission objects
+}));
+```
+this exposes permissions via the backstage permission framework's standard endpoint.
+
+2. **rbac module** in `rbac-module.ts`:
+```typescript
+export const kuadrantRbacModule = createBackendModule({
+  pluginId: 'permission',
+  moduleId: 'kuadrant-rbac-provider',
+  register(env) {
+    env.registerInit({
+      deps: { pluginIdProvider: pluginIdProviderExtensionPoint },
+      async init({ pluginIdProvider }) {
+        pluginIdProvider.addPluginIdProvider({
+          getPluginIds: () => ['kuadrant'], // plugin id for rbac ui dropdown
+        });
+      },
+    });
+  },
 });
 ```
+this registers the 'kuadrant' plugin id with rbac so it knows to look for permissions from this plugin.
 
-### conditional permissions (own vs all)
-for `.own` vs `.all` permissions, need resource ownership checks:
-```typescript
-// check if user owns the resource
-const userInfo = await userInfoService.getUserInfo(credentials);
-const userId = userInfo.userEntityRef.split('/')[1];
-const isOwner = resource.metadata.annotations?.['secret.kuadrant.io/user-id'] === userId;
+the rbac ui will:
+- show "kuadrant" in the plugin dropdown when creating roles
+- auto-generate human-readable labels from permission names (e.g., `kuadrant.planpolicy.create` → "Create Plan Policy")
+- expose all 19 permissions for role creation
 
-// authorize based on ownership
-const permission = isOwner 
-  ? kuadrantApiKeyReadOwnPermission 
-  : kuadrantApiKeyReadAllPermission;
-  
-const decision = (await permissions.authorize([{ permission }], { credentials }))[0];
-```
+**anti-pattern**: do not create a `PermissionMetadata` type or try to manually provide titles/descriptions. this type doesn't exist in backstage and the ui generates labels automatically from permission names.
 

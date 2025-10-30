@@ -32,6 +32,8 @@ interface APIProduct {
     documentation?: {
       openAPISpec?: string;
       docsURL?: string;
+      gitRepository?: string;
+      techdocsRef?: string;
     };
     contact?: {
       team?: string;
@@ -137,6 +139,7 @@ export class APIProductEntityProvider implements EntityProvider {
         annotations: {
           'backstage.io/managed-by-location': `kuadrant:${namespace}/${name}`,
           'backstage.io/managed-by-origin-location': `kuadrant:${namespace}/${name}`,
+          'backstage.io/orphan-strategy': 'keep',
           'kuadrant.io/namespace': namespace,
           'kuadrant.io/apiproduct': name,
           // add httproute annotation if we can infer it (usually same as apiproduct name without -api suffix)
@@ -146,6 +149,12 @@ export class APIProductEntityProvider implements EntityProvider {
           }),
           ...(product.spec.documentation?.docsURL && {
             'kuadrant.io/docs-url': product.spec.documentation.docsURL,
+          }),
+          ...(product.spec.documentation?.gitRepository && {
+            'backstage.io/source-location': `url:${product.spec.documentation.gitRepository}`,
+          }),
+          ...(product.spec.documentation?.techdocsRef && {
+            'backstage.io/techdocs-ref': product.spec.documentation.techdocsRef,
           }),
           ...(product.spec.contact?.email && {
             'kuadrant.io/contact-email': product.spec.contact.email,
