@@ -32,8 +32,8 @@ jobs:
       - name: Show Yarn version
         run: yarn --version
 
-#      - name: Install dependencies
-#        run: yarn install --immutable
+      - name: Install dependencies
+        run: yarn install --immutable
 
       - name: Lint
         run: yarn lint:all
