@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
-import { Typography, Grid, Box, Chip, Button } from '@material-ui/core';
+import { Typography, Grid, Box, Chip, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
+import DeleteIcon from '@material-ui/icons/Delete';
 import {
   InfoCard,
   Header,
@@ -11,6 +12,8 @@ import {
   Progress,
   ResponseErrorPanel,
   Link,
+  Table,
+  TableColumn,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
@@ -39,6 +42,9 @@ export const ResourceList = () => {
   const { userInfo, loading: userLoading } = useUserRole();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const { value: apiProducts, loading: apiProductsLoading, error: apiProductsError } = useAsync(async (): Promise<KuadrantList> => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -52,23 +58,117 @@ export const ResourceList = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const handleDeleteClick = (namespace: string, name: string) => {
+    setApiProductToDelete({ namespace, name });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!apiProductToDelete) return;
+
+    setDeleting(true);
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/apiproducts/${apiProductToDelete.namespace}/${apiProductToDelete.name}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        throw new Error('failed to delete apiproduct');
+      }
+
+      setRefreshTrigger(prev => prev + 1);
+    } catch (err) {
+      console.error('error deleting apiproduct:', err);
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+      setApiProductToDelete(null);
+    }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setApiProductToDelete(null);
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-GB', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  const columns: TableColumn[] = [
+    {
+      title: 'Name',
+      field: 'name',
+      render: (row: any) => (
+        <Link to={`/catalog/default/api/${row.metadata.name}/api-product`}>
+          <strong>{row.spec?.displayName || row.metadata.name}</strong>
+        </Link>
+      ),
+    },
+    {
+      title: 'Resource Name',
+      field: 'metadata.name',
+    },
+    {
+      title: 'Version',
+      field: 'spec.version',
+      render: (row: any) => row.spec?.version || '-',
+    },
+    {
+      title: 'Plans',
+      field: 'plans',
+      render: (row: any) => {
+        const plans = row.spec?.plans || [];
+        if (plans.length === 0) return '-';
+        return (
+          <Box display="flex" gap={0.5}>
+            {plans.map((plan: any, idx: number) => (
+              <Chip key={idx} label={plan.tier} size="small" />
+            ))}
+          </Box>
+        );
+      },
+    },
+    {
+      title: 'Namespace',
+      field: 'metadata.namespace',
+    },
+    {
+      title: 'Created',
+      field: 'metadata.creationTimestamp',
+      render: (row: any) => formatDate(row.metadata.creationTimestamp),
+    },
+    {
+      title: 'Actions',
+      field: 'actions',
+      render: (row: any) => (
+        <IconButton
+          size="small"
+          onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+          title="delete apiproduct"
+        >
+          <DeleteIcon fontSize="small" />
+        </IconButton>
+      ),
+    },
+  ];
+
   const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
-      return <Typography variant="body2" color="textSecondary">No resources found</Typography>;
+      return <Typography variant="body2" color="textSecondary">No API products found</Typography>;
     }
     return (
-      <Box>
-        {resources.map((resource) => (
-          <Box key={`${resource.metadata.namespace}/${resource.metadata.name}`} mb={1}>
-            <Typography variant="body2">
-              <Link to={`/catalog/default/api/${resource.metadata.name}/api-product`}>
-                <strong>{resource.metadata.name}</strong>
-              </Link>
-              {' '}({resource.metadata.namespace})
-            </Typography>
-          </Box>
-        ))}
-      </Box>
+      <Table
+        options={{ paging: false, search: false, toolbar: false }}
+        columns={columns}
+        data={resources}
+      />
     );
   };
 
@@ -120,12 +220,7 @@ export const ResourceList = () => {
           <Grid container spacing={3} direction="column">
             <Grid item>
               <InfoCard title="API Products">
-                <Typography variant="body1" gutterBottom>
-                  Published APIs with plan tiers and rate limits
-                </Typography>
-                <Box mt={2}>
-                  {renderResources(apiProducts?.items)}
-                </Box>
+                {renderResources(apiProducts?.items)}
               </InfoCard>
             </Grid>
 
@@ -141,6 +236,23 @@ export const ResourceList = () => {
           onClose={() => setCreateDialogOpen(false)}
           onSuccess={handleCreateSuccess}
         />
+        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+          <DialogTitle>Delete API Product</DialogTitle>
+          <DialogContent>
+            <DialogContentText>
+              Are you sure you want to delete {apiProductToDelete?.name} from namespace {apiProductToDelete?.namespace}?
+              This will permanently remove the API Product from Kubernetes.
+            </DialogContentText>
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleDeleteCancel} color="primary">
+              Cancel
+            </Button>
+            <Button onClick={handleDeleteConfirm} color="secondary" disabled={deleting}>
+              {deleting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </DialogActions>
+        </Dialog>
       </Content>
     </Page>
   );

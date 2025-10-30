@@ -16,6 +16,7 @@ import {
   kuadrantApiProductListPermission,
   kuadrantApiProductReadPermission,
   kuadrantApiProductCreatePermission,
+  kuadrantApiProductDeletePermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
   kuadrantApiKeyRequestUpdatePermission,
@@ -236,6 +237,40 @@ export async function createRouter({
       } else {
         // pass the detailed error message to the frontend
         res.status(500).json({ error: errorMessage });
+      }
+    }
+  });
+
+  router.delete('/apiproducts/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductDeletePermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+
+      await k8sClient.deleteCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apiproducts',
+        name
+      );
+
+      res.status(204).send();
+    } catch (error) {
+      console.error('error deleting apiproduct:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to delete apiproduct' });
       }
     }
   });
