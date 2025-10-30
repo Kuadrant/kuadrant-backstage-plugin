@@ -449,18 +449,23 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
+      const { apiName, apiNamespace, planTier, useCase, userId, userEmail, namespace } = parsed.data;
 
+      // check permission with resource reference (per-apiproduct access control)
+      const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestCreatePermission }],
+        [{
+          permission: kuadrantApiKeyRequestCreatePermission,
+          resourceRef,
+        }],
         { credentials }
       );
 
       if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+        throw new NotAllowedError(`not authorised to request access to ${apiName}`);
       }
 
       const { userId: authenticatedUserId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
-      const { apiName, apiNamespace, planTier, useCase, userId, userEmail, namespace } = parsed.data;
 
       // validate userId matches authenticated user (platform engineers and api owners can create on behalf of others)
       const canCreateForOthers = isPlatformEngineer || isApiOwner;
@@ -500,6 +505,80 @@ export async function createRouter({
         'apikeyrequests',
         request,
       );
+
+      // check if apiproduct has automatic approval mode
+      try {
+        const apiProduct = await k8sClient.getCustomResource(
+          'extensions.kuadrant.io',
+          'v1alpha1',
+          apiNamespace,
+          'apiproducts',
+          apiName,
+        );
+
+        if (apiProduct.spec?.approvalMode === 'automatic') {
+          // automatically approve and create secret
+          const apiKey = generateApiKey();
+          const timestamp = Date.now();
+          const secretName = `${userId}-${apiName}-${timestamp}`
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '-');
+
+          const secret = {
+            apiVersion: 'v1',
+            kind: 'Secret',
+            metadata: {
+              name: secretName,
+              namespace: apiNamespace,
+              labels: {
+                app: apiName,
+              },
+              annotations: {
+                'secret.kuadrant.io/plan-id': planTier,
+                'secret.kuadrant.io/user-id': userId,
+              },
+            },
+            stringData: {
+              api_key: apiKey,
+            },
+            type: 'Opaque',
+          };
+
+          await k8sClient.createSecret(apiNamespace, secret);
+
+          // get plan limits
+          let planLimits: any = null;
+          const plan = apiProduct.spec?.plans?.find((p: any) => p.tier === planTier);
+          if (plan) {
+            planLimits = plan.limits;
+          }
+
+          // update request status to approved
+          const status = {
+            phase: 'Approved',
+            reviewedBy: 'system',
+            reviewedAt: new Date().toISOString(),
+            reason: 'automatic approval',
+            apiKey,
+            apiHostname: `${apiName}.apps.example.com`,
+            apiBasePath: '/api/v1',
+            apiDescription: `${apiName} api`,
+            planLimits,
+          };
+
+          await k8sClient.patchCustomResourceStatus(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            namespace,
+            'apikeyrequests',
+            requestName,
+            status,
+          );
+        }
+      } catch (error) {
+        console.warn('could not check approval mode or auto-approve:', error);
+        // continue anyway - request was created successfully
+      }
 
       res.status(201).json(created);
     } catch (error) {
@@ -821,6 +900,33 @@ export async function createRouter({
       const canDeleteAll = isPlatformEngineer || isApiOwner;
       if (!canDeleteAll && requestUserId !== userId) {
         throw new NotAllowedError('you can only delete your own api key requests');
+      }
+
+      // if request is approved, find and delete associated secret
+      if (request.status?.phase === 'Approved') {
+        try {
+          const apiNamespace = request.spec?.apiNamespace;
+          const apiName = request.spec?.apiName;
+          const planTier = request.spec?.planTier;
+
+          // list secrets in the api namespace and find the one with matching annotations
+          const secrets = await k8sClient.listSecrets(apiNamespace);
+          const matchingSecret = secrets.items?.find((s: any) => {
+            const annotations = s.metadata?.annotations || {};
+            return (
+              annotations['secret.kuadrant.io/user-id'] === requestUserId &&
+              annotations['secret.kuadrant.io/plan-id'] === planTier &&
+              s.metadata?.labels?.app === apiName
+            );
+          });
+
+          if (matchingSecret) {
+            await k8sClient.deleteSecret(apiNamespace, matchingSecret.metadata.name);
+          }
+        } catch (error) {
+          console.warn('failed to delete associated secret:', error);
+          // continue with request deletion even if secret deletion fails
+        }
       }
 
       await k8sClient.deleteCustomResource(

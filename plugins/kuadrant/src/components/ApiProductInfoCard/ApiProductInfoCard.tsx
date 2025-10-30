@@ -103,7 +103,6 @@ export const ApiProductInfoCard = () => {
                     <TableCell>
                       <Chip
                         label={plan.tier}
-                        color={plan.tier === 'gold' ? 'secondary' : plan.tier === 'silver' ? 'primary' : 'default'}
                         size="small"
                       />
                     </TableCell>

@@ -33,24 +33,6 @@ import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import { APIKeyRequest } from '../../types/api-management';
 
-interface Secret {
-  metadata: {
-    name: string;
-    namespace: string;
-    creationTimestamp: string;
-    annotations?: {
-      'secret.kuadrant.io/plan-id'?: string;
-      'secret.kuadrant.io/user-id'?: string;
-    };
-    labels?: {
-      app?: string;
-    };
-  };
-  data?: {
-    api_key?: string;
-  };
-}
-
 interface APIProduct {
   metadata: {
     name: string;
@@ -101,18 +83,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     setUserEmail(profile.email || '');
   }, [identityApi]);
 
-  const { value: apiKeys, loading: keysLoading, error: keysError } = useAsync(async () => {
-    if (!userId) return [];
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apikeys?namespace=${namespace}&userId=${userId}`
-    );
-    if (!response.ok) {
-      throw new Error('failed to fetch api keys');
-    }
-    const data = await response.json();
-    return data.items || [];
-  }, [namespace, userId, refresh, fetchApi]);
-
   const { value: requests, loading: requestsLoading, error: requestsError } = useAsync(async () => {
     if (!userId) return [];
     const response = await fetchApi.fetch(
@@ -141,21 +111,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
     return product;
   }, [namespace, apiName, fetchApi]);
-
-  const handleDelete = async (name: string) => {
-    try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apikeys/${namespace}/${name}`,
-        { method: 'DELETE' }
-      );
-      if (!response.ok) {
-        throw new Error('failed to delete api key');
-      }
-      setRefresh(r => r + 1);
-    } catch (err) {
-      console.error('error deleting api key:', err);
-    }
-  };
 
   const handleDeleteRequest = async (name: string) => {
     try {
@@ -223,8 +178,8 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     }
   };
 
-  const loading = keysLoading || requestsLoading || plansLoading;
-  const error = keysError || requestsError || plansError;
+  const loading = requestsLoading || plansLoading;
+  const error = requestsError || plansError;
 
   if (loading) {
     return <Progress />;
@@ -234,99 +189,12 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     return <ResponseErrorPanel error={error} />;
   }
 
-  const secrets = (apiKeys || []) as Secret[];
   const myRequests = (requests || []) as APIKeyRequest[];
   const plans = (apiProduct?.spec?.plans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
   const rejectedRequests = myRequests.filter(r => r.status?.phase === 'Rejected');
-
-  const columns: TableColumn<Secret>[] = [
-    {
-      title: 'Name',
-      field: 'metadata.name',
-      render: (row: Secret) => (
-        <Typography variant="body2">{row.metadata.name}</Typography>
-      ),
-    },
-    {
-      title: 'API',
-      field: 'metadata.labels.app',
-      render: (row: Secret) => (
-        <Typography variant="body2">{row.metadata.labels?.app || 'N/A'}</Typography>
-      ),
-    },
-    {
-      title: 'Plan Tier',
-      field: 'planTier',
-      render: (row: Secret) => (
-        <Chip
-          label={row.metadata.annotations?.['secret.kuadrant.io/plan-id'] || 'Unknown'}
-          color="primary"
-          size="small"
-        />
-      ),
-      customFilterAndSearch: (filter: string, row: Secret) => {
-        const planTier = row.metadata.annotations?.['secret.kuadrant.io/plan-id'] || 'Unknown';
-        return planTier.toLowerCase().includes(filter.toLowerCase());
-      },
-    },
-    {
-      title: 'Created',
-      field: 'metadata.creationTimestamp',
-      render: (row: Secret) => (
-        <Typography variant="body2">
-          {new Date(row.metadata.creationTimestamp).toLocaleDateString()}
-        </Typography>
-      ),
-    },
-    {
-      title: 'API Key',
-      field: 'data.api_key',
-      searchable: false,
-      render: (row: Secret) => {
-        const isVisible = visibleKeys.has(row.metadata.name);
-        const apiKey = row.data?.api_key
-          ? atob(row.data.api_key)
-          : 'N/A';
-
-        return (
-          <Box display="flex" alignItems="center">
-            <Typography
-              variant="body2"
-              style={{
-                fontFamily: 'monospace',
-                marginRight: 8,
-              }}
-            >
-              {isVisible ? apiKey : '••••••••••••••••'}
-            </Typography>
-            <IconButton
-              size="small"
-              onClick={() => toggleVisibility(row.metadata.name)}
-            >
-              {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
-            </IconButton>
-          </Box>
-        );
-      },
-    },
-    {
-      title: 'Actions',
-      field: 'actions',
-      searchable: false,
-      render: (row: Secret) => (
-        <IconButton
-          size="small"
-          onClick={() => handleDelete(row.metadata.name)}
-          color="secondary"
-        >
-          <DeleteIcon />
-        </IconButton>
-      ),
-    },
-  ];
 
   const approvedColumns: TableColumn<APIKeyRequest>[] = [
     {
@@ -373,6 +241,21 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           </Box>
         );
       },
+    },
+    {
+      title: 'Actions',
+      field: 'actions',
+      searchable: false,
+      render: (row: APIKeyRequest) => (
+        <IconButton
+          size="small"
+          onClick={() => handleDeleteRequest(row.metadata.name)}
+          color="secondary"
+          title="Revoke access and delete key"
+        >
+          <DeleteIcon />
+        </IconButton>
+      ),
     },
   ];
 
@@ -500,7 +383,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
         {approvedRequests.length > 0 && (
           <Grid item>
             <Table
-              title="Approved Requests"
+              title="API Keys"
               options={{
                 paging: false,
                 search: false,
@@ -510,25 +393,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             />
           </Grid>
         )}
-        <Grid item>
-          <Table
-            title="API Keys (from Secrets)"
-            options={{
-              paging: true,
-              search: true,
-              pageSize: 10,
-            }}
-            columns={columns}
-            data={secrets}
-            emptyContent={
-              <Box p={4}>
-                <Typography align="center">
-                  No API keys found
-                </Typography>
-              </Box>
-            }
-          />
-        </Grid>
       </Grid>
 
       <Dialog open={open} onClose={() => setOpen(false)} maxWidth="sm" fullWidth>

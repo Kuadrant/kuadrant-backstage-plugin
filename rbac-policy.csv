@@ -1,5 +1,5 @@
 # platform engineer: manages infrastructure (planpolicy, gateways, httproutes)
-# can do: create/update planpolicy, read all resources (monitoring)
+# can do: create/update planpolicy, read all resources (monitoring), request api access for testing
 # cannot do: approve/reject requests, create apiproducts
 p, role:default/platform-engineer, kuadrant.planpolicy.create, create, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.read, read, allow
@@ -8,12 +8,13 @@ p, role:default/platform-engineer, kuadrant.planpolicy.delete, delete, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.list, read, allow
 p, role:default/platform-engineer, kuadrant.apiproduct.read, read, allow
 p, role:default/platform-engineer, kuadrant.apiproduct.list, read, allow
+p, role:default/platform-engineer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/platform-engineer, kuadrant.apikeyrequest.read.all, read, allow
 p, role:default/platform-engineer, kuadrant.apikeyrequest.list, read, allow
 p, role:default/platform-engineer, catalog.entity.read, read, allow
 
 # api owner: publishes apis, approves requests for own apis
-# can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference)
+# can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference), request api access
 # cannot do: create/update planpolicy, approve requests for other apis
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
@@ -22,6 +23,7 @@ p, role:default/api-owner, kuadrant.apiproduct.read, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.update, update, allow
 p, role:default/api-owner, kuadrant.apiproduct.delete, delete, allow
 p, role:default/api-owner, kuadrant.apiproduct.list, read, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/api-owner, kuadrant.apikeyrequest.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.update, update, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.list, read, allow
@@ -34,11 +36,16 @@ p, role:default/api-owner, catalog.entity.read, read, allow
 # cannot do: approve requests, create apis, modify rate limits
 p, role:default/api-consumer, kuadrant.apiproduct.read, read, allow
 p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
-p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow
+# allow requesting access to any api (per-apiproduct access control can be added below)
+p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/api-consumer, kuadrant.apikeyrequest.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
+
+# example: restrict specific apis to specific roles
+# p, role:default/partner, kuadrant.apikeyrequest.create, create, allow, apiproduct:toystore/toystore-api
+# p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
 
 # assign groups to roles
 g, group:default/platform-engineers, role:default/platform-engineer
