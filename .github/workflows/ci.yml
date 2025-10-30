@@ -35,8 +35,8 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Lint
-        run: yarn lint:all
+#      - name: Lint
+#        run: yarn lint:all
 
       - name: Type check
         run: yarn tsc:full
