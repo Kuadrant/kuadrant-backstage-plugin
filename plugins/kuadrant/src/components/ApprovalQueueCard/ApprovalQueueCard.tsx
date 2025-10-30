@@ -6,11 +6,9 @@ import {
   TableColumn,
   Progress,
   ResponseErrorPanel,
+  InfoCard,
 } from '@backstage/core-components';
 import {
-  Card,
-  CardContent,
-  CardHeader,
   Button,
   Dialog,
   DialogTitle,
@@ -18,6 +16,8 @@ import {
   DialogActions,
   TextField,
   Chip,
+  Typography,
+  Box,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
