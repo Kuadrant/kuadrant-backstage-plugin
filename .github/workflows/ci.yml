@@ -1,0 +1,47 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build-validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Show Yarn version
+        run: yarn --version
+
+      - name: Lint checks
+        run: yarn lint:check
+
+      - name: Prettier check
+        run: yarn prettier:check
+
+      - name: Type check
+        run: yarn tsc
+
+      - name: Build all packages
+        run: yarn build
+
+      - name: Verify frontend plugin bundle
+        run: test -f plugins/kuadrant/dist/index.esm.js
+
+      - name: Verify backend plugin bundle
+        run: test -f plugins/kuadrant-backend/dist/index.cjs.js
