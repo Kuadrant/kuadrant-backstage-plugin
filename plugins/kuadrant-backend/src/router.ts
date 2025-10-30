@@ -553,6 +553,23 @@ export async function createRouter({
             planLimits = plan.limits;
           }
 
+          // fetch httproute to get hostname
+          let apiHostname = `${apiName}.apps.example.com`;
+          try {
+            const httproute = await k8sClient.getCustomResource(
+              'gateway.networking.k8s.io',
+              'v1',
+              apiNamespace,
+              'httproutes',
+              apiName,
+            );
+            if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
+              apiHostname = httproute.spec.hostnames[0];
+            }
+          } catch (error) {
+            console.warn('could not fetch httproute for hostname, using default:', error);
+          }
+
           // update request status to approved
           const status = {
             phase: 'Approved',
@@ -560,7 +577,7 @@ export async function createRouter({
             reviewedAt: new Date().toISOString(),
             reason: 'automatic approval',
             apiKey,
-            apiHostname: `${apiName}.apps.example.com`,
+            apiHostname,
             apiBasePath: '/api/v1',
             apiDescription: `${apiName} api`,
             planLimits,
@@ -786,13 +803,30 @@ export async function createRouter({
         }
       }
 
+      // fetch httproute to get hostname
+      let apiHostname = `${spec.apiName}.apps.example.com`;
+      try {
+        const httproute = await k8sClient.getCustomResource(
+          'gateway.networking.k8s.io',
+          'v1',
+          spec.apiNamespace,
+          'httproutes',
+          spec.apiName,
+        );
+        if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
+          apiHostname = httproute.spec.hostnames[0];
+        }
+      } catch (error) {
+        console.warn('could not fetch httproute for hostname, using default:', error);
+      }
+
       const status = {
         phase: 'Approved',
         reviewedBy,
         reviewedAt: new Date().toISOString(),
         reason: comment || 'approved',
         apiKey,
-        apiHostname: `${spec.apiName}.apps.example.com`,
+        apiHostname,
         apiBasePath: '/api/v1',
         apiDescription: `${spec.apiName} api`,
         planLimits,

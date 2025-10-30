@@ -46,8 +46,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const { value: planPolicies, loading: planPoliciesLoading } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
     const data = await response.json();
-    return data.items || [];
-  }, [backendUrl, fetchApi, open]);
+    // filter to only show planpolicies in the same namespace as the apiproduct
+    return (data.items || []).filter((policy: any) =>
+      !namespace || policy.metadata.namespace === namespace
+    );
+  }, [backendUrl, fetchApi, open, namespace]);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -70,6 +73,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       }
 
       const [selectedPlanNamespace, selectedPlanName] = selectedPlanPolicy.split('/');
+
+      // Validate namespace matching
+      if (selectedPlanNamespace !== namespace) {
+        throw new Error(`PlanPolicy must be in the same namespace as the APIProduct (${namespace}). Selected PlanPolicy is in ${selectedPlanNamespace}.`);
+      }
 
       const apiProduct = {
         apiVersion: 'extensions.kuadrant.io/v1alpha1',

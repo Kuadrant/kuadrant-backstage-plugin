@@ -336,6 +336,20 @@ export const ApprovalQueueCard = () => {
         </Typography>
       ),
     },
+    {
+      title: 'Approval Type',
+      field: 'status.reviewedBy',
+      render: (row) => {
+        const isAutomatic = row.status?.reviewedBy === 'system';
+        return (
+          <Chip
+            label={isAutomatic ? 'Automatic' : 'Manual'}
+            size="small"
+            color={isAutomatic ? 'default' : 'primary'}
+          />
+        );
+      },
+    },
   ];
 
   const rejectedColumns: TableColumn<APIKeyRequest>[] = [
