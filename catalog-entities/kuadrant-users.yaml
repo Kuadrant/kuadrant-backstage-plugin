@@ -2,6 +2,16 @@
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
+  name: guest
+spec:
+  profile:
+    displayName: Guest User
+    email: guest@example.com
+  memberOf: [platform-engineers, api-owners, api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
   name: platform-engineer
 spec:
   profile:
