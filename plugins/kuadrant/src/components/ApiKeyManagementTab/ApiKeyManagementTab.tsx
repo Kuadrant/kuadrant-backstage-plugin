@@ -1,10 +1,12 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useAsync } from 'react-use';
 import {
   Table,
   TableColumn,
   Progress,
   ResponseErrorPanel,
+  InfoCard,
+  CodeSnippet,
 } from '@backstage/core-components';
 import {
   IconButton,
@@ -22,6 +24,8 @@ import {
   MenuItem,
   FormControl,
   InputLabel,
+  Tabs,
+  Tab,
 } from '@material-ui/core';
 import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
@@ -176,6 +180,131 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     } finally {
       setCreating(false);
     }
+  };
+
+  const detailPanelConfig = useMemo(() => [
+    {
+      render: (data: any) => {
+        // backstage Table wraps the data in { rowData: actualData }
+        const request = data.rowData as APIKeyRequest;
+        if (!request?.metadata?.name) {
+          return <Box />;
+        }
+
+        return <DetailPanelContent request={request} apiName={apiName} />;
+      },
+    },
+  ], [apiName]);
+
+  // separate component to isolate state
+  const DetailPanelContent = ({ request, apiName: api }: { request: APIKeyRequest; apiName: string }) => {
+    const [selectedLanguage, setSelectedLanguage] = useState(0);
+    const hostname = request.status?.apiHostname || `${api}.apps.example.com`;
+
+    return (
+      <Box p={3} bgcolor="background.default" onClick={(e) => e.stopPropagation()}>
+        <Typography variant="h6" gutterBottom>
+          Usage Examples
+        </Typography>
+        <Typography variant="body2" paragraph>
+          Use these code examples to test the API with your {request.spec.planTier} tier key.
+        </Typography>
+        <Box onClick={(e) => e.stopPropagation()}>
+          <Tabs
+            value={selectedLanguage}
+            onChange={(e, newValue) => {
+              e.stopPropagation();
+              setSelectedLanguage(newValue);
+            }}
+            indicatorColor="primary"
+          >
+            <Tab label="cURL" onClick={(e) => e.stopPropagation()} />
+            <Tab label="Node.js" onClick={(e) => e.stopPropagation()} />
+            <Tab label="Python" onClick={(e) => e.stopPropagation()} />
+            <Tab label="Go" onClick={(e) => e.stopPropagation()} />
+          </Tabs>
+        </Box>
+            <Box mt={2}>
+              {selectedLanguage === 0 && (
+                <CodeSnippet
+                  text={`curl -X GET https://${hostname}/api/v1/endpoint \\
+  -H "Authorization: Bearer ${request.status?.apiKey}"`}
+                  language="bash"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 1 && (
+                <CodeSnippet
+                  text={`const fetch = require('node-fetch');
+
+const apiKey = '${request.status?.apiKey}';
+const endpoint = 'https://${hostname}/api/v1/endpoint';
+
+fetch(endpoint, {
+  method: 'GET',
+  headers: {
+    'Authorization': \`Bearer \${apiKey}\`
+  }
+})
+  .then(response => response.json())
+  .then(data => console.log(data))
+  .catch(error => console.error('Error:', error));`}
+                  language="javascript"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 2 && (
+                <CodeSnippet
+                  text={`import requests
+
+api_key = '${request.status?.apiKey}'
+endpoint = 'https://${hostname}/api/v1/endpoint'
+
+headers = {
+    'Authorization': f'Bearer {api_key}'
+}
+
+response = requests.get(endpoint, headers=headers)
+print(response.json())`}
+                  language="python"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 3 && (
+                <CodeSnippet
+                  text={`package main
+
+import (
+    "fmt"
+    "net/http"
+    "io"
+)
+
+func main() {
+    apiKey := "${request.status?.apiKey}"
+    endpoint := "https://${hostname}/api/v1/endpoint"
+
+    client := &http.Client{}
+    req, _ := http.NewRequest("GET", endpoint, nil)
+    req.Header.Add("Authorization", "Bearer " + apiKey)
+
+    resp, err := client.Do(req)
+    if err != nil {
+        fmt.Println("Error:", err)
+        return
+    }
+    defer resp.Body.Close()
+
+    body, _ := io.ReadAll(resp.Body)
+    fmt.Println(string(body))
+}`}
+                  language="go"
+                  showCopyCodeButton
+                />
+              )}
+        </Box>
+      </Box>
+    );
   };
 
   const loading = requestsLoading || plansLoading;
@@ -383,6 +512,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
         {approvedRequests.length > 0 && (
           <Grid item>
             <Table
+              key="api-keys-table"
               title="API Keys"
               options={{
                 paging: false,
@@ -390,6 +520,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
               }}
               columns={approvedColumns}
               data={approvedRequests}
+              detailPanel={detailPanelConfig}
             />
           </Grid>
         )}

@@ -314,6 +314,53 @@ Plan tier names are **not hardcoded** (gold/silver/bronze) - they are arbitrary 
 
 PlanPolicy predicates (CEL expressions) are evaluated by the gateway at runtime, not by Backstage. Backstage should not duplicate Authorino's auth logic. Access control in Backstage is for portal UX (who can see/request APIs), not runtime enforcement (who can call APIs with which rate limits).
 
+### Backstage Table detailPanel with Interactive Content
+
+When using the Backstage `Table` component's `detailPanel` feature with interactive elements (tabs, buttons, etc.), there's a critical pattern to avoid re-render issues:
+
+**Problem**: If the detail panel content uses parent component state, changing that state causes the entire parent to re-render, which makes the Material Table lose its internal expansion state and collapse the row.
+
+**Solution**: Create a separate component for the detail panel content with its own isolated local state:
+
+```typescript
+// In parent component - keep detailPanel config simple and stable
+const detailPanelConfig = useMemo(() => [
+  {
+    render: (data: any) => {
+      const item = data.rowData;
+      if (!item) return <Box />;
+      return <DetailPanelContent item={item} />;
+    },
+  },
+], [/* minimal dependencies */]);
+
+// Separate component with isolated state
+const DetailPanelContent = ({ item }) => {
+  const [localState, setLocalState] = useState(initialValue);
+
+  return (
+    <Box onClick={(e) => e.stopPropagation()}>
+      {/* Interactive content like Tabs, buttons, etc. */}
+      <Tabs value={localState} onChange={(e, val) => {
+        e.stopPropagation();
+        setLocalState(val);
+      }}>
+        {/* ... */}
+      </Tabs>
+    </Box>
+  );
+};
+```
+
+**Key principles:**
+1. Each detail panel instance gets its own component with isolated state
+2. Changing state in one detail panel doesn't trigger parent re-renders
+3. Add `onClick={(e) => e.stopPropagation()}` to prevent clicks from bubbling to table row
+4. Add `e.stopPropagation()` to interactive element handlers (onChange, onClick, etc.)
+5. Keep `detailPanelConfig` in `useMemo` with minimal dependencies
+
+**Example**: API key management tab shows expandable rows with code examples in multiple languages (cURL, Node.js, Python, Go). Each row has language tabs that can be switched without collapsing the expansion.
+
 ### Adding Custom Plugins
 
 To add custom plugins to the monorepo for local development:
@@ -687,4 +734,142 @@ the rbac ui will:
 - expose all 19 permissions for role creation
 
 **anti-pattern**: do not create a `PermissionMetadata` type or try to manually provide titles/descriptions. this type doesn't exist in backstage and the ui generates labels automatically from permission names.
+
+## Kuadrant Resource Namespace Organisation
+
+Kuadrant follows a strict namespace organisation pattern where all resources for an API must live in the same namespace:
+
+```
+namespace: toystore
+├── httproute (toystore) - gateway api route definition
+├── authpolicy (toystore) - authentication policy targeting httproute
+├── planpolicy (toystore-plans) - rate limiting policy targeting httproute
+├── service (toystore) - backend service
+└── secrets (api keys) - created by backstage with plan-id annotations
+```
+
+### Why This Matters
+
+1. **AuthPolicy references Secrets**: AuthPolicy needs to access Secrets in the same namespace for authentication
+2. **Policies target HTTPRoute**: Both AuthPolicy and PlanPolicy use `targetRef` to reference the HTTPRoute by name (same namespace lookup)
+3. **Secrets placement**: API keys (Secrets) must be in the API's namespace so AuthPolicy can reference them
+
+### Implementation in Backstage
+
+**Frontend validation** (`CreateAPIProductDialog.tsx:50-52, 77-80`):
+- PlanPolicy dropdown filtered to only show policies in the same namespace as the APIProduct being created
+- Validation error thrown if cross-namespace PlanPolicy selected
+
+**Backend Secret creation** (`router.ts:532, 547, 752`):
+- Secrets always created in `apiNamespace` (not request namespace)
+- Ensures Secrets live where AuthPolicy can access them
+
+**Example error**:
+```
+PlanPolicy must be in the same namespace as the APIProduct (default).
+Selected PlanPolicy is in toystore.
+```
+
+## Automatic vs Manual Approval Modes
+
+APIProducts support two approval modes for API key requests:
+
+### Approval Modes
+
+1. **Manual** (default): Requests require explicit approval by API owner
+2. **Automatic**: Requests immediately create API keys without review
+
+### Implementation
+
+**CRD field** (`extensions.kuadrant.io_apiproduct.yaml:39-43`):
+```yaml
+approvalMode:
+  type: string
+  enum: [automatic, manual]
+  default: manual
+  description: Whether access requests are auto-approved or require manual review
+```
+
+**Frontend** (`CreateAPIProductDialog.tsx:35, 202-214`):
+- Dropdown selector in create form
+- Defaults to manual
+- Includes helper text explaining behaviour
+
+**Backend logic** (`router.ts:509-581`):
+When APIKeyRequest is created (POST /requests):
+1. Create APIKeyRequest resource in Kubernetes
+2. Fetch associated APIProduct
+3. If `apiProduct.spec.approvalMode === 'automatic'`:
+   - Immediately generate API key
+   - Create Secret in API namespace
+   - Update APIKeyRequest status to 'Approved' with `reviewedBy: 'system'`
+4. If manual, request stays in 'Pending' state
+
+### User Experience
+
+**Manual mode** (toystore demo):
+- User requests API access → status: Pending
+- API Owner reviews → clicks approve → status: Approved
+- User sees API key
+
+**Automatic mode**:
+- User requests API access → immediately approved
+- User sees API key instantly
+- No approval queue needed
+
+## API Key Management Model
+
+APIKeyRequests are the source of truth for API keys, not Kubernetes Secrets.
+
+### Resource Relationship
+
+```
+APIKeyRequest (CRD)          Secret (Kubernetes)
+├── metadata.name            Created when approved
+├── spec.planTier            annotations:
+├── spec.apiName               - secret.kuadrant.io/plan-id
+├── spec.requestedBy.userId    - secret.kuadrant.io/user-id
+└── status.apiKey            labels:
+                               - app: <apiName>
+```
+
+### UI Behaviour
+
+**What users see**:
+- Pending Requests - awaiting approval
+- Rejected Requests - denied access
+- API Keys - approved requests showing the key from APIKeyRequest.status.apiKey
+
+**What users don't see**:
+- Kubernetes Secrets directly
+- Secret names or metadata
+
+### Deletion Flow
+
+When user deletes an approved API key (`router.ts:905-930`):
+1. Backend finds matching Secret by annotations:
+   - `secret.kuadrant.io/user-id` === requestUserId
+   - `secret.kuadrant.io/plan-id` === planTier
+   - `app` label === apiName
+2. Deletes Secret from API namespace
+3. Deletes APIKeyRequest resource
+4. Both disappear from Kubernetes
+
+### Why Secrets Aren't Listed
+
+**Problem**: Previously showed two sections:
+- "Approved Requests" (from APIKeyRequests)
+- "API Keys (from Secrets)" (from Kubernetes Secrets)
+
+Deleting a Secret left the APIKeyRequest, showing duplicate/stale data.
+
+**Solution**:
+- UI only shows APIKeyRequests (single source of truth)
+- Secrets are implementation details managed by backend
+- Delete button on approved requests triggers both deletions
+
+**Removed code**:
+- `GET /apikeys` endpoint (no longer called)
+- Secret fetching in `ApiKeyManagementTab.tsx`
+- "API Keys (from Secrets)" table component
 
