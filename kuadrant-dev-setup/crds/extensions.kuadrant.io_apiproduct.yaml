@@ -110,7 +110,10 @@ spec:
                     description: url to general documentation
                   gitRepository:
                     type: string
-                    description: url to git repository
+                    description: url to git repository (shown as view source in backstage)
+                  techdocsRef:
+                    type: string
+                    description: techdocs reference (e.g. url:https://github.com/org/repo or dir:. for local docs)
               contact:
                 type: object
                 description: contact information for api owners
