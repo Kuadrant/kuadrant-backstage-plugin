@@ -11,7 +11,10 @@
   },
   "backstage": {
     "role": "backend-plugin",
-    "pluginId": "kuadrant"
+    "pluginId": "kuadrant",
+    "pluginPackages": [
+      "@kuadrant/plugin-kuadrant-backend"
+    ]
   },
   "exports": {
     ".": "./src/index.ts",
