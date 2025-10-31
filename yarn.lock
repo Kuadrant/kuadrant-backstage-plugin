@@ -9422,7 +9422,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@kuadrant/plugin-kuadrant@0.1.0, @kuadrant/plugin-kuadrant@workspace:plugins/kuadrant":
+"@kuadrant/plugin-kuadrant@workspace:*, @kuadrant/plugin-kuadrant@workspace:plugins/kuadrant":
   version: 0.0.0-use.local
   resolution: "@kuadrant/plugin-kuadrant@workspace:plugins/kuadrant"
   dependencies:
@@ -19775,7 +19775,7 @@ __metadata:
     "@emotion/react": 11.14.0
     "@emotion/styled": 11.14.1
     "@janus-idp/cli": 3.6.1
-    "@kuadrant/plugin-kuadrant": 0.1.0
+    "@kuadrant/plugin-kuadrant": "workspace:*"
     "@material-ui/core": ^4.12.4
     "@mui/icons-material": 5.18.0
     "@mui/material": 5.18.0
