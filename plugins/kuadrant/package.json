@@ -11,7 +11,10 @@
   },
   "backstage": {
     "role": "frontend-plugin",
-    "pluginId": "kuadrant"
+    "pluginId": "kuadrant",
+    "pluginPackages": [
+      "@kuadrant/plugin-kuadrant"
+    ]
   },
   "scalprum": {
     "name": "internal.plugin-kuadrant",
