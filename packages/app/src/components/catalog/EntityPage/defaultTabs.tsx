@@ -4,7 +4,7 @@ import { isKind } from '@backstage/plugin-catalog';
 import {
   EntityKuadrantApiKeysContent,
   EntityKuadrantApiProductInfoContent,
-} from '@internal/plugin-kuadrant';
+} from '@kuadrant/plugin-kuadrant';
 
 import Grid from '../Grid';
 import { isType } from '../utils';

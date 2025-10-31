@@ -1,5 +1,5 @@
 {
-  "name": "@internal/plugin-kuadrant-backend-rbac",
+  "name": "@kuadrant/plugin-kuadrant-backend-rbac",
   "version": "0.1.0",
   "main": "./rbac-module.cjs.js",
   "types": "./rbac-module.d.ts",
