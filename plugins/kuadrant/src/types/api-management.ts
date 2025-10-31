@@ -29,6 +29,7 @@ export interface APIKeyRequestStatus {
   reviewedBy?: string;
   reviewedAt?: string;
   reason?: string;
+  comment?: string;
   apiKey?: string;
   apiHostname?: string;
   apiBasePath?: string;

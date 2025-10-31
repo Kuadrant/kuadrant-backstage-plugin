@@ -20,9 +20,8 @@ import { ScaffolderFieldExtensions } from '@backstage/plugin-scaffolder-react';
 import { SearchPage as BackstageSearchPage } from '@backstage/plugin-search';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
 
-import { KuadrantPage } from '@internal/plugin-kuadrant';
 import { RbacPage } from '@backstage-community/plugin-rbac';
-
+import { KuadrantPage } from '@internal/plugin-kuadrant';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
 
 import getDynamicRootConfig from '../../utils/dynamicUI/getDynamicRootConfig';

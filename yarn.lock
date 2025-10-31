@@ -8665,7 +8665,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@internal/plugin-kuadrant-backend@workspace:plugins/kuadrant-backend":
+"@internal/plugin-kuadrant-backend@workspace:^, @internal/plugin-kuadrant-backend@workspace:plugins/kuadrant-backend":
   version: 0.0.0-use.local
   resolution: "@internal/plugin-kuadrant-backend@workspace:plugins/kuadrant-backend"
   dependencies:
@@ -19776,6 +19776,7 @@ __metadata:
     "@emotion/styled": 11.14.1
     "@internal/plugin-kuadrant": 0.1.0
     "@janus-idp/cli": 3.6.1
+    "@material-ui/core": ^4.12.4
     "@mui/icons-material": 5.18.0
     "@mui/material": 5.18.0
     "@mui/styled-engine": 5.18.0
@@ -20514,6 +20515,7 @@ __metadata:
     "@backstage/plugin-search-backend-module-pg": 0.5.47
     "@backstage/plugin-user-settings-backend": 0.3.5
     "@internal/plugin-dynamic-plugins-info-backend": "*"
+    "@internal/plugin-kuadrant-backend": "workspace:^"
     "@internal/plugin-licensed-users-info-backend": "*"
     "@internal/plugin-scalprum-backend": "*"
     "@janus-idp/backstage-plugin-audit-log-node": 1.7.2

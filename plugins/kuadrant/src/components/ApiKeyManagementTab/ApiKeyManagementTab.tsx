@@ -1,11 +1,10 @@
-import { useState, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useAsync } from 'react-use';
 import {
   Table,
   TableColumn,
   Progress,
   ResponseErrorPanel,
-  InfoCard,
   CodeSnippet,
 } from '@backstage/core-components';
 import {

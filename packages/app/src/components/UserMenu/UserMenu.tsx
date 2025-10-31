@@ -1,6 +1,8 @@
 import React from 'react';
-import { useApi, identityApiRef } from '@backstage/core-plugin-api';
-import { IconButton, Menu, MenuItem, Avatar, Box } from '@material-ui/core';
+
+import { identityApiRef, useApi } from '@backstage/core-plugin-api';
+
+import { Avatar, Box, IconButton, Menu, MenuItem } from '@material-ui/core';
 import { makeStyles } from '@material-ui/core/styles';
 
 const useStyles = makeStyles(theme => ({
@@ -20,7 +22,10 @@ export const UserMenu = () => {
   const classes = useStyles();
   const identityApi = useApi(identityApiRef);
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
-  const [profile, setProfile] = React.useState<{ displayName?: string; email?: string } | null>(null);
+  const [profile, setProfile] = React.useState<{
+    displayName?: string;
+    email?: string;
+  } | null>(null);
 
   React.useEffect(() => {
     identityApi.getProfileInfo().then(setProfile);
@@ -72,10 +77,17 @@ export const UserMenu = () => {
         <MenuItem disabled>
           <div>
             <div>{profile.displayName}</div>
-            <div style={{ fontSize: '0.875rem', color: 'grey' }}>{profile.email}</div>
+            <div style={{ fontSize: '0.875rem', color: 'grey' }}>
+              {profile.email}
+            </div>
           </div>
         </MenuItem>
-        <MenuItem onClick={() => { window.location.href = '/settings'; handleClose(); }}>
+        <MenuItem
+          onClick={() => {
+            window.location.href = '/settings';
+            handleClose();
+          }}
+        >
           Settings
         </MenuItem>
         <MenuItem onClick={handleSignOut}>Sign Out</MenuItem>

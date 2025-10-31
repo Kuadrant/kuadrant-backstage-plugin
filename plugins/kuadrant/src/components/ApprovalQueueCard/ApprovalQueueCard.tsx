@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { useApi, fetchApiRef, identityApiRef, configApiRef } from '@backstage/core-plugin-api';
 import { useAsync } from 'react-use';
 import {
@@ -254,7 +254,7 @@ export const ApprovalQueueCard = () => {
     {
       title: 'Actions',
       render: (row) => (
-        <Box display="flex" gap={1}>
+        <Box display="flex" style={{ gap: 8 }}>
           <Button
             size="small"
             startIcon={<CheckCircleIcon />}

@@ -44,10 +44,10 @@ import DynamicRootContext, {
 
 import { useLanguagePreference } from '../../hooks/useLanguagePreference';
 import { useTranslation } from '../../hooks/useTranslation';
+import { UserMenu } from '../UserMenu';
 import { ApplicationHeaders } from './ApplicationHeaders';
 import { MenuIcon } from './MenuIcon';
 import { SidebarLogo } from './SidebarLogo';
-import { UserMenu } from '../UserMenu';
 
 /**
  * This is a workaround to remove the fix height of the Page component
