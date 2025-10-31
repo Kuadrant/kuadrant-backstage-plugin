@@ -19774,6 +19774,7 @@ __metadata:
     "@backstage/ui": 0.7.0
     "@emotion/react": 11.14.0
     "@emotion/styled": 11.14.1
+    "@internal/plugin-kuadrant": 0.1.0
     "@janus-idp/cli": 3.6.1
     "@kuadrant/plugin-kuadrant": 0.1.0
     "@material-ui/core": ^4.12.4
