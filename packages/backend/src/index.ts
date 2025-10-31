@@ -167,11 +167,11 @@ backend.add(
 backend.add(import('@internal/plugin-licensed-users-info-backend'));
 
 // kuadrant plugins
-backend.add(import('@internal/plugin-kuadrant-backend'));
+backend.add(import('@kuadrant/plugin-kuadrant-backend'));
 // load catalog module (apiproduct entity provider)
-backend.add(import('@internal/plugin-kuadrant-backend/alpha'));
+backend.add(import('@kuadrant/plugin-kuadrant-backend/alpha'));
 // register kuadrant plugin id with rbac for permission discovery
-backend.add(import('@internal/plugin-kuadrant-backend/rbac'));
+backend.add(import('@kuadrant/plugin-kuadrant-backend/rbac'));
 
 backend.add(userSettingsBackend);
 
