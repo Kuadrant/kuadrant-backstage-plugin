@@ -2,6 +2,11 @@
   "name": "@kuadrant/plugin-kuadrant",
   "version": "0.0.1-test.1",
   "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kuadrant/kuadrant-backstage-plugin.git",
+    "directory": "plugins/kuadrant"
+  },
   "main": "src/index.ts",
   "types": "src/index.ts",
   "publishConfig": {
