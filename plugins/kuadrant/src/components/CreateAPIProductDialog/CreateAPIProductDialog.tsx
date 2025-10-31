@@ -239,7 +239,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             <Typography variant="subtitle2" gutterBottom style={{ marginTop: 16 }}>
               Tags
             </Typography>
-            <Box display="flex" gap={1} flexWrap="wrap" marginBottom={1}>
+            <Box display="flex" flexWrap="wrap" marginBottom={1} style={{ gap: 8 }}>
               {tags.map(tag => (
                 <Chip
                   key={tag}
@@ -249,7 +249,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                 />
               ))}
             </Box>
-            <Box display="flex" gap={1}>
+            <Box display="flex" style={{ gap: 8 }}>
               <TextField
                 fullWidth
                 size="small"

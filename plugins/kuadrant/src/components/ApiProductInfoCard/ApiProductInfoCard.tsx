@@ -70,12 +70,12 @@ export const ApiProductInfoCard = () => {
             <Typography variant="body2" color="textSecondary" paragraph>
               {spec.description}
             </Typography>
-            <Box display="flex" gap={1} alignItems="center" flexWrap="wrap">
+            <Box display="flex" alignItems="center" flexWrap="wrap" style={{ gap: 8 }}>
               <Typography variant="body2">
                 <strong>Version:</strong> {spec.version || 'v1'}
               </Typography>
               {spec.tags && spec.tags.length > 0 && (
-                <Box display="flex" gap={0.5} ml={2}>
+                <Box display="flex" ml={2} style={{ gap: 4 }}>
                   {spec.tags.map((tag: string) => (
                     <Chip key={tag} label={tag} size="small" />
                   ))}
@@ -110,7 +110,7 @@ export const ApiProductInfoCard = () => {
                     <TableCell>
                       {plan.limits && Object.entries(plan.limits).map(([key, value]) => (
                         <Typography key={key} variant="body2">
-                          {value} per {key}
+                          {String(value)} per {key}
                         </Typography>
                       ))}
                     </TableCell>

@@ -127,7 +127,7 @@ export const ResourceList = () => {
         const plans = row.spec?.plans || [];
         if (plans.length === 0) return '-';
         return (
-          <Box display="flex" gap={0.5}>
+          <Box display="flex" style={{ gap: 4 }}>
             {plans.map((plan: any, idx: number) => (
               <Chip key={idx} label={plan.tier} size="small" />
             ))}
@@ -192,7 +192,7 @@ export const ResourceList = () => {
       </Header>
       <Content>
         <ContentHeader title="API Products">
-          <Box display="flex" alignItems="center" gap={2}>
+          <Box display="flex" alignItems="center" style={{ gap: 16 }}>
             {userInfo && (
               <Box display="flex" alignItems="center" style={{ gap: 8 }}>
                 <Typography variant="body2">Viewing as:</Typography>

@@ -55,7 +55,7 @@ export function useUserRole(): { userInfo: UserInfo | null; loading: boolean } {
       // in dev mode without auth backend, return default guest with full access
       return {
         userId: 'guest',
-        role: 'platform-engineer',
+        role: 'platform-engineer' as UserRole,
         isPlatformEngineer: true,
         isApiOwner: true,
         isApiConsumer: true,
