@@ -1,15 +1,20 @@
 name: Publish to NPM
 
 on:
-  push:
-    tags:
-      - 'v*.*.*'
+  release:
+    types: [published]
+  pull_request:
+    types: [closed]
+    branches:
+      - main
   workflow_dispatch:
 
 jobs:
   publish:
     name: Publish Packages
     runs-on: ubuntu-latest
+
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     permissions:
       contents: read
@@ -18,6 +23,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -29,34 +36,24 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Extract version from tag
+      - name: Determine version
         id: version
         run: |
-          VERSION=${GITHUB_REF#refs/tags/v}
+          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+            # Release: use tag version
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG="latest"
+          else
+            # Dev: use package.json + git SHA
+            BASE_VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
+            GIT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${BASE_VERSION}-${GIT_SHA}"
+            TAG="dev"
+          fi
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "Publishing version: $VERSION"
-
-      - name: Verify package.json versions match tag
-        run: |
-          FRONTEND_VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
-          BACKEND_VERSION=$(node -p "require('./plugins/kuadrant-backend/package.json').version")
-          TAG_VERSION="${{ steps.version.outputs.version }}"
-
-          echo "Tag version: $TAG_VERSION"
-          echo "Frontend version: $FRONTEND_VERSION"
-          echo "Backend version: $BACKEND_VERSION"
-
-          if [ "$FRONTEND_VERSION" != "$TAG_VERSION" ]; then
-            echo "Frontend package.json version ($FRONTEND_VERSION) doesn't match tag ($TAG_VERSION)"
-            exit 1
-          fi
-
-          if [ "$BACKEND_VERSION" != "$TAG_VERSION" ]; then
-            echo "Backend package.json version ($BACKEND_VERSION) doesn't match tag ($TAG_VERSION)"
-            exit 1
-          fi
-
-          echo "All versions match!"
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Publishing: $VERSION (tag: $TAG)"
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -64,25 +61,39 @@ jobs:
       - name: Build packages
         run: yarn build
 
-      - name: Publish frontend plugin
+      - name: Update versions
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          cd plugins/kuadrant
+          npm pkg set version=$VERSION
+
+          cd ../kuadrant-backend
+          npm pkg set version=$VERSION
+
+      - name: Publish frontend
         run: |
           cd plugins/kuadrant
-          npm publish --provenance --access public
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
 
-      - name: Publish backend plugin
+      - name: Publish backend
         run: |
           cd plugins/kuadrant-backend
-          npm publish --provenance --access public
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
 
       - name: Summary
         run: |
-          echo "## 📦 Published Packages" >> $GITHUB_STEP_SUMMARY
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+
+          echo "## Published to NPM" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Version:** ${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "-[@kuadrant/plugin-kuadrant@${{ steps.version.outputs.version }}](https://www.npmjs.com/package/@kuadrant/plugin-kuadrant)" >> $GITHUB_STEP_SUMMARY
-          echo "-[@kuadrant/plugin-kuadrant-backend@${{ steps.version.outputs.version }}](https://www.npmjs.com/package/@kuadrant/plugin-kuadrant-backend)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/plugin-kuadrant@$VERSION](https://www.npmjs.com/package/@kuadrant/plugin-kuadrant)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/plugin-kuadrant-backend@$VERSION](https://www.npmjs.com/package/@kuadrant/plugin-kuadrant-backend)" >> $GITHUB_STEP_SUMMARY
