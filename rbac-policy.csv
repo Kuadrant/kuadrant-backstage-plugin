@@ -1,16 +1,22 @@
-# platform engineer: manages infrastructure (planpolicy, gateways, httproutes)
-# can do: create/update planpolicy, read all resources (monitoring), request api access for testing
-# cannot do: approve/reject requests, create apiproducts
+# platform engineer: manages infrastructure (planpolicy, gateways, httproutes) - cluster admin level
+# can do: full access to all resources (create/update planpolicy, apiproducts, approve/reject requests)
+# cluster admin with elevated permissions for platform management
 p, role:default/platform-engineer, kuadrant.planpolicy.create, create, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.read, read, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.update, update, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.delete, delete, allow
 p, role:default/platform-engineer, kuadrant.planpolicy.list, read, allow
+p, role:default/platform-engineer, kuadrant.apiproduct.create, create, allow
 p, role:default/platform-engineer, kuadrant.apiproduct.read, read, allow
+p, role:default/platform-engineer, kuadrant.apiproduct.update, update, allow
+p, role:default/platform-engineer, kuadrant.apiproduct.delete, delete, allow
 p, role:default/platform-engineer, kuadrant.apiproduct.list, read, allow
 p, role:default/platform-engineer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/platform-engineer, kuadrant.apikeyrequest.read.all, read, allow
+p, role:default/platform-engineer, kuadrant.apikeyrequest.update, update, allow
 p, role:default/platform-engineer, kuadrant.apikeyrequest.list, read, allow
+p, role:default/platform-engineer, kuadrant.apikey.read.all, read, allow
+p, role:default/platform-engineer, kuadrant.apikey.delete.all, delete, allow
 p, role:default/platform-engineer, catalog.entity.read, read, allow
 
 # api owner: publishes apis, approves requests for own apis
