@@ -21,7 +21,7 @@ import { SearchPage as BackstageSearchPage } from '@backstage/plugin-search';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
 
 import { RbacPage } from '@backstage-community/plugin-rbac';
-import { KuadrantPage } from '@kuadrant/kuadrant-backstage-plugin-frontend';
+import { KuadrantPage, PlanPolicyDetailPage } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
 
 import getDynamicRootConfig from '../../utils/dynamicUI/getDynamicRootConfig';
@@ -136,6 +136,7 @@ const AppBase = () => {
               </Route>
               <Route path="/catalog-graph" element={<CatalogGraphPage />} />
               <Route path="/learning-paths" element={<LearningPaths />} />
+              <Route path="/kuadrant/planpolicy/:namespace/:name" element={<PlanPolicyDetailPage />} />
               <Route path="/kuadrant" element={<KuadrantPage />} />
               <Route path="/rbac" element={<RbacPage />} />
               {dynamicRoutes.map(
