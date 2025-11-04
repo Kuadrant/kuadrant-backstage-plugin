@@ -172,10 +172,10 @@ spec:
     - name: Version
       type: string
       jsonPath: .spec.version
-    - name: Plans
+    - name: Plan Policy
       type: string
-      jsonPath: .spec.plans[*].tier
-      description: Available plan tiers
+      jsonPath: ".spec.planPolicyRef.name"
+      description: Referenced PlanPolicy name
     - name: Age
       type: date
       jsonPath: .metadata.creationTimestamp
