@@ -51,8 +51,13 @@ export const ResourceList = () => {
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
-  const loading = userLoading || apiProductsLoading;
-  const error = apiProductsError;
+  const { value: planPolicies, loading: planPoliciesLoading, error: planPoliciesError } = useAsync(async (): Promise<KuadrantList> => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+    return await response.json();
+  }, [backendUrl, fetchApi, refreshTrigger]);
+
+  const loading = userLoading || apiProductsLoading || planPoliciesLoading;
+  const error = apiProductsError || planPoliciesError;
 
   const handleCreateSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -159,6 +164,22 @@ export const ResourceList = () => {
     },
   ];
 
+  const planPolicyColumns: TableColumn[] = [
+    {
+      title: 'Name',
+      field: 'metadata.name',
+      render: (row: any) => (
+        <Link to={`/kuadrant/planpolicy/${row.metadata.namespace}/${row.metadata.name}`}>
+          <strong>{row.metadata.name}</strong>
+        </Link>
+      ),
+    },
+    {
+      title: 'Namespace',
+      field: 'metadata.namespace',
+    },
+  ];
+
   const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
       return <Typography variant="body2" color="textSecondary">No API products found</Typography>;
@@ -167,6 +188,19 @@ export const ResourceList = () => {
       <Table
         options={{ paging: false, search: false, toolbar: false }}
         columns={columns}
+        data={resources}
+      />
+    );
+  };
+
+  const renderPlanPolicies = (resources: KuadrantResource[] | undefined) => {
+    if (!resources || resources.length === 0) {
+      return <Typography variant="body2" color="textSecondary">No plan policies found</Typography>;
+    }
+    return (
+      <Table
+        options={{ paging: false, search: false, toolbar: false }}
+        columns={planPolicyColumns}
         data={resources}
       />
     );
@@ -221,6 +255,12 @@ export const ResourceList = () => {
             <Grid item>
               <InfoCard title="API Products">
                 {renderResources(apiProducts?.items)}
+              </InfoCard>
+            </Grid>
+
+            <Grid item>
+              <InfoCard title="Plan Policies">
+                {renderPlanPolicies(planPolicies?.items)}
               </InfoCard>
             </Grid>
 
