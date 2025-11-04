@@ -8,6 +8,8 @@ import {
   ResponseErrorPanel,
   InfoCard,
 } from '@backstage/core-components';
+import { kuadrantApiKeyRequestUpdatePermission } from '../../permissions';
+import { useKuadrantPermission } from '../../utils/permissions';
 import {
   Button,
   Dialog,
@@ -163,6 +165,12 @@ export const ApprovalQueueCard = () => {
     action: 'approve',
   });
 
+  const {
+    allowed: canUpdateRequests,
+    loading: updatePermissionLoading,
+    error: updatePermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestUpdatePermission);
+
   const { value, loading, error } = useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
     const reviewedBy = identity.userEntityRef;
@@ -293,7 +301,7 @@ export const ApprovalQueueCard = () => {
     }
   };
 
-  if (loading) {
+  if (loading || updatePermissionLoading) {
     return <Progress />;
   }
 
@@ -301,10 +309,23 @@ export const ApprovalQueueCard = () => {
     return <ResponseErrorPanel error={error} />;
   }
 
-  const pending = (value?.pending || []).map((req: APIKeyRequest) => ({
-    ...req,
-    id: req.metadata.name,
-  }));
+  if (updatePermissionError) {
+    return (
+      <Box p={2}>
+        <Typography color="error">
+          Unable to check permissions: {updatePermissionError.message}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Permission: kuadrant.apikeyrequest.update
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Please try again or contact your administrator
+        </Typography>
+      </Box>
+    );
+  }
+
+  const pending = value?.pending || [];
   const approved = value?.approved || [];
   const rejected = value?.rejected || [];
 
@@ -370,28 +391,31 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Actions',
-      render: (row) => (
-        <Box display="flex" style={{ gap: 8 }}>
-          <Button
-            size="small"
-            startIcon={<CheckCircleIcon />}
-            onClick={() => handleApprove(row)}
-            color="primary"
-            variant="outlined"
-          >
-            Approve
-          </Button>
-          <Button
-            size="small"
-            startIcon={<CancelIcon />}
-            onClick={() => handleReject(row)}
-            color="secondary"
-            variant="outlined"
-          >
-            Reject
-          </Button>
-        </Box>
-      ),
+      render: (row) => {
+        if (!canUpdateRequests) return null;
+        return (
+          <Box display="flex" style={{ gap: 8 }}>
+            <Button
+              size="small"
+              startIcon={<CheckCircleIcon />}
+              onClick={() => handleApprove(row)}
+              color="primary"
+              variant="outlined"
+            >
+              Approve
+            </Button>
+            <Button
+              size="small"
+              startIcon={<CancelIcon />}
+              onClick={() => handleReject(row)}
+              color="secondary"
+              variant="outlined"
+            >
+              Reject
+            </Button>
+          </Box>
+        );
+      },
     },
   ];
 

@@ -35,6 +35,12 @@ import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import { APIKeyRequest } from '../../types/api-management';
+import {
+  kuadrantApiKeyRequestCreatePermission,
+  kuadrantApiKeyDeleteOwnPermission,
+  kuadrantApiKeyDeleteAllPermission,
+} from '../../permissions';
+import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
 
 interface APIProduct {
   metadata: {
@@ -74,6 +80,24 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [useCase, setUseCase] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  const {
+    allowed: canCreateRequest,
+    loading: createRequestPermissionLoading,
+    error: createRequestPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission);
+
+  const {
+    allowed: canDeleteOwnKey,
+    loading: deleteOwnPermissionLoading,
+    error: deleteOwnPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteOwnPermission);
+
+  const {
+    allowed: canDeleteAllKeys,
+    loading: deleteAllPermissionLoading,
+    error: deleteAllPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
 
   const httproute = entity.metadata.annotations?.['kuadrant.io/httproute'] || entity.metadata.name;
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'] || propNamespace || 'default';
@@ -306,8 +330,9 @@ func main() {
     );
   };
 
-  const loading = requestsLoading || plansLoading;
+  const loading = requestsLoading || plansLoading || createRequestPermissionLoading || deleteOwnPermissionLoading || deleteAllPermissionLoading;
   const error = requestsError || plansError;
+  const permissionError = createRequestPermissionError || deleteOwnPermissionError || deleteAllPermissionError;
 
   if (loading) {
     return <Progress />;
@@ -315,6 +340,25 @@ func main() {
 
   if (error) {
     return <ResponseErrorPanel error={error} />;
+  }
+
+  if (permissionError) {
+    const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
+                            deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
+                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' : 'unknown';
+    return (
+      <Box p={2}>
+        <Typography color="error">
+          Unable to check permissions: {permissionError.message}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Permission: {failedPermission}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Please try again or contact your administrator
+        </Typography>
+      </Box>
+    );
   }
 
   const myRequests = (requests || []) as APIKeyRequest[];
@@ -374,16 +418,21 @@ func main() {
       title: 'Actions',
       field: 'actions',
       searchable: false,
-      render: (row: APIKeyRequest) => (
-        <IconButton
-          size="small"
-          onClick={() => handleDeleteRequest(row.metadata.name)}
-          color="secondary"
-          title="Revoke access and delete key"
-        >
-          <DeleteIcon />
-        </IconButton>
-      ),
+      render: (row: APIKeyRequest) => {
+        const ownerId = row.spec.requestedBy.userId;
+        const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
+        if (!canDelete) return null;
+        return (
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteRequest(row.metadata.name)}
+            color="secondary"
+            title="Revoke access and delete key"
+          >
+            <DeleteIcon />
+          </IconButton>
+        );
+      },
     },
   ];
 
@@ -452,7 +501,9 @@ func main() {
       searchable: false,
       render: (row: APIKeyRequest) => {
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
-        if (!isPending) return null;
+        const ownerId = row.spec.requestedBy.userId;
+        const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
+        if (!isPending || !canDelete) return null;
         return (
           <IconButton
             size="small"
@@ -469,19 +520,21 @@ func main() {
   return (
     <Box p={2}>
       <Grid container spacing={3} direction="column">
-        <Grid item>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => setOpen(true)}
-              disabled={plans.length === 0}
-            >
-              Request API Access
-            </Button>
-          </Box>
-        </Grid>
+        {canCreateRequest && (
+          <Grid item>
+            <Box display="flex" justifyContent="flex-end" mb={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => setOpen(true)}
+                disabled={plans.length === 0}
+              >
+                Request API Access
+              </Button>
+            </Box>
+          </Grid>
+        )}
         {pendingRequests.length > 0 && (
           <Grid item>
             <Table

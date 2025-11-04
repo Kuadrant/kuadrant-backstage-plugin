@@ -176,6 +176,163 @@ test.beforeAll(async ({ }, testInfo) => {
 
 Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `audit-log`, `core`, `navigation`, `api`, `integration`
 
+## RBAC Permission System
+
+The application uses Casbin-based RBAC with two key configuration files that work together:
+
+### Configuration Files
+
+**1. `catalog-entities/kuadrant-users.yaml`**
+- defines users and groups in the backstage catalog
+- sets user identity and group membership via `memberOf` field
+- determines which groups a user belongs to
+
+**2. `rbac-policy.csv`**
+- defines permissions for roles and groups using casbin policy format
+- maps groups → roles → specific permissions
+- controls actual access to resources and operations
+- referenced in `app-config.local.yaml` at `permission.rbac.policies-csv-file`
+
+### Permission Flow
+
+```
+user logs in → auth sets userEntityRef (e.g., user:default/guest)
+    ↓
+catalog lookup → finds user's memberOf groups from kuadrant-users.yaml
+    ↓
+rbac-policy.csv → maps groups to roles (e.g., g, group:default/api-owners, role:default/api-owner)
+    ↓
+rbac-policy.csv → grants permissions to roles (e.g., p, role:default/api-owner, kuadrant.apiproduct.create, create, allow)
+    ↓
+user gets all permissions from all their group memberships
+```
+
+### Testing Different Permission Levels
+
+the guest user (default in development) has full admin access. to test restricted permission levels, make the following changes:
+
+#### Test as API Consumer (Restricted Access)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [api-consumers]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-consumer
+```
+(this is redundant if group membership is set, but keeps direct assignments consistent)
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+**4. expected behaviour:**
+- ✅ view api products (browse catalog)
+- ✅ request api keys for apis
+- ✅ view/delete own api keys only
+- ✅ see only "API Products" card on /kuadrant page
+- ❌ no "Plan Policies" card visible
+- ❌ no "Approval Queue" card visible
+- ❌ no "Create API Product" button
+- ❌ no delete buttons on api products
+- ❌ cannot view other users' api keys
+
+#### Test as API Owner (Can Publish APIs)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [api-owners]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-owner
+```
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+**4. expected behaviour:**
+- ✅ all api-consumer permissions above
+- ✅ see "API Products", "Plan Policies", and "Approval Queue" cards
+- ✅ "Create API Product" button visible
+- ✅ delete buttons on api products
+- ✅ create/update/delete api products
+- ✅ approve/reject api key requests in approval queue
+- ✅ view/delete any api key
+- ✅ view plan policies (read-only)
+- ❌ cannot create/update/delete plan policies
+
+#### Test as Platform Engineer (Full Admin)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [platform-engineers]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/platform-engineer
+```
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+**4. expected behaviour:**
+- ✅ all api-owner permissions above
+- ✅ create/update/delete plan policies
+- ✅ full administrative access to all kuadrant resources
+
+#### Restore Default (All Permissions)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [platform-engineers, api-owners, api-consumers]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-owner
+```
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+### Note on Configuration Files
+
+**group membership (primary mechanism):**
+- `catalog-entities/kuadrant-users.yaml` controls which groups a user belongs to
+- this is the primary way to grant permissions
+- requires full application restart to take effect
+
+**direct user-to-role assignments (optional):**
+- `rbac-policy.csv` line 65 can directly assign guest to a role
+- redundant if user is already in a group that maps to that role
+- useful for users not in any groups or for specific overrides
+- hot-reloads due to `policyFileReload: true` in app-config
+
+**admin/superUsers bypass (avoid for testing):**
+- `app-config.local.yaml` defines admin and superUsers in the `permission.rbac` section
+- these users bypass all RBAC checks entirely
+- do not add guest to these lists when testing permissions
+
 ## Important Notes
 
 ### System Dependencies
@@ -816,6 +973,177 @@ When APIKeyRequest is created (POST /requests):
 - User requests API access → immediately approved
 - User sees API key instantly
 - No approval queue needed
+
+## Frontend Permission System (2025-11-05)
+
+### Overview
+
+The Kuadrant frontend uses Backstage's permission framework for fine-grained access control. All UI actions (create, delete, approve, etc.) check permissions before rendering buttons/forms.
+
+### Custom Permission Hook
+
+**`src/utils/permissions.ts`** provides `useKuadrantPermission` hook that:
+- Handles both BasicPermission and ResourcePermission types without type bypasses
+- Returns `{ allowed, loading, error }` for proper error handling
+- Eliminates `as any` type casting found in raw `usePermission` usage
+
+**Usage**:
+```typescript
+import { useKuadrantPermission } from '../../utils/permissions';
+import { kuadrantApiProductCreatePermission } from '../../permissions';
+
+const { allowed, loading, error } = useKuadrantPermission(
+  kuadrantApiProductCreatePermission
+);
+
+if (loading) return <Progress />;
+if (error) return <ErrorMessage error={error} />;
+if (!allowed) return null; // hide button
+```
+
+### Permission Error Handling
+
+All components show detailed error messages when permission checks fail:
+```typescript
+if (permissionError) {
+  return (
+    <Box p={2}>
+      <Typography color="error">
+        Unable to check permissions: {permissionError.message}
+      </Typography>
+      <Typography variant="body2" color="textSecondary">
+        Permission: kuadrant.apiproduct.create
+      </Typography>
+      <Typography variant="body2" color="textSecondary">
+        Please try again or contact your administrator
+      </Typography>
+    </Box>
+  );
+}
+```
+
+This helps users and administrators diagnose permission service failures vs actual permission denial.
+
+### Ownership-Aware Actions
+
+Delete buttons for API keys use ownership checking via `canDeleteResource` helper:
+```typescript
+import { canDeleteResource } from '../../utils/permissions';
+
+// in render
+const canDelete = canDeleteResource(
+  row.spec.requestedBy.userId,  // owner
+  currentUserId,                 // current user
+  canDeleteOwnKey,               // permission to delete own
+  canDeleteAllKeys               // permission to delete all
+);
+
+if (!canDelete) return null;
+```
+
+This prevents showing delete buttons on keys users can't actually delete, avoiding confusing "permission denied" errors.
+
+### ResourcePermission Handling
+
+`kuadrantApiKeyRequestCreatePermission` is a ResourcePermission (scoped to 'apiproduct'). The custom hook handles this automatically:
+
+```typescript
+// frontend - no special handling needed
+const { allowed } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission);
+
+// backend - uses resource reference
+const decision = await permissions.authorize([{
+  permission: kuadrantApiKeyRequestCreatePermission,
+  resourceRef: `apiproduct:${namespace}/${name}`,
+}], { credentials });
+```
+
+### Component Patterns
+
+**1. Page-level access via PermissionGate**:
+```typescript
+export const KuadrantPage = () => (
+  <PermissionGate
+    permission={kuadrantApiProductListPermission}
+    errorMessage="You don't have permission to view the Kuadrant page"
+  >
+    <ResourceList />
+  </PermissionGate>
+);
+```
+
+**2. Action button gating**:
+```typescript
+{canCreateApiProduct && (
+  <Button onClick={() => setCreateDialogOpen(true)}>
+    Create API Product
+  </Button>
+)}
+```
+
+**3. Conditional table columns**:
+```typescript
+{
+  title: 'Actions',
+  render: (row) => {
+    if (!canDelete) return null;
+    return <IconButton onClick={() => handleDelete(row)} />;
+  },
+}
+```
+
+### Permission Documentation
+
+All permissions in `src/permissions.ts` include JSDoc comments explaining:
+- What the permission controls
+- When to use it
+- Whether it's BasicPermission or ResourcePermission
+- The difference between `.own` vs `.all` variants
+
+Example:
+```typescript
+/**
+ * permission to delete API keys owned by the current user
+ * allows users to revoke their own access
+ */
+export const kuadrantApiKeyDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apikey.delete.own',
+  attributes: { action: 'delete' },
+});
+```
+
+### Common Patterns
+
+**Loading states**: Include permission loading in component loading logic:
+```typescript
+const loading = dataLoading || permissionLoading;
+if (loading) return <Progress />;
+```
+
+**Multiple permissions**: Check all permission errors:
+```typescript
+const permissionError = createError || deleteError || updateError;
+if (permissionError) {
+  // show error with failed permission name
+}
+```
+
+**Empty states**: Hide entire sections when users lack permissions:
+```typescript
+{canViewApprovalQueue && (
+  <Grid item>
+    <ApprovalQueueCard />
+  </Grid>
+)}
+```
+
+### Key Files
+
+- `src/utils/permissions.ts` - Custom hook and helper functions
+- `src/permissions.ts` - Permission definitions (must match backend)
+- `src/components/PermissionGate/PermissionGate.tsx` - Page-level access control
+- `src/components/KuadrantPage/KuadrantPage.tsx` - Example of multi-permission component
+- `src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx` - Example of ownership-aware actions
 
 ## API Key Management Model
 
