@@ -77,12 +77,73 @@ const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalD
   );
 };
 
+interface BulkActionDialogProps {
+  open: boolean;
+  requests: APIKeyRequest[];
+  action: 'approve' | 'reject';
+  onClose: () => void;
+  onConfirm: (comment: string) => void;
+}
+
+const BulkActionDialog = ({ open, requests, action, onClose, onConfirm }: BulkActionDialogProps) => {
+  const [comment, setComment] = useState('');
+
+  const handleConfirm = () => {
+    onConfirm(comment);
+    setComment('');
+  };
+
+  const isApprove = action === 'approve';
+
+  return (
+    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+      <DialogTitle>
+        {isApprove ? 'Approve' : 'Reject'} {requests.length} API Key Requests
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" paragraph>
+          You are about to {isApprove ? 'approve' : 'reject'} the following requests:
+        </Typography>
+        <Box mb={2} maxHeight={200} overflow="auto">
+          {requests.map(request => (
+            <Box key={`${request.metadata.namespace}/${request.metadata.name}`} mb={1} p={1} bgcolor="background.default">
+              <Typography variant="body2">
+                <strong>{request.spec.requestedBy.userId}</strong> - {request.spec.apiName} ({request.spec.planTier})
+              </Typography>
+            </Box>
+          ))}
+        </Box>
+        <TextField
+          label="Comment (optional)"
+          multiline
+          fullWidth
+          margin="normal"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          helperText={`This comment will be applied to all ${isApprove ? 'approved' : 'rejected'} requests`}
+        />
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>Cancel</Button>
+        <Button
+          onClick={handleConfirm}
+          color={isApprove ? 'primary' : 'secondary'}
+          variant="contained"
+        >
+          {isApprove ? 'Approve All' : 'Reject All'}
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 export const ApprovalQueueCard = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [refresh, setRefresh] = useState(0);
+  const [selectedRequests, setSelectedRequests] = useState<APIKeyRequest[]>([]);
   const [dialogState, setDialogState] = useState<{
     open: boolean;
     request: APIKeyRequest | null;
@@ -90,6 +151,15 @@ export const ApprovalQueueCard = () => {
   }>({
     open: false,
     request: null,
+    action: 'approve',
+  });
+  const [bulkDialogState, setBulkDialogState] = useState<{
+    open: boolean;
+    requests: APIKeyRequest[];
+    action: 'approve' | 'reject';
+  }>({
+    open: false,
+    requests: [],
     action: 'approve',
   });
 
@@ -179,6 +249,50 @@ export const ApprovalQueueCard = () => {
     }
   };
 
+  const handleBulkApprove = () => {
+    if (selectedRequests.length === 0) return;
+    setBulkDialogState({ open: true, requests: selectedRequests, action: 'approve' });
+  };
+
+  const handleBulkReject = () => {
+    if (selectedRequests.length === 0) return;
+    setBulkDialogState({ open: true, requests: selectedRequests, action: 'reject' });
+  };
+
+  const handleBulkConfirm = async (comment: string) => {
+    if (!value || bulkDialogState.requests.length === 0) return;
+
+    const isApprove = bulkDialogState.action === 'approve';
+    const endpoint = isApprove
+      ? `${backendUrl}/api/kuadrant/requests/bulk-approve`
+      : `${backendUrl}/api/kuadrant/requests/bulk-reject`;
+
+    try {
+      const response = await fetchApi.fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          requests: bulkDialogState.requests.map(r => ({
+            namespace: r.metadata.namespace,
+            name: r.metadata.name,
+          })),
+          comment,
+          reviewedBy: value.reviewedBy,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`failed to bulk ${bulkDialogState.action} requests`);
+      }
+
+      setBulkDialogState({ open: false, requests: [], action: 'approve' });
+      setSelectedRequests([]);
+      setRefresh(r => r + 1);
+    } catch (err) {
+      console.error(`error bulk ${bulkDialogState.action}ing requests:`, err);
+    }
+  };
+
   if (loading) {
     return <Progress />;
   }
@@ -187,7 +301,10 @@ export const ApprovalQueueCard = () => {
     return <ResponseErrorPanel error={error} />;
   }
 
-  const pending = value?.pending || [];
+  const pending = (value?.pending || []).map((req: APIKeyRequest) => ({
+    ...req,
+    id: req.metadata.name,
+  }));
   const approved = value?.approved || [];
   const rejected = value?.rejected || [];
 
@@ -412,10 +529,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Reason',
-      field: 'status.comment',
+      field: 'status.reason',
       render: (row) => (
-        <Typography variant="body2" style={{ maxWidth: 200 }} noWrap title={row.status?.comment}>
-          {row.status?.comment || '-'}
+        <Typography variant="body2" style={{ maxWidth: 200 }} noWrap title={row.status?.reason}>
+          {row.status?.reason || '-'}
         </Typography>
       ),
     },
@@ -428,11 +545,48 @@ export const ApprovalQueueCard = () => {
           {pending.length === 0 ? (
             <Typography variant="body2" color="textSecondary">No pending requests</Typography>
           ) : (
-            <Table
-              options={{ paging: true, pageSize: 5, search: false, toolbar: false }}
-              data={pending}
-              columns={pendingColumns}
-            />
+            <>
+              {selectedRequests.length > 0 && (
+                <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
+                  <Typography variant="body2">
+                    {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
+                  </Typography>
+                  <Box display="flex" style={{ gap: 8 }}>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="primary"
+                      startIcon={<CheckCircleIcon />}
+                      onClick={handleBulkApprove}
+                    >
+                      Approve Selected
+                    </Button>
+                    <Button
+                      size="small"
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<CancelIcon />}
+                      onClick={handleBulkReject}
+                    >
+                      Reject Selected
+                    </Button>
+                  </Box>
+                </Box>
+              )}
+              <Table
+                options={{
+                  selection: true,
+                  paging: true,
+                  pageSize: 5,
+                  search: false,
+                  showTextRowsSelected: false,
+                  toolbar: false,
+                }}
+                data={pending}
+                columns={pendingColumns}
+                onSelectionChange={(rows) => setSelectedRequests(rows as APIKeyRequest[])}
+              />
+            </>
           )}
         </InfoCard>
 
@@ -466,6 +620,13 @@ export const ApprovalQueueCard = () => {
         action={dialogState.action}
         onClose={() => setDialogState({ open: false, request: null, action: 'approve' })}
         onConfirm={handleConfirm}
+      />
+      <BulkActionDialog
+        open={bulkDialogState.open}
+        requests={bulkDialogState.requests}
+        action={bulkDialogState.action}
+        onClose={() => setBulkDialogState({ open: false, requests: [], action: 'approve' })}
+        onConfirm={handleBulkConfirm}
       />
     </>
   );
