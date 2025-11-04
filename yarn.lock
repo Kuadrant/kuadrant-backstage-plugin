@@ -9395,9 +9395,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@kuadrant/plugin-kuadrant-backend@workspace:^, @kuadrant/plugin-kuadrant-backend@workspace:plugins/kuadrant-backend":
+"@kuadrant/kuadrant-backstage-plugin-backend@workspace:^, @kuadrant/kuadrant-backstage-plugin-backend@workspace:plugins/kuadrant-backend":
   version: 0.0.0-use.local
-  resolution: "@kuadrant/plugin-kuadrant-backend@workspace:plugins/kuadrant-backend"
+  resolution: "@kuadrant/kuadrant-backstage-plugin-backend@workspace:plugins/kuadrant-backend"
   dependencies:
     "@backstage/backend-defaults": ^0.12.1
     "@backstage/backend-plugin-api": ^1.4.3
@@ -9422,9 +9422,9 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@kuadrant/plugin-kuadrant@workspace:*, @kuadrant/plugin-kuadrant@workspace:plugins/kuadrant":
+"@kuadrant/kuadrant-backstage-plugin-frontend@workspace:*, @kuadrant/kuadrant-backstage-plugin-frontend@workspace:plugins/kuadrant":
   version: 0.0.0-use.local
-  resolution: "@kuadrant/plugin-kuadrant@workspace:plugins/kuadrant"
+  resolution: "@kuadrant/kuadrant-backstage-plugin-frontend@workspace:plugins/kuadrant"
   dependencies:
     "@backstage/cli": ^0.34.2
     "@backstage/core-app-api": ^1.19.0
@@ -19775,7 +19775,7 @@ __metadata:
     "@emotion/react": 11.14.0
     "@emotion/styled": 11.14.1
     "@janus-idp/cli": 3.6.1
-    "@kuadrant/plugin-kuadrant": "workspace:*"
+    "@kuadrant/kuadrant-backstage-plugin-frontend": "workspace:*"
     "@material-ui/core": ^4.12.4
     "@mui/icons-material": 5.18.0
     "@mui/material": 5.18.0
@@ -20518,7 +20518,7 @@ __metadata:
     "@internal/plugin-licensed-users-info-backend": "*"
     "@internal/plugin-scalprum-backend": "*"
     "@janus-idp/backstage-plugin-audit-log-node": 1.7.2
-    "@kuadrant/plugin-kuadrant-backend": "workspace:^"
+    "@kuadrant/kuadrant-backstage-plugin-backend": "workspace:^"
     "@opentelemetry/api": 1.9.0
     "@opentelemetry/auto-instrumentations-node": 0.58.1
     "@opentelemetry/exporter-prometheus": 0.57.2

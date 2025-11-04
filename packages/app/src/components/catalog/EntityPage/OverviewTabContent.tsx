@@ -26,7 +26,7 @@ import {
   EntityUserProfileCard,
 } from '@backstage/plugin-org';
 
-import { EntityKuadrantApiAccessCard } from '@kuadrant/plugin-kuadrant';
+import { EntityKuadrantApiAccessCard } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 
 import Grid from '../Grid';
 import { hasLinks } from '../utils';
