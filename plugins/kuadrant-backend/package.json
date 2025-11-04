@@ -1,8 +1,12 @@
 {
-  "name": "@internal/plugin-kuadrant-backend",
-  "version": "0.1.0",
+  "name": "@kuadrant/kuadrant-backstage-plugin-backend",
+  "version": "0.0.1-test.1",
   "license": "Apache-2.0",
-  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kuadrant/kuadrant-backstage-plugin.git",
+    "directory": "plugins/kuadrant-backend"
+  },
   "main": "src/index.ts",
   "types": "src/index.ts",
   "publishConfig": {
@@ -12,7 +16,10 @@
   },
   "backstage": {
     "role": "backend-plugin",
-    "pluginId": "kuadrant"
+    "pluginId": "kuadrant",
+    "pluginPackages": [
+      "@kuadrant/kuadrant-backstage-plugin-backend"
+    ]
   },
   "exports": {
     ".": "./src/index.ts",

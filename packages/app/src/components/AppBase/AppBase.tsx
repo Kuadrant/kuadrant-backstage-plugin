@@ -21,7 +21,7 @@ import { SearchPage as BackstageSearchPage } from '@backstage/plugin-search';
 import { UserSettingsPage } from '@backstage/plugin-user-settings';
 
 import { RbacPage } from '@backstage-community/plugin-rbac';
-import { KuadrantPage, PlanPolicyDetailPage } from '@internal/plugin-kuadrant';
+import { KuadrantPage, PlanPolicyDetailPage } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
 
 import getDynamicRootConfig from '../../utils/dynamicUI/getDynamicRootConfig';

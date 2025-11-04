@@ -1,5 +1,5 @@
 {
-  "name": "@internal/plugin-kuadrant-backend-alpha",
+  "name": "@kuadrant/plugin-kuadrant-backend-alpha",
   "version": "0.1.0",
   "main": "./module.cjs.js",
   "types": "./module.d.ts",

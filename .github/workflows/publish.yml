@@ -1,0 +1,99 @@
+name: Publish to NPM
+
+on:
+  release:
+    types: [published]
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  publish:
+    name: Publish Packages
+    runs-on: ubuntu-latest
+
+    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
+            # Release: use tag version
+            VERSION=${GITHUB_REF#refs/tags/v}
+            TAG="latest"
+          else
+            # Dev: use package.json + git SHA
+            BASE_VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
+            GIT_SHA=$(git rev-parse --short HEAD)
+            VERSION="${BASE_VERSION}-${GIT_SHA}"
+            TAG="dev"
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "Publishing: $VERSION (tag: $TAG)"
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build packages
+        run: yarn build
+
+      - name: Update versions
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+
+          cd plugins/kuadrant
+          npm pkg set version=$VERSION
+
+          cd ../kuadrant-backend
+          npm pkg set version=$VERSION
+
+      - name: Publish frontend
+        run: |
+          cd plugins/kuadrant
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
+
+      - name: Publish backend
+        run: |
+          cd plugins/kuadrant-backend
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
+
+      - name: Summary
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          TAG="${{ steps.version.outputs.tag }}"
+
+          echo "## Published to NPM" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
+          echo "**Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-frontend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend)" >> $GITHUB_STEP_SUMMARY
