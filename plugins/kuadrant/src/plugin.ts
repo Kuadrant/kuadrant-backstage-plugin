@@ -75,10 +75,11 @@ export const EntityKuadrantApiProductInfoContent = kuadrantPlugin.provide(
 );
 
 export const PlanPolicyDetailPage = kuadrantPlugin.provide(
-  createRoutableExtension({
+  createComponentExtension({
     name: 'PlanPolicyDetailPage',
-    component: () =>
-      import('./components/PlanPolicyDetailPage').then(m => m.PlanPolicyDetailPage),
-    mountPoint: resourceRouteRef,
+    component: {
+      lazy: () =>
+        import('./components/PlanPolicyDetailPage').then(m => m.PlanPolicyDetailPage),
+    },
   }),
 );

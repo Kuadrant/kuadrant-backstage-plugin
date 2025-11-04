@@ -29,6 +29,8 @@ techdocs:
   builder: external
 auth:
   environment: development
+dynamicPlugins:
+  frontend: {}
 catalog:
   import:
     entityFilename: catalog-info.yaml
