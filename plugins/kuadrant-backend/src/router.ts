@@ -914,6 +914,258 @@ export async function createRouter({
     }
   });
 
+  const bulkApproveSchema = z.object({
+    requests: z.array(z.object({
+      namespace: z.string(),
+      name: z.string(),
+    })),
+    comment: z.string().optional(),
+  });
+
+  router.post('/requests/bulk-approve', async (req, res) => {
+    const parsed = bulkApproveSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new InputError(parsed.error.toString());
+    }
+
+    try {
+      const { userId, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
+      let canApprove = isApiOwner;
+
+      // if permissions are enabled, also check via permission framework
+      if (!canApprove) {
+        try {
+          const credentials = await httpAuth.credentials(req, { allow: ['none'] });
+          if (credentials) {
+            const decision = await permissions.authorize(
+              [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+              { credentials },
+            );
+            canApprove = decision[0].result === AuthorizeResult.ALLOW;
+          }
+        } catch (error) {
+          console.warn('permission check failed, using group-based authorization:', error);
+        }
+      }
+
+      if (!canApprove) {
+        throw new NotAllowedError('you do not have permission to approve api key requests');
+      }
+
+      const { requests, comment } = parsed.data;
+      const reviewedBy = `user:default/${userId}`;
+      const results = [];
+
+      for (const reqRef of requests) {
+        try {
+          const request = await k8sClient.getCustomResource(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            reqRef.namespace,
+            'apikeyrequests',
+            reqRef.name,
+          );
+
+          const spec = request.spec as any;
+          const apiKey = generateApiKey();
+          const timestamp = Date.now();
+          const secretName = `${spec.requestedBy.userId}-${spec.apiName}-${timestamp}`
+            .toLowerCase()
+            .replace(/[^a-z0-9-]/g, '-');
+
+          const secret = {
+            apiVersion: 'v1',
+            kind: 'Secret',
+            metadata: {
+              name: secretName,
+              namespace: spec.apiNamespace,
+              labels: {
+                app: spec.apiName,
+              },
+              annotations: {
+                'secret.kuadrant.io/plan-id': spec.planTier,
+                'secret.kuadrant.io/user-id': spec.requestedBy.userId,
+              },
+            },
+            stringData: {
+              api_key: apiKey,
+            },
+            type: 'Opaque',
+          };
+
+          await k8sClient.createSecret(spec.apiNamespace, secret);
+
+          // try to get plan limits from apiproduct or planpolicy
+          let planLimits: any = null;
+          try {
+            const products = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+            const product = (products.items || []).find((p: any) =>
+              p.metadata.name.includes(spec.apiName) || p.spec?.displayName?.toLowerCase().includes(spec.apiName.toLowerCase())
+            );
+            if (product) {
+              const plan = product.spec?.plans?.find((p: any) => p.tier === spec.planTier);
+              if (plan) {
+                planLimits = plan.limits;
+              }
+            }
+          } catch (e) {
+            console.warn('could not fetch apiproduct for plan limits:', e);
+          }
+
+          if (!planLimits) {
+            try {
+              const policy = await k8sClient.getCustomResource(
+                'extensions.kuadrant.io',
+                'v1alpha1',
+                spec.apiNamespace,
+                'planpolicies',
+                `${spec.apiName}-plan`,
+              );
+              const plan = policy.spec?.plans?.find((p: any) => p.tier === spec.planTier);
+              if (plan) {
+                planLimits = plan.limits;
+              }
+            } catch (e) {
+              console.warn('could not fetch planpolicy for plan limits:', e);
+            }
+          }
+
+          // fetch httproute to get hostname
+          let apiHostname = `${spec.apiName}.apps.example.com`;
+          try {
+            const httproute = await k8sClient.getCustomResource(
+              'gateway.networking.k8s.io',
+              'v1',
+              spec.apiNamespace,
+              'httproutes',
+              spec.apiName,
+            );
+            if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
+              apiHostname = httproute.spec.hostnames[0];
+            }
+          } catch (error) {
+            console.warn('could not fetch httproute for hostname, using default:', error);
+          }
+
+          const status = {
+            phase: 'Approved',
+            reviewedBy,
+            reviewedAt: new Date().toISOString(),
+            reason: comment || 'approved',
+            apiKey,
+            apiHostname,
+            apiBasePath: '/api/v1',
+            apiDescription: `${spec.apiName} api`,
+            planLimits,
+          };
+
+          await k8sClient.patchCustomResourceStatus(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            reqRef.namespace,
+            'apikeyrequests',
+            reqRef.name,
+            status,
+          );
+
+          results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true, secretName });
+        } catch (error) {
+          console.error(`error approving request ${reqRef.namespace}/${reqRef.name}:`, error);
+          results.push({
+            namespace: reqRef.namespace,
+            name: reqRef.name,
+            success: false,
+            error: error instanceof Error ? error.message : 'unknown error'
+          });
+        }
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error('error in bulk approve:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to bulk approve api key requests' });
+      }
+    }
+  });
+
+  router.post('/requests/bulk-reject', async (req, res) => {
+    const parsed = bulkApproveSchema.safeParse(req.body);
+    if (!parsed.success) {
+      throw new InputError(parsed.error.toString());
+    }
+
+    try {
+      const { userId, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
+      let canReject = isApiOwner;
+
+      // if permissions are enabled, also check via permission framework
+      if (!canReject) {
+        try {
+          const credentials = await httpAuth.credentials(req, { allow: ['none'] });
+          if (credentials) {
+            const decision = await permissions.authorize(
+              [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+              { credentials },
+            );
+            canReject = decision[0].result === AuthorizeResult.ALLOW;
+          }
+        } catch (error) {
+          console.warn('permission check failed, using group-based authorization:', error);
+        }
+      }
+
+      if (!canReject) {
+        throw new NotAllowedError('you do not have permission to reject api key requests');
+      }
+
+      const { requests, comment } = parsed.data;
+      const reviewedBy = `user:default/${userId}`;
+      const results = [];
+
+      for (const reqRef of requests) {
+        try {
+          const status = {
+            phase: 'Rejected',
+            reviewedBy,
+            reviewedAt: new Date().toISOString(),
+            reason: comment || 'rejected',
+          };
+
+          await k8sClient.patchCustomResourceStatus(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            reqRef.namespace,
+            'apikeyrequests',
+            reqRef.name,
+            status,
+          );
+
+          results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true });
+        } catch (error) {
+          console.error(`error rejecting request ${reqRef.namespace}/${reqRef.name}:`, error);
+          results.push({
+            namespace: reqRef.namespace,
+            name: reqRef.name,
+            success: false,
+            error: error instanceof Error ? error.message : 'unknown error'
+          });
+        }
+      }
+
+      res.json({ results });
+    } catch (error) {
+      console.error('error in bulk reject:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to bulk reject api key requests' });
+      }
+    }
+  });
+
   router.delete('/requests/:namespace/:name', async (req, res) => {
     try {
       const { userId, isPlatformEngineer, isApiOwner } = await getUserIdentity(req, httpAuth, userInfo);
