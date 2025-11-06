@@ -128,7 +128,9 @@ export const tabRules: Record<
     if: isKind('system'),
   },
   '/api-keys': {
-    if: isKind('api'),
+    if: (entity: Entity) =>
+      isKind('api')(entity) &&
+      entity.metadata.annotations?.['kuadrant.io/apiproduct'] !== undefined,
   },
   '/api-product-info': {
     if: (entity: Entity) =>
