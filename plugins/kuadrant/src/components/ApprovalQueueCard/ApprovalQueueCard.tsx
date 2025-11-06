@@ -570,7 +570,7 @@ export const ApprovalQueueCard = () => {
             <Typography variant="body2" color="textSecondary">No pending requests</Typography>
           ) : (
             <>
-              {selectedRequests.length > 0 && (
+              {canUpdateRequests && selectedRequests.length > 0 && (
                 <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
                   <Typography variant="body2">
                     {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
@@ -599,7 +599,7 @@ export const ApprovalQueueCard = () => {
               )}
               <Table
                 options={{
-                  selection: true,
+                  selection: canUpdateRequests,
                   paging: true,
                   pageSize: 5,
                   search: false,
