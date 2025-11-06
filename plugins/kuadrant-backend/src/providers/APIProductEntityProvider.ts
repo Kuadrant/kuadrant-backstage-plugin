@@ -20,6 +20,7 @@ interface APIProduct {
     description?: string;
     version?: string;
     tags?: string[];
+    publishStatus?: 'Draft' | 'Published';
     plans?: Array<{
       tier: string;
       description?: string;
@@ -92,8 +93,15 @@ export class APIProductEntityProvider implements EntityProvider {
       const apiProducts = (response.items || []) as APIProduct[];
       console.log(`apiproduct provider: found ${apiProducts.length} apiproducts`);
 
+      // filter out Draft API products - only include Published ones
+      const publishedProducts = apiProducts.filter(product => {
+        const publishStatus = product.spec.publishStatus || 'Draft';  // default to Draft if not specified
+        return publishStatus === 'Published';
+      });
+      console.log(`apiproduct provider: filtered to ${publishedProducts.length} published apiproducts (${apiProducts.length - publishedProducts.length} drafts excluded)`);
+
       // transform apiproducts to backstage api entities
-      const entities = apiProducts.map(product => this.transformToEntity(product));
+      const entities = publishedProducts.map(product => this.transformToEntity(product));
       console.log(`apiproduct provider: transformed ${entities.length} entities`);
 
       // submit entities to catalog

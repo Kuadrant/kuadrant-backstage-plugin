@@ -76,6 +76,7 @@ export interface APIProductSpec {
     namespace: string;
   };
   plans: Plan[];
+  publishStatus?: 'Draft' | 'Published';
   documentation?: {
     openAPISpec?: string;
     swaggerUI?: string;
