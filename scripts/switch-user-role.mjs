@@ -16,13 +16,8 @@ const roleConfig = {
     rbacRole: 'role:default/api-owner',
     name: 'API Owner',
   },
-  engineer: {
-    groups: '[platform-engineers]',
-    rbacRole: 'role:default/platform-engineer',
-    name: 'Platform Engineer',
-  },
   default: {
-    groups: '[platform-engineers, api-owners, api-consumers]',
+    groups: '[api-owners, api-consumers]',
     rbacRole: 'role:default/api-owner',
     name: 'default (all permissions)',
   },
@@ -31,7 +26,7 @@ const roleConfig = {
 const role = process.argv[2];
 
 if (!role || !roleConfig[role]) {
-  console.error('usage: node switch-user-role.mjs {consumer|owner|engineer|default}');
+  console.error('usage: node switch-user-role.mjs {consumer|owner|default}');
   process.exit(1);
 }
 

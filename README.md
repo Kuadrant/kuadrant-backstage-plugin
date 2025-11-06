@@ -110,12 +110,11 @@ yarn test                         # Run tests
 
 ### Testing Permissions
 
-The application uses RBAC with three roles: API Consumer, API Owner, and Platform Engineer. Use these commands to switch roles:
+The application uses RBAC with two roles: API Consumer and API Owner. Use these commands to switch roles:
 
 ```bash
 yarn user:consumer      # Switch to API Consumer
 yarn user:owner         # Switch to API Owner
-yarn user:engineer      # Switch to Platform Engineer
 yarn user:default       # Restore default permissions
 ```
 
@@ -132,9 +131,7 @@ After switching roles, restart with `yarn dev`.
 - Can approve/reject API key requests
 - Can view Plan Policies (read-only)
 
-**Platform Engineer (full admin):**
-- Full admin access
-- Can create/edit Plan Policies
+Note: PlanPolicies are managed on the cluster by platform engineers. This plugin only provides read access to view existing policies.
 
 ## Project Structure
 

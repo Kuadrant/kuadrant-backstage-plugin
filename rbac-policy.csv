@@ -1,27 +1,6 @@
-# platform engineer: manages infrastructure (planpolicy, gateways, httproutes) - cluster admin level
-# can do: full access to all resources (create/update planpolicy, apiproducts, approve/reject requests)
-# cluster admin with elevated permissions for platform management
-p, role:default/platform-engineer, kuadrant.planpolicy.create, create, allow
-p, role:default/platform-engineer, kuadrant.planpolicy.read, read, allow
-p, role:default/platform-engineer, kuadrant.planpolicy.update, update, allow
-p, role:default/platform-engineer, kuadrant.planpolicy.delete, delete, allow
-p, role:default/platform-engineer, kuadrant.planpolicy.list, read, allow
-p, role:default/platform-engineer, kuadrant.apiproduct.create, create, allow
-p, role:default/platform-engineer, kuadrant.apiproduct.read, read, allow
-p, role:default/platform-engineer, kuadrant.apiproduct.update, update, allow
-p, role:default/platform-engineer, kuadrant.apiproduct.delete, delete, allow
-p, role:default/platform-engineer, kuadrant.apiproduct.list, read, allow
-p, role:default/platform-engineer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
-p, role:default/platform-engineer, kuadrant.apikeyrequest.read.all, read, allow
-p, role:default/platform-engineer, kuadrant.apikeyrequest.update, update, allow
-p, role:default/platform-engineer, kuadrant.apikeyrequest.list, read, allow
-p, role:default/platform-engineer, kuadrant.apikey.read.all, read, allow
-p, role:default/platform-engineer, kuadrant.apikey.delete.all, delete, allow
-p, role:default/platform-engineer, catalog.entity.read, read, allow
-
-# api owner: publishes apis, approves requests for own apis
+# api owner: publishes apis, approves requests
 # can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference), request api access
-# cannot do: create/update planpolicy, approve requests for other apis
+# cannot do: create/update/delete planpolicy (managed on cluster by platform engineers)
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
@@ -54,12 +33,10 @@ p, role:default/api-consumer, catalog.entity.read, read, allow
 # p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
 
 # assign groups to roles
-g, group:default/platform-engineers, role:default/platform-engineer
 g, group:default/api-owners, role:default/api-owner
 g, group:default/api-consumers, role:default/api-consumer
 
 # assign users to roles (for development with guest auth)
-g, user:default/platform-engineer, role:default/platform-engineer
 g, user:default/api-owner, role:default/api-owner
 g, user:default/api-consumer, role:default/api-consumer
 g, user:default/guest, role:default/api-owner

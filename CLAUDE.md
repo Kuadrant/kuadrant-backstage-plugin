@@ -180,6 +180,23 @@ Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `
 
 The application uses Casbin-based RBAC with two key configuration files that work together:
 
+### Roles
+
+**API Owner:**
+- can create/update/delete API Products
+- can approve/reject API key requests
+- can view Plan Policies (read-only)
+
+**API Consumer:**
+- can view API Products
+- can request API keys
+- can manage own API keys only
+
+**Platform Engineers:**
+- not a role in this plugin - they manage PlanPolicies directly on the cluster
+- PlanPolicy create/update/delete operations are not exposed via this plugin
+- only read/list permissions for PlanPolicy exist in the plugin
+
 ### Configuration Files
 
 **1. `catalog-entities/kuadrant-users.yaml`**
@@ -209,7 +226,17 @@ user gets all permissions from all their group memberships
 
 ### Testing Different Permission Levels
 
-the guest user (default in development) has full admin access. to test restricted permission levels, make the following changes:
+the guest user (default in development) has full admin access. to test restricted permission levels, use these commands:
+
+```bash
+yarn user:consumer      # switch to API Consumer
+yarn user:owner         # switch to API Owner
+yarn user:default       # restore default permissions
+```
+
+after switching roles, restart with `yarn dev`.
+
+alternatively, make the following manual changes:
 
 #### Test as API Consumer (Restricted Access)
 
@@ -270,38 +297,14 @@ yarn dev
 - ✅ approve/reject api key requests in approval queue
 - ✅ view/delete any api key
 - ✅ view plan policies (read-only)
-- ❌ cannot create/update/delete plan policies
-
-#### Test as Platform Engineer (Full Admin)
-
-**1. edit `catalog-entities/kuadrant-users.yaml`:**
-find the guest user entry and change:
-```yaml
-memberOf: [platform-engineers]
-```
-
-**2. optionally edit `rbac-policy.csv`:**
-find the guest user assignment and change:
-```csv
-g, user:default/guest, role:default/platform-engineer
-```
-
-**3. restart the application:**
-```bash
-yarn dev
-```
-
-**4. expected behaviour:**
-- ✅ all api-owner permissions above
-- ✅ create/update/delete plan policies
-- ✅ full administrative access to all kuadrant resources
+- ❌ cannot create/update/delete plan policies (managed on cluster)
 
 #### Restore Default (All Permissions)
 
 **1. edit `catalog-entities/kuadrant-users.yaml`:**
 find the guest user entry and change:
 ```yaml
-memberOf: [platform-engineers, api-owners, api-consumers]
+memberOf: [api-owners, api-consumers]
 ```
 
 **2. optionally edit `rbac-policy.csv`:**

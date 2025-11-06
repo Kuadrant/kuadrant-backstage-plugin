@@ -31,7 +31,6 @@
     "versions:bump": "node ./scripts/update-backstage.mjs",
     "user:consumer": "node scripts/switch-user-role.mjs consumer",
     "user:owner": "node scripts/switch-user-role.mjs owner",
-    "user:engineer": "node scripts/switch-user-role.mjs engineer",
     "user:default": "node scripts/switch-user-role.mjs default"
   },
   "workspaces": {
