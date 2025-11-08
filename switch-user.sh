@@ -26,7 +26,7 @@ echo "switching to user: $USER"
 
 # update app-config.local.yaml
 if grep -q "userEntityRef:" app-config.local.yaml 2>/dev/null; then
-  sed -i '' "s|userEntityRef:.*|userEntityRef: user:default/$USER|" app-config.local.yaml
+  sed -i "s|userEntityRef:.*|userEntityRef: user:default/$USER|" app-config.local.yaml
 else
   echo "error: could not find userEntityRef in app-config.local.yaml"
   exit 1
