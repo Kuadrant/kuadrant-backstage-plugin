@@ -32,8 +32,9 @@ else
   exit 1
 fi
 
+# No need to restart `yarn dev` - the backend stays running and only the frontend page refreshes.
 echo ""
 echo "✓ switched to user: $USER (backstage entity: user:default/$USER)"
-echo "✓ restart rhdh with: yarn dev"
+echo "✓ **Refresh your browser** (press F5 or Ctrl+R / Cmd+R)"
+echo "✓ **Sign in again** using the Guest button"
 echo ""
-echo "the backend will automatically reload and use the new user"
