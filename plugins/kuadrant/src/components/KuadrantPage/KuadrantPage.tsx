@@ -19,6 +19,7 @@ import {
 import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
+import { MyApiKeysCard } from '../MyApiKeysCard';
 import { PermissionGate } from '../PermissionGate';
 import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 import {
@@ -313,6 +314,10 @@ export const ResourceList = () => {
         )}
         {!loading && !error && !permissionError && (
           <Grid container spacing={3} direction="column">
+            <Grid item>
+              <MyApiKeysCard />
+            </Grid>
+
             <Grid item>
               <InfoCard title="API Products">
                 {renderResources(apiProducts?.items)}
