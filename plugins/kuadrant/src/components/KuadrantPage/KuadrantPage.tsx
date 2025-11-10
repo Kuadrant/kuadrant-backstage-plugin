@@ -8,7 +8,6 @@ import {
   Header,
   Page,
   Content,
-  ContentHeader,
   SupportButton,
   Progress,
   ResponseErrorPanel,
@@ -276,39 +275,25 @@ export const ResourceList = () => {
 
   return (
     <Page themeId="tool">
-      <Header title="Kuadrant" subtitle="API Management for Kubernetes">
+      <Header title="Kuadrant" subtitle="API management for Kubernetes">
         <SupportButton>Manage API products and access requests</SupportButton>
       </Header>
       <Content>
-        <ContentHeader title="API Products">
-          <Box display="flex" alignItems="center" style={{ gap: 16 }}>
-            {canCreateApiProduct && (
-              <Button
-                variant="contained"
-                color="primary"
-                startIcon={<AddIcon />}
-                onClick={() => setCreateDialogOpen(true)}
-              >
-                Create API Product
-              </Button>
-            )}
-          </Box>
-        </ContentHeader>
         {loading && <Progress />}
         {error && <ResponseErrorPanel error={error} />}
         {permissionError && (
           <Box p={2}>
             <Typography color="error">
-              Unable to check permissions: {permissionError.message}
+              unable to check permissions: {permissionError.message}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
+              permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
                          deletePermissionError ? 'kuadrant.apiproduct.delete' :
                          approvalQueuePermissionError ? 'kuadrant.apikeyrequest.read.all' :
                          planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              Please try again or contact your administrator
+              please try again or contact your administrator
             </Typography>
           </Box>
         )}
@@ -319,7 +304,24 @@ export const ResourceList = () => {
             </Grid>
 
             <Grid item>
-              <InfoCard title="API Products">
+              <InfoCard
+                title="API Products"
+                action={
+                  canCreateApiProduct ? (
+                    <Box display="flex" alignItems="center" height="100%" mt={1}>
+                      <Button
+                        variant="contained"
+                        color="primary"
+                        size="small"
+                        startIcon={<AddIcon />}
+                        onClick={() => setCreateDialogOpen(true)}
+                      >
+                        Create API Product
+                      </Button>
+                    </Box>
+                  ) : undefined
+                }
+              >
                 {renderResources(apiProducts?.items)}
               </InfoCard>
             </Grid>

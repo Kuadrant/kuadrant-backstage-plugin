@@ -20,6 +20,8 @@ import {
   Chip,
   Typography,
   Box,
+  Tabs,
+  Tab,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
@@ -145,6 +147,7 @@ export const ApprovalQueueCard = () => {
   const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [refresh, setRefresh] = useState(0);
+  const [selectedTab, setSelectedTab] = useState(0);
   const [selectedRequests, setSelectedRequests] = useState<APIKeyRequest[]>([]);
   const [dialogState, setDialogState] = useState<{
     open: boolean;
@@ -562,82 +565,95 @@ export const ApprovalQueueCard = () => {
     },
   ];
 
+  const getTabData = () => {
+    switch (selectedTab) {
+      case 0:
+        return { data: approved, columns: approvedColumns, showSelection: false };
+      case 1:
+        return { data: pending, columns: pendingColumns, showSelection: true };
+      case 2:
+        return { data: rejected, columns: rejectedColumns, showSelection: false };
+      default:
+        return { data: approved, columns: approvedColumns, showSelection: false };
+    }
+  };
+
+  const tabData = getTabData();
+
   return (
     <>
-      <Box>
-        <InfoCard title={`Pending Requests (${pending.length})`}>
-          {pending.length === 0 ? (
-            <Typography variant="body2" color="textSecondary">No pending requests</Typography>
-          ) : (
-            <>
-              {canUpdateRequests && selectedRequests.length > 0 && (
-                <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
-                  <Typography variant="body2">
-                    {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
-                  </Typography>
-                  <Box display="flex" style={{ gap: 8 }}>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="primary"
-                      startIcon={<CheckCircleIcon />}
-                      onClick={handleBulkApprove}
-                    >
-                      Approve Selected
-                    </Button>
-                    <Button
-                      size="small"
-                      variant="contained"
-                      color="secondary"
-                      startIcon={<CancelIcon />}
-                      onClick={handleBulkReject}
-                    >
-                      Reject Selected
-                    </Button>
-                  </Box>
-                </Box>
-              )}
-              <Table
-                options={{
-                  selection: canUpdateRequests,
-                  paging: true,
-                  pageSize: 5,
-                  search: false,
-                  showTextRowsSelected: false,
-                  toolbar: false,
-                }}
-                data={pending}
-                columns={pendingColumns}
-                onSelectionChange={(rows) => setSelectedRequests(rows as APIKeyRequest[])}
-              />
-            </>
-          )}
-        </InfoCard>
+      <InfoCard
+        title="API Access Requests"
+        subheader={`${pending.length} pending, ${approved.length} approved, ${rejected.length} rejected`}
+      >
+        <Box mb={2}>
+          <Tabs
+            value={selectedTab}
+            onChange={(_, newValue) => {
+              setSelectedTab(newValue);
+              setSelectedRequests([]);
+            }}
+            indicatorColor="primary"
+            textColor="primary"
+          >
+            <Tab label={`Approved (${approved.length})`} />
+            <Tab label={`Pending (${pending.length})`} />
+            <Tab label={`Rejected (${rejected.length})`} />
+          </Tabs>
+        </Box>
 
-        {approved.length > 0 && (
-          <Box mt={3}>
-            <InfoCard title={`Approved Requests (${approved.length})`}>
-              <Table
-                options={{ paging: true, pageSize: 5, search: false, toolbar: false }}
-                data={approved}
-                columns={approvedColumns}
-              />
-            </InfoCard>
+        {canUpdateRequests && selectedTab === 1 && selectedRequests.length > 0 && (
+          <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
+            <Typography variant="body2">
+              {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
+            </Typography>
+            <Box display="flex" style={{ gap: 8 }}>
+              <Button
+                size="small"
+                variant="contained"
+                color="primary"
+                startIcon={<CheckCircleIcon />}
+                onClick={handleBulkApprove}
+              >
+                Approve Selected
+              </Button>
+              <Button
+                size="small"
+                variant="contained"
+                color="secondary"
+                startIcon={<CancelIcon />}
+                onClick={handleBulkReject}
+              >
+                Reject Selected
+              </Button>
+            </Box>
           </Box>
         )}
 
-        {rejected.length > 0 && (
-          <Box mt={3}>
-            <InfoCard title={`Rejected Requests (${rejected.length})`}>
-              <Table
-                options={{ paging: true, pageSize: 5, search: false, toolbar: false }}
-                data={rejected}
-                columns={rejectedColumns}
-              />
-            </InfoCard>
+        {tabData.data.length === 0 ? (
+          <Box p={3} textAlign="center">
+            <Typography variant="body1" color="textSecondary">
+              {selectedTab === 0 && 'No approved requests.'}
+              {selectedTab === 1 && 'No pending requests.'}
+              {selectedTab === 2 && 'No rejected requests.'}
+            </Typography>
           </Box>
+        ) : (
+          <Table
+            options={{
+              selection: canUpdateRequests && tabData.showSelection,
+              paging: tabData.data.length > 10,
+              pageSize: 10,
+              search: false,
+              showTextRowsSelected: false,
+              toolbar: false,
+            }}
+            data={tabData.data}
+            columns={tabData.columns}
+            onSelectionChange={(rows) => setSelectedRequests(rows as APIKeyRequest[])}
+          />
         )}
-      </Box>
+      </InfoCard>
       <ApprovalDialog
         open={dialogState.open}
         request={dialogState.request}

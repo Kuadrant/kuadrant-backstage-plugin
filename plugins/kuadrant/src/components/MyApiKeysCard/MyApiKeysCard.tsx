@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { InfoCard, Table, TableColumn, Link } from '@backstage/core-components';
 import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
-import { Box, Chip, Typography, Tabs, Tab } from '@material-ui/core';
+import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip } from '@material-ui/core';
+import VisibilityIcon from '@material-ui/icons/Visibility';
+import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 
 interface APIKeyRequest {
   metadata: {
@@ -25,6 +27,8 @@ interface APIKeyRequest {
     apiKey?: string;
     apiHostname?: string;
     reason?: string;
+    reviewedBy?: string;
+    reviewedAt?: string;
   };
 }
 
@@ -35,6 +39,7 @@ export const MyApiKeysCard = () => {
   const backendUrl = config.getString('backend.baseUrl');
   const [selectedTab, setSelectedTab] = useState(0);
   const [userId, setUserId] = useState<string>('');
+  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -70,16 +75,28 @@ export const MyApiKeysCard = () => {
   }
 
   const allRequests = requests || [];
-  const approvedRequests = allRequests.filter(r => r.status?.phase === 'Approved');
-  const pendingRequests = allRequests.filter(r => r.status?.phase === 'Pending');
-  const rejectedRequests = allRequests.filter(r => r.status?.phase === 'Rejected');
+  const approvedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Approved');
+  const pendingRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Pending');
+  const rejectedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Rejected');
+
+  const toggleKeyVisibility = (keyName: string) => {
+    setVisibleKeys(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(keyName)) {
+        newSet.delete(keyName);
+      } else {
+        newSet.add(keyName);
+      }
+      return newSet;
+    });
+  };
 
   const columns: TableColumn<APIKeyRequest>[] = [
     {
       title: 'API Product',
       field: 'spec.apiName',
       render: (row: APIKeyRequest) => (
-        <Link to={`/catalog/default/api/${row.spec.apiName}`}>
+        <Link to={`/catalog/default/api/${row.spec.apiName}/api-keys`}>
           <strong>{row.spec.apiName}</strong>
         </Link>
       ),
@@ -94,6 +111,17 @@ export const MyApiKeysCard = () => {
       },
     },
     {
+      title: 'Use Case',
+      field: 'spec.useCase',
+      render: (row: APIKeyRequest) => {
+        return (
+          <Typography variant="body2">
+            {row.spec.useCase || '-'}
+          </Typography>
+        );
+      },
+    },
+    {
       title: 'Status',
       field: 'status.phase',
       render: (row: APIKeyRequest) => {
@@ -104,12 +132,55 @@ export const MyApiKeysCard = () => {
       },
     },
     {
+      title: 'Reason',
+      render: (row: APIKeyRequest) => {
+        if (row.status?.phase === 'Rejected' && row.status.reason) {
+          return (
+            <Typography variant="body2" color="error">
+              {row.status.reason}
+            </Typography>
+          );
+        }
+        return <Typography variant="body2" color="textSecondary">-</Typography>;
+      },
+    },
+    {
+      title: 'Reviewed By',
+      render: (row: APIKeyRequest) => {
+        if ((row.status?.phase === 'Approved' || row.status?.phase === 'Rejected') && row.status.reviewedBy) {
+          const reviewedDate = row.status.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '';
+          return (
+            <Box>
+              <Typography variant="body2">{row.status.reviewedBy}</Typography>
+              {reviewedDate && (
+                <Typography variant="caption" color="textSecondary">
+                  {reviewedDate}
+                </Typography>
+              )}
+            </Box>
+          );
+        }
+        return <Typography variant="body2" color="textSecondary">-</Typography>;
+      },
+    },
+    {
       title: 'API Key',
       render: (row: APIKeyRequest) => {
         if (row.status?.phase === 'Approved' && row.status.apiKey) {
+          const isVisible = visibleKeys.has(row.metadata.name);
           return (
-            <Box fontFamily="monospace" fontSize="0.875rem">
-              {row.status.apiKey.substring(0, 20)}...
+            <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+              <Box fontFamily="monospace" fontSize="0.875rem">
+                {isVisible ? row.status.apiKey : '•'.repeat(20) + '...'}
+              </Box>
+              <Tooltip title={isVisible ? 'hide key' : 'show key'}>
+                <IconButton
+                  size="small"
+                  onClick={() => toggleKeyVisibility(row.metadata.name)}
+                >
+                  {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                </IconButton>
+              </Tooltip>
             </Box>
           );
         }
