@@ -176,6 +176,7 @@ spec:
   description: simple toy store api for demonstration
   version: v1
   approvalMode: manual
+  publishStatus: Published
   tags:
     - demo
     - retail

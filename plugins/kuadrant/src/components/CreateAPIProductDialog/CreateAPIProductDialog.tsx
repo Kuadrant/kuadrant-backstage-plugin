@@ -33,6 +33,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('v1');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
+  const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Published');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedHTTPRoute, setSelectedHTTPRoute] = useState('');
@@ -93,6 +94,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           description,
           version,
           approvalMode,
+          publishStatus,
           tags,
           targetRef: {
             group: 'gateway.networking.k8s.io',
@@ -222,6 +224,20 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             >
               <MenuItem value="manual">Manual</MenuItem>
               <MenuItem value="automatic">Automatic</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              select
+              label="Publish Status"
+              value={publishStatus}
+              onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
+              margin="normal"
+              helperText="Draft: hidden from catalog. Published: visible to consumers."
+            >
+              <MenuItem value="Draft">Draft</MenuItem>
+              <MenuItem value="Published">Published</MenuItem>
             </TextField>
           </Grid>
           <Grid item xs={12}>
