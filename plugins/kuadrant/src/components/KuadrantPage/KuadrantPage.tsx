@@ -24,6 +24,7 @@ import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 import {
   kuadrantApiProductCreatePermission,
   kuadrantApiProductDeletePermission,
+  kuadrantApiProductUpdatePermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantPlanPolicyListPermission,
@@ -73,6 +74,10 @@ export const ResourceList = () => {
     loading: deletePermissionLoading,
     error: deletePermissionError,
   } = useKuadrantPermission(kuadrantApiProductDeletePermission);
+
+  const {
+    allowed: canUpdateApiProduct,
+  } = useKuadrantPermission(kuadrantApiProductUpdatePermission);
 
   const {
     allowed: canListPlanPolicies,
@@ -175,17 +180,16 @@ export const ResourceList = () => {
       render: (row: any) => row.spec?.targetRef?.name || '-',
     },
     {
-      title: 'Plans',
-      field: 'plans',
+      title: 'Publish Status',
+      field: 'spec.publishStatus',
       render: (row: any) => {
-        const plans = row.spec?.plans || [];
-        if (plans.length === 0) return '-';
+        const status = row.spec?.publishStatus || 'Draft';
         return (
-          <Box display="flex" style={{ gap: 4 }}>
-            {plans.map((plan: any, idx: number) => (
-              <Chip key={idx} label={plan.tier} size="small" />
-            ))}
-          </Box>
+          <Chip 
+            label={status} 
+            size="small" 
+            color={status === 'Published' ? 'primary' : 'default'}
+          />
         );
       },
     },
@@ -203,34 +207,27 @@ export const ResourceList = () => {
       field: 'actions',
       render: (row: any) => (
         <Box display="flex" style={{ gap: 4 }}>
-          <IconButton
-            size="small"
-            onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
-            title="edit apiproduct"
-          >
-            <EditIcon fontSize="small" />
-          </IconButton>
-          <IconButton
-            size="small"
-            onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
-            title="delete apiproduct"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
+          {canUpdateApiProduct && (
+            <IconButton
+              size="small"
+              onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
+              title="Edit API Product"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          )}
+          
+          {canDeleteApiProduct && (
+            <IconButton
+              size="small"
+              onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+              title="Delete API Product"
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
         </Box>
       ),
-      render: (row: any) => {
-        if (!canDeleteApiProduct) return null;
-        return (
-          <IconButton
-            size="small"
-            onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
-            title="delete apiproduct"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        );
-      },
     },
   ];
 

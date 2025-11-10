@@ -35,8 +35,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Draft');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
   const [tags, setTags] = useState<string[]>([]);
-  const [plans, setPlans] = useState<any[]>([]);
-  const [planPolicyRef, setPlanPolicyRef] = useState<any>(null);
+  const [targetRef, setTargetRef] = useState<any>(null);
   const [tagInput, setTagInput] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactTeam, setContactTeam] = useState('');
@@ -60,8 +59,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           setPublishStatus(data.spec.publishStatus || 'Draft');
           setApprovalMode(data.spec.approvalMode || 'manual');
           setTags(data.spec.tags || []);
-          setPlans(data.spec.plans || []);
-          setPlanPolicyRef(data.spec.planPolicyRef || null);
+          setTargetRef(data.spec.targetRef || null);
           setContactEmail(data.spec.contact?.email || '');
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
@@ -96,12 +94,11 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           displayName,
           description,
           version,
-          publishStatus,
-          approvalMode,
-          tags,
-          plans,
-          planPolicyRef,
-          ...(contactEmail || contactTeam ? {
+        publishStatus,
+        approvalMode,
+        tags,
+        targetRef,
+        ...(contactEmail || contactTeam ? {
             contact: {
               ...(contactEmail && { email: contactEmail }),
               ...(contactTeam && { team: contactTeam }),
