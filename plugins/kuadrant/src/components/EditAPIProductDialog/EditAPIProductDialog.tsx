@@ -24,17 +24,10 @@ interface EditAPIProductDialogProps {
   name: string;
 }
 
-export const EditAPIProductDialog = ({
-                                       open,
-                                       onClose,
-                                       onSuccess,
-                                       namespace,
-                                       name
-                                     }: EditAPIProductDialogProps) => {
+export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}: EditAPIProductDialogProps) => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
-
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
@@ -42,6 +35,8 @@ export const EditAPIProductDialog = ({
   const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Draft');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
   const [tags, setTags] = useState<string[]>([]);
+  const [plans, setPlans] = useState<any[]>([]);
+  const [planPolicyRef, setPlanPolicyRef] = useState<any>(null);
   const [tagInput, setTagInput] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactTeam, setContactTeam] = useState('');
@@ -65,6 +60,8 @@ export const EditAPIProductDialog = ({
           setPublishStatus(data.spec.publishStatus || 'Draft');
           setApprovalMode(data.spec.approvalMode || 'manual');
           setTags(data.spec.tags || []);
+          setPlans(data.spec.plans || []);
+          setPlanPolicyRef(data.spec.planPolicyRef || null);
           setContactEmail(data.spec.contact?.email || '');
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
@@ -102,6 +99,8 @@ export const EditAPIProductDialog = ({
           publishStatus,
           approvalMode,
           tags,
+          plans,
+          planPolicyRef,
           ...(contactEmail || contactTeam ? {
             contact: {
               ...(contactEmail && { email: contactEmail }),
