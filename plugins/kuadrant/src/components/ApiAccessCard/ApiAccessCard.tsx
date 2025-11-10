@@ -13,17 +13,18 @@ import {
 import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 
-interface ApiKey {
+interface APIKeyRequest {
   metadata: {
     name: string;
     namespace: string;
-    annotations?: {
-      'secret.kuadrant.io/plan-id'?: string;
-      'secret.kuadrant.io/user-id'?: string;
-    };
   };
-  data?: {
-    api_key?: string;
+  spec: {
+    apiName: string;
+    planTier: string;
+  };
+  status?: {
+    phase: 'Pending' | 'Approved' | 'Rejected';
+    apiKey?: string;
   };
 }
 
@@ -40,7 +41,8 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   const backendUrl = config.getString('backend.baseUrl');
   const [userId, setUserId] = useState<string>('guest');
 
-  // read from entity annotations, fallback to props for backwards compat
+  // get apiproduct name from entity annotation (set by entity provider)
+  const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'] || propNamespace || 'default';
 
   // get current user identity
@@ -49,14 +51,21 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     setUserId(identity.userEntityRef.split('/')[1] || 'guest');
   }, [identityApi]);
 
-  const { value: apiKeys, loading: keysLoading, error: keysError } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apikeys?namespace=${namespace}&userId=${userId}`);
+  const { value: requests, loading: keysLoading, error: keysError } = useAsync(async () => {
+    const url = namespace
+      ? `${backendUrl}/api/kuadrant/requests/my?namespace=${namespace}`
+      : `${backendUrl}/api/kuadrant/requests/my`;
+    const response = await fetchApi.fetch(url);
     if (!response.ok) {
-      throw new Error('failed to fetch api keys');
+      throw new Error('failed to fetch api key requests');
     }
     const data = await response.json();
-    return data.items || [];
-  }, [namespace, userId, backendUrl, fetchApi]);
+    // filter to only this apiproduct's approved requests
+    const allRequests = data.items || [];
+    return allRequests.filter((r: APIKeyRequest) =>
+      r.spec.apiName === apiProductName && r.status?.phase === 'Approved'
+    );
+  }, [namespace, apiProductName, backendUrl, fetchApi]);
 
   if (keysLoading) {
     return <Progress />;
@@ -66,7 +75,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     return <ResponseErrorPanel error={keysError} />;
   }
 
-  const keys = (apiKeys as ApiKey[]) || [];
+  const keys = (requests as APIKeyRequest[]) || [];
 
   return (
     <>
@@ -77,14 +86,14 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
               <Typography variant="body1" gutterBottom>
                 You have {keys.length} active API key{keys.length !== 1 ? 's' : ''} for this API
               </Typography>
-              {keys.map((key: ApiKey) => {
-                const planTier = key.metadata.annotations?.['secret.kuadrant.io/plan-id'] || 'Unknown';
+              {keys.map((request: APIKeyRequest) => {
+                const planTier = request.spec.planTier;
 
                 return (
-                  <Box key={key.metadata.name} mb={1} p={1} border={1} borderColor="grey.300" borderRadius={4}>
+                  <Box key={request.metadata.name} mb={1} p={1} border={1} borderColor="grey.300" borderRadius={4}>
                     <Box display="flex" justifyContent="space-between" alignItems="center">
                       <Typography variant="body2">
-                        {key.metadata.name}
+                        {request.metadata.name}
                       </Typography>
                       <Chip label={planTier} color="primary" size="small" />
                     </Box>

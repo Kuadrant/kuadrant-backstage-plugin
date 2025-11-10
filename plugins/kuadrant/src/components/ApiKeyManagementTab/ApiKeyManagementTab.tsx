@@ -93,9 +93,8 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   }, [identityApi]);
 
   const { value: requests, loading: requestsLoading, error: requestsError } = useAsync(async () => {
-    if (!userId) return [];
     const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests/my?userId=${userId}&namespace=${namespace}`
+      `${backendUrl}/api/kuadrant/requests/my?namespace=${namespace}`
     );
     if (!response.ok) {
       throw new Error('failed to fetch requests');
@@ -105,7 +104,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     return (data.items || []).filter(
       (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
     );
-  }, [userId, apiProductName, namespace, refresh, fetchApi]);
+  }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
   const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
