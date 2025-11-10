@@ -336,6 +336,124 @@ yarn dev
 - these users bypass all RBAC checks entirely
 - do not add guest to these lists when testing permissions
 
+## Recent Architectural Changes
+
+### HTTPRoute-First APIProduct Model (IMPLEMENTED)
+
+**Previous implementation:**
+- API Owner created APIProduct in Backstage form
+- APIProduct referenced PlanPolicy directly via `spec.planPolicyRef`
+- No HTTPRoute reference in APIProduct
+- Plans were populated by controller reading from PlanPolicy
+
+**Current implementation:**
+- Platform Engineers set up infrastructure on-cluster **first**:
+  1. Create PlanPolicy with rate limit tiers
+  2. Apply PlanPolicy to HTTPRoute via `targetRef`
+  3. Annotate HTTPRoute to expose in Backstage (`backstage.io/expose: "true"`)
+- API Owner workflow in Backstage:
+  1. Browse list of available HTTPRoutes (filtered by annotation)
+  2. Select existing HTTPRoute to publish
+  3. Add catalog metadata (display name, description, docs, tags)
+  4. APIProduct is created with `spec.targetRef` pointing to HTTPRoute
+- Plans are included in APIProduct spec (will be discovered by controller in future)
+- APIProduct is a catalog/metadata layer, not defining infrastructure relationships
+
+**Benefits:**
+- Backstage remains read-only for infrastructure resources (HTTPRoute, PlanPolicy)
+- PlanPolicy configuration happens on-cluster where it belongs (via kubectl/GitOps)
+- Clear separation: Platform Engineers configure infrastructure, API Owners publish to catalog
+- Multiple APIProducts can reference the same HTTPRoute
+- Aligns with spec requirement: plans are "offered" on APIs, not assigned through portal
+
+**Changes made:**
+1. Updated APIProduct CRD to have `spec.targetRef` (HTTPRoute reference) instead of `spec.planPolicyRef`
+2. Updated CreateAPIProductDialog to list/select HTTPRoutes instead of PlanPolicies
+3. Added backend endpoint `/httproutes` to list HTTPRoutes
+4. Updated backend validation to check `targetRef` instead of `planPolicyRef`
+5. HTTPRoutes must have `backstage.io/expose: "true"` annotation to appear in selection
+
+### APIKeyRequest Scoping to APIProduct (IMPLEMENTED)
+
+**Problem:**
+- APIKeyRequest `spec.apiName` previously referenced HTTPRoute name
+- Multiple APIProducts referencing same HTTPRoute would share API key requests
+- No isolation between different products exposing the same route
+
+**Solution:**
+- Changed `spec.apiName` to reference the **APIProduct name** instead of HTTPRoute name
+- Each APIProduct now has its own isolated set of API key requests
+- Multiple APIProducts can safely reference the same HTTPRoute with separate keys/requests
+
+**Changes made:**
+1. Updated ApiKeyManagementTab to use `entity.metadata.annotations['kuadrant.io/apiproduct']`
+2. Frontend now passes APIProduct name in `apiName` field when creating requests
+3. Backend already used `apiName` from request body, no changes needed
+4. Updated APIKeyRequest CRD descriptions to clarify `apiName` is APIProduct name
+
+**Benefits:**
+- Multiple APIProducts can share HTTPRoute infrastructure
+- Each product has separate approval workflow, keys, and request tracking
+- API keys are scoped to the product abstraction, not infrastructure
+- Allows different products with different plans on same HTTPRoute
+
+### Immediate Catalog Sync for APIProducts (IMPLEMENTED)
+
+**Previous behaviour:**
+- APIProductEntityProvider synced catalog every 30 seconds via periodic `setInterval`
+- After creating/deleting an APIProduct, users had to wait up to 30 seconds to see changes in catalog
+- No event-driven updates on CRUD operations
+
+**Current implementation:**
+- Provider instance is shared between module and router via singleton pattern
+- `refresh()` method is public and callable from router endpoints
+- After successful APIProduct create/delete operations, router immediately calls `provider.refresh()`
+- Catalog updates appear instantly without waiting for next scheduled sync
+
+**Changes made:**
+1. Made `APIProductEntityProvider.refresh()` method public (was private)
+2. Added singleton pattern in `module.ts` to export provider instance
+3. Added `getAPIProductEntityProvider()` function to retrieve instance
+4. Updated router to import provider getter and call `refresh()` after:
+   - POST `/apiproducts` (after successful create)
+   - DELETE `/apiproducts/:namespace/:name` (after successful delete)
+
+**Benefits:**
+- Improved developer experience with immediate feedback
+- Reduced wait time from up to 30 seconds to instant
+- Maintains periodic sync as backup for external changes
+- No breaking changes to existing functionality
+
+### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
+
+**Context:**
+- APIProduct spec includes plans array that should be discovered from PlanPolicy
+- Full controller implementation not yet available
+- Without plans, API Keys tab shows "no plans available" error
+
+**Temporary implementation:**
+- Backend populates `spec.plans` during APIProduct creation
+- Finds PlanPolicy targeting the same HTTPRoute as the APIProduct
+- Copies plans array (tier, description, limits) from PlanPolicy to APIProduct
+- Non-blocking: continues without plans if PlanPolicy lookup fails
+
+**Changes made:**
+1. Added PlanPolicy lookup in POST `/apiproducts` endpoint
+2. Searches for PlanPolicy with matching `targetRef` (HTTPRoute)
+3. Copies plans from PlanPolicy into APIProduct before creating resource
+4. Wrapped in try-catch to avoid breaking creation if PlanPolicy missing
+
+**Limitations:**
+- Only populates plans at creation time (not updated if PlanPolicy changes)
+- Does not write to status (writes to spec instead, which is acceptable until controller exists)
+- Will be replaced by proper controller that maintains discoveredPlans in status
+
+**Benefits:**
+- Makes API Keys tab functional immediately
+- Allows developers to request API access with plan selection
+- Provides realistic testing environment for approval workflows
+- No changes needed when controller is implemented (controller will override spec with status)
+
 ## Important Notes
 
 ### System Dependencies

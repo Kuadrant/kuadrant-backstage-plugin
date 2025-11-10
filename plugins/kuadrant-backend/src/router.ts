@@ -8,6 +8,7 @@ import Router from 'express-promise-router';
 import cors from 'cors';
 import { randomBytes } from 'crypto';
 import { KuadrantK8sClient } from './k8s-client';
+import { getAPIProductEntityProvider } from './module';
 import {
   kuadrantPermissions,
   kuadrantApiKeyDeleteAllPermission,
@@ -182,40 +183,59 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const apiProduct = req.body;
       const namespace = apiProduct.metadata?.namespace;
-      const planPolicyRef = apiProduct.spec?.planPolicyRef;
+      const targetRef = apiProduct.spec?.targetRef;
 
       if (!namespace) {
         throw new InputError('namespace is required in metadata');
       }
 
-      if (!planPolicyRef?.name || !planPolicyRef?.namespace) {
-        throw new InputError('planPolicyRef with name and namespace is required');
+      if (!targetRef?.name || !targetRef?.kind) {
+        throw new InputError('targetRef with name and kind is required');
       }
-
-      // fetch the planpolicy to get plan details
-      const planPolicy = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
-        'v1alpha1',
-        planPolicyRef.namespace,
-        'planpolicies',
-        planPolicyRef.name,
-      );
-
-      // extract plans from planpolicy
-      const plans = planPolicy.spec?.plans || [];
-
-      if (plans.length === 0) {
-        throw new InputError('selected planpolicy has no plans defined');
-      }
-
-      // inject plans into apiproduct spec
-      apiProduct.spec.plans = plans;
 
       // set the owner to the authenticated user
       if (!apiProduct.spec.contact) {
         apiProduct.spec.contact = {};
       }
       apiProduct.spec.contact.team = `user:default/${userId}`;
+
+      // temporary: populate plans from planpolicy until controller implements this
+      // look up httproute and find planpolicy targeting it
+      const httpRouteNamespace = targetRef.namespace || namespace;
+      const httpRouteName = targetRef.name;
+
+      try {
+        // list all planpolicies in the httproute's namespace
+        const planPoliciesResponse = await k8sClient.listCustomResources(
+          'extensions.kuadrant.io',
+          'v1alpha1',
+          'planpolicies',
+          httpRouteNamespace
+        );
+
+        // find planpolicy targeting this httproute
+        const planPolicy = (planPoliciesResponse.items || []).find((pp: any) => {
+          const ref = pp.spec?.targetRef;
+          return ref?.kind === 'HTTPRoute' &&
+                 ref?.name === httpRouteName &&
+                 (!ref?.namespace || ref?.namespace === httpRouteNamespace);
+        });
+
+        if (planPolicy && planPolicy.spec?.plans) {
+          // copy plans from planpolicy to apiproduct spec
+          apiProduct.spec.plans = planPolicy.spec.plans.map((plan: any) => ({
+            tier: plan.tier,
+            description: plan.description,
+            limits: plan.limits
+          }));
+          console.log(`copied ${apiProduct.spec.plans.length} plans from planpolicy ${planPolicy.metadata.name}`);
+        } else {
+          console.log(`no planpolicy found for httproute ${httpRouteNamespace}/${httpRouteName}`);
+        }
+      } catch (error) {
+        console.warn('failed to populate plans from planpolicy:', error);
+        // continue without plans rather than failing the creation
+      }
 
       const created = await k8sClient.createCustomResource(
         'extensions.kuadrant.io',
@@ -224,6 +244,12 @@ export async function createRouter({
         'apiproducts',
         apiProduct,
       );
+
+      // trigger immediate catalog sync
+      const provider = getAPIProductEntityProvider();
+      if (provider) {
+        await provider.refresh();
+      }
 
       res.status(201).json(created);
     } catch (error) {
@@ -264,6 +290,12 @@ export async function createRouter({
         name
       );
 
+      // trigger immediate catalog sync
+      const provider = getAPIProductEntityProvider();
+      if (provider) {
+        await provider.refresh();
+      }
+
       res.status(204).send();
     } catch (error) {
       console.error('error deleting apiproduct:', error);
@@ -271,6 +303,33 @@ export async function createRouter({
         res.status(403).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'failed to delete apiproduct' });
+      }
+    }
+  });
+
+  // httproute endpoints
+  router.get('/httproutes', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const data = await k8sClient.listCustomResources('gateway.networking.k8s.io', 'v1', 'httproutes');
+
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching httproutes:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch httproutes' });
       }
     }
   });

@@ -74,7 +74,7 @@ export class APIProductEntityProvider implements EntityProvider {
     }, 30 * 1000);
   }
 
-  private async refresh(): Promise<void> {
+  public async refresh(): Promise<void> {
     console.log('apiproduct provider: refresh called');
     if (!this.connection) {
       console.log('apiproduct provider: no connection, skipping refresh');

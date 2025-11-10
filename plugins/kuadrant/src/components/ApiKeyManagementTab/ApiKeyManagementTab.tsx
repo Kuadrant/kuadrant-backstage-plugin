@@ -81,27 +81,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const {
-    allowed: canCreateRequest,
-    loading: createRequestPermissionLoading,
-    error: createRequestPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission);
-
-  const {
-    allowed: canDeleteOwnKey,
-    loading: deleteOwnPermissionLoading,
-    error: deleteOwnPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyDeleteOwnPermission);
-
-  const {
-    allowed: canDeleteAllKeys,
-    loading: deleteAllPermissionLoading,
-    error: deleteAllPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
-
-  const httproute = entity.metadata.annotations?.['kuadrant.io/httproute'] || entity.metadata.name;
+  // get apiproduct name from entity annotation (set by entity provider)
+  const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'] || propNamespace || 'default';
-  const apiName = httproute;
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -119,10 +101,11 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       throw new Error('failed to fetch requests');
     }
     const data = await response.json();
+    // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiName === apiName && r.spec.apiNamespace === namespace
+      (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
     );
-  }, [userId, apiName, namespace, refresh, fetchApi]);
+  }, [userId, apiProductName, namespace, refresh, fetchApi]);
 
   const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -133,11 +116,32 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
     const product = data.items?.find((p: APIProduct) =>
       p.metadata.namespace === namespace &&
-      (p.metadata.name === apiName || p.metadata.name === `${apiName}-api`)
+      p.metadata.name === apiProductName
     );
 
     return product;
-  }, [namespace, apiName, fetchApi]);
+  }, [namespace, apiProductName, fetchApi]);
+
+  // check permissions with resource reference once we have the apiproduct
+  const resourceRef = apiProduct ? `apiproduct:${apiProduct.metadata.namespace}/${apiProduct.metadata.name}` : undefined;
+
+  const {
+    allowed: canCreateRequest,
+    loading: createRequestPermissionLoading,
+    error: createRequestPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission, resourceRef);
+
+  const {
+    allowed: canDeleteOwnKey,
+    loading: deleteOwnPermissionLoading,
+    error: deleteOwnPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteOwnPermission);
+
+  const {
+    allowed: canDeleteAllKeys,
+    loading: deleteAllPermissionLoading,
+    error: deleteAllPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
 
   const handleDeleteRequest = async (name: string) => {
     try {
@@ -178,7 +182,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiName,
+          apiName: apiProductName,
           apiNamespace: namespace,
           userId,
           userEmail,
@@ -214,10 +218,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           return <Box />;
         }
 
-        return <DetailPanelContent request={request} apiName={apiName} />;
+        return <DetailPanelContent request={request} apiName={apiProductName} />;
       },
     },
-  ], [apiName]);
+  ], [apiProductName]);
 
   // separate component to isolate state
   const DetailPanelContent = ({ request, apiName: api }: { request: APIKeyRequest; apiName: string }) => {
@@ -522,7 +526,7 @@ func main() {
       <Grid container spacing={3} direction="column">
         {canCreateRequest && (
           <Grid item>
-            <Box display="flex" justifyContent="flex-end" mb={2}>
+            <Box display="flex" flexDirection="column" alignItems="flex-end" mb={2}>
               <Button
                 variant="contained"
                 color="primary"
@@ -532,6 +536,20 @@ func main() {
               >
                 Request API Access
               </Button>
+              {plans.length === 0 && (
+                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                  {!apiProduct ? 'API product not found' : 'No plans available'}
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+        )}
+        {pendingRequests.length === 0 && rejectedRequests.length === 0 && approvedRequests.length === 0 && (
+          <Grid item>
+            <Box p={3} textAlign="center">
+              <Typography variant="body1" color="textSecondary">
+                No API keys yet. Request access to get started.
+              </Typography>
             </Box>
           </Grid>
         )}

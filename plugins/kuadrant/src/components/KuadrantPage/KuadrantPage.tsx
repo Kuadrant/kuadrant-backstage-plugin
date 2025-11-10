@@ -157,6 +157,11 @@ export const ResourceList = () => {
       render: (row: any) => row.spec?.version || '-',
     },
     {
+      title: 'HTTPRoute',
+      field: 'spec.targetRef.name',
+      render: (row: any) => row.spec?.targetRef?.name || '-',
+    },
+    {
       title: 'Plans',
       field: 'plans',
       render: (row: any) => {
