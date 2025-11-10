@@ -424,6 +424,31 @@ yarn dev
 - Maintains periodic sync as backup for external changes
 - No breaking changes to existing functionality
 
+### PublishStatus for APIProducts (IMPLEMENTED)
+
+**Context:**
+- APIProducts need Draft/Published workflow
+- Only Published APIProducts should appear in Backstage catalog
+- Draft APIProducts are hidden until ready for consumption
+
+**Implementation:**
+- APIProduct CRD has `spec.publishStatus` field with enum values: `Draft`, `Published`
+- Default value is `Draft` (hidden from catalog)
+- Entity provider filters APIProducts, only syncing those with `publishStatus: Published`
+- CreateAPIProductDialog includes dropdown to select publish status (defaults to `Published`)
+
+**Changes made:**
+1. CRD already included `publishStatus` field with enum validation
+2. Entity provider filters out Draft APIProducts during sync
+3. Added publishStatus dropdown to CreateAPIProductDialog
+4. Updated demo resources to set `publishStatus: Published` by default
+
+**Benefits:**
+- API Owners can create draft APIProducts without exposing them to consumers
+- Clear workflow: draft → published
+- No accidental exposure of incomplete API products
+- Aligns with typical content publishing workflows
+
 ### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
 
 **Context:**
