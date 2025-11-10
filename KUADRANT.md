@@ -257,9 +257,6 @@ Switch between test users to verify RBAC behaviour:
 
 # switch to api consumer (can only request keys)
 ./switch-user.sh api-consumer
-
-# restart development server
-yarn dev
 ```
 
 **Test users** (defined in `catalog-entities/kuadrant-users.yaml`):
@@ -268,8 +265,8 @@ yarn dev
 - `api-consumer` - member of api-consumers group
 
 After switching:
-1. Restart `yarn dev`
-2. Refresh browser (cmd+r)
+1. Refresh your browser (press F5 or Ctrl+R / Cmd+R)
+2. Sign in again using the Guest button
 3. You're now authenticated as the selected user
 
 ### RBAC Policy
