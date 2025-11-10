@@ -312,6 +312,14 @@ export class KuadrantK8sClient {
         plural,
         name,
         patch,
+        undefined,
+        undefined,
+        undefined,
+        {
+          headers: {
+            'Content-Type': 'application/merge-patch+json',
+          },
+        }
       );
       return response.body as K8sResource;
     } catch (error: any) {
