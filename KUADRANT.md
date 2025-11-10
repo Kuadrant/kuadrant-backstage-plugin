@@ -249,20 +249,23 @@ The backend exports these permissions (defined in `plugins/kuadrant-backend/src/
 Switch between test users to verify RBAC behaviour:
 
 ```bash
-# switch to platform engineer (full admin access)
-./switch-user.sh platform-engineer
+# switch to api consumer (can only request keys)
+yarn user:consumer
 
 # switch to api owner (can approve requests)
-./switch-user.sh api-owner
+yarn user:owner
 
-# switch to api consumer (can only request keys)
-./switch-user.sh api-consumer
+# switch to default (all permissions)
+yarn user:default
+
+# restart development server
+yarn dev
 ```
 
-**Test users** (defined in `catalog-entities/kuadrant-users.yaml`):
-- `platform-engineer` - member of platform-engineers group
-- `api-owner` - member of api-owners group
-- `api-consumer` - member of api-consumers group
+**Test roles** (modifies guest user in `catalog-entities/kuadrant-users.yaml`):
+- `consumer` - member of api-consumers group only
+- `owner` - member of api-owners group only
+- `default` - member of both api-owners and api-consumers groups
 
 After switching:
 1. Refresh your browser (press F5 or Ctrl+R / Cmd+R)
@@ -301,7 +304,7 @@ permission:
     policies-csv-file: ../../rbac-policy.csv
 ```
 
-The `userEntityRef` determines which user you're logged in as (changeable via `switch-user.sh`).
+The `userEntityRef` determines which user you're logged in as (changeable via yarn user commands).
 
 ### Kubernetes RBAC
 
