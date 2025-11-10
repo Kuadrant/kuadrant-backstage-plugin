@@ -135,6 +135,11 @@ spec:
                   url:
                     type: string
                     description: url to team page or support portal
+              publishStatus:
+                type: string
+                enum: [ Draft, Published ]
+                default: Draft
+                description: controls whether the api product appears in the backstage catalog (Draft = hidden, Published = visible)
           status:
             type: object
             properties:
