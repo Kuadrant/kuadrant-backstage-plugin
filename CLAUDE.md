@@ -176,6 +176,309 @@ test.beforeAll(async ({ }, testInfo) => {
 
 Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `audit-log`, `core`, `navigation`, `api`, `integration`
 
+## RBAC Permission System
+
+The application uses Casbin-based RBAC with two key configuration files that work together:
+
+### Roles
+
+**API Owner:**
+- can create/update/delete API Products
+- can approve/reject API key requests
+- can view Plan Policies (read-only)
+
+**API Consumer:**
+- can view API Products
+- can request API keys
+- can manage own API keys only
+
+**Platform Engineers:**
+- not a role in this plugin - they manage PlanPolicies directly on the cluster
+- PlanPolicy create/update/delete operations are not exposed via this plugin
+- only read/list permissions for PlanPolicy exist in the plugin
+
+### Configuration Files
+
+**1. `catalog-entities/kuadrant-users.yaml`**
+- defines users and groups in the backstage catalog
+- sets user identity and group membership via `memberOf` field
+- determines which groups a user belongs to
+
+**2. `rbac-policy.csv`**
+- defines permissions for roles and groups using casbin policy format
+- maps groups → roles → specific permissions
+- controls actual access to resources and operations
+- referenced in `app-config.local.yaml` at `permission.rbac.policies-csv-file`
+
+### Permission Flow
+
+```
+user logs in → auth sets userEntityRef (e.g., user:default/guest)
+    ↓
+catalog lookup → finds user's memberOf groups from kuadrant-users.yaml
+    ↓
+rbac-policy.csv → maps groups to roles (e.g., g, group:default/api-owners, role:default/api-owner)
+    ↓
+rbac-policy.csv → grants permissions to roles (e.g., p, role:default/api-owner, kuadrant.apiproduct.create, create, allow)
+    ↓
+user gets all permissions from all their group memberships
+```
+
+### Testing Different Permission Levels
+
+the guest user (default in development) has full admin access. to test restricted permission levels, use these commands:
+
+```bash
+yarn user:consumer      # switch to API Consumer
+yarn user:owner         # switch to API Owner
+yarn user:default       # restore default permissions
+```
+
+after switching roles, restart with `yarn dev`.
+
+alternatively, make the following manual changes:
+
+#### Test as API Consumer (Restricted Access)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [api-consumers]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-consumer
+```
+(this is redundant if group membership is set, but keeps direct assignments consistent)
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+**4. expected behaviour:**
+- ✅ view api products (browse catalog)
+- ✅ request api keys for apis
+- ✅ view/delete own api keys only
+- ✅ see only "API Products" card on /kuadrant page
+- ❌ no "Plan Policies" card visible
+- ❌ no "Approval Queue" card visible
+- ❌ no "Create API Product" button
+- ❌ no delete buttons on api products
+- ❌ cannot view other users' api keys
+
+#### Test as API Owner (Can Publish APIs)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [api-owners]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-owner
+```
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+**4. expected behaviour:**
+- ✅ all api-consumer permissions above
+- ✅ see "API Products", "Plan Policies", and "Approval Queue" cards
+- ✅ "Create API Product" button visible
+- ✅ delete buttons on api products
+- ✅ create/update/delete api products
+- ✅ approve/reject api key requests in approval queue
+- ✅ view/delete any api key
+- ✅ view plan policies (read-only)
+- ❌ cannot create/update/delete plan policies (managed on cluster)
+
+#### Restore Default (All Permissions)
+
+**1. edit `catalog-entities/kuadrant-users.yaml`:**
+find the guest user entry and change:
+```yaml
+memberOf: [api-owners, api-consumers]
+```
+
+**2. optionally edit `rbac-policy.csv`:**
+find the guest user assignment and change:
+```csv
+g, user:default/guest, role:default/api-owner
+```
+
+**3. restart the application:**
+```bash
+yarn dev
+```
+
+### Note on Configuration Files
+
+**group membership (primary mechanism):**
+- `catalog-entities/kuadrant-users.yaml` controls which groups a user belongs to
+- this is the primary way to grant permissions
+- requires full application restart to take effect
+
+**direct user-to-role assignments (optional):**
+- `rbac-policy.csv` line 65 can directly assign guest to a role
+- redundant if user is already in a group that maps to that role
+- useful for users not in any groups or for specific overrides
+- hot-reloads due to `policyFileReload: true` in app-config
+
+**admin/superUsers bypass (avoid for testing):**
+- `app-config.local.yaml` defines admin and superUsers in the `permission.rbac` section
+- these users bypass all RBAC checks entirely
+- do not add guest to these lists when testing permissions
+
+## Recent Architectural Changes
+
+### HTTPRoute-First APIProduct Model (IMPLEMENTED)
+
+**Previous implementation:**
+- API Owner created APIProduct in Backstage form
+- APIProduct referenced PlanPolicy directly via `spec.planPolicyRef`
+- No HTTPRoute reference in APIProduct
+- Plans were populated by controller reading from PlanPolicy
+
+**Current implementation:**
+- Platform Engineers set up infrastructure on-cluster **first**:
+  1. Create PlanPolicy with rate limit tiers
+  2. Apply PlanPolicy to HTTPRoute via `targetRef`
+  3. Annotate HTTPRoute to expose in Backstage (`backstage.io/expose: "true"`)
+- API Owner workflow in Backstage:
+  1. Browse list of available HTTPRoutes (filtered by annotation)
+  2. Select existing HTTPRoute to publish
+  3. Add catalog metadata (display name, description, docs, tags)
+  4. APIProduct is created with `spec.targetRef` pointing to HTTPRoute
+- Plans are included in APIProduct spec (will be discovered by controller in future)
+- APIProduct is a catalog/metadata layer, not defining infrastructure relationships
+
+**Benefits:**
+- Backstage remains read-only for infrastructure resources (HTTPRoute, PlanPolicy)
+- PlanPolicy configuration happens on-cluster where it belongs (via kubectl/GitOps)
+- Clear separation: Platform Engineers configure infrastructure, API Owners publish to catalog
+- Multiple APIProducts can reference the same HTTPRoute
+- Aligns with spec requirement: plans are "offered" on APIs, not assigned through portal
+
+**Changes made:**
+1. Updated APIProduct CRD to have `spec.targetRef` (HTTPRoute reference) instead of `spec.planPolicyRef`
+2. Updated CreateAPIProductDialog to list/select HTTPRoutes instead of PlanPolicies
+3. Added backend endpoint `/httproutes` to list HTTPRoutes
+4. Updated backend validation to check `targetRef` instead of `planPolicyRef`
+5. HTTPRoutes must have `backstage.io/expose: "true"` annotation to appear in selection
+
+### APIKeyRequest Scoping to APIProduct (IMPLEMENTED)
+
+**Problem:**
+- APIKeyRequest `spec.apiName` previously referenced HTTPRoute name
+- Multiple APIProducts referencing same HTTPRoute would share API key requests
+- No isolation between different products exposing the same route
+
+**Solution:**
+- Changed `spec.apiName` to reference the **APIProduct name** instead of HTTPRoute name
+- Each APIProduct now has its own isolated set of API key requests
+- Multiple APIProducts can safely reference the same HTTPRoute with separate keys/requests
+
+**Changes made:**
+1. Updated ApiKeyManagementTab to use `entity.metadata.annotations['kuadrant.io/apiproduct']`
+2. Frontend now passes APIProduct name in `apiName` field when creating requests
+3. Backend already used `apiName` from request body, no changes needed
+4. Updated APIKeyRequest CRD descriptions to clarify `apiName` is APIProduct name
+
+**Benefits:**
+- Multiple APIProducts can share HTTPRoute infrastructure
+- Each product has separate approval workflow, keys, and request tracking
+- API keys are scoped to the product abstraction, not infrastructure
+- Allows different products with different plans on same HTTPRoute
+
+### Immediate Catalog Sync for APIProducts (IMPLEMENTED)
+
+**Previous behaviour:**
+- APIProductEntityProvider synced catalog every 30 seconds via periodic `setInterval`
+- After creating/deleting an APIProduct, users had to wait up to 30 seconds to see changes in catalog
+- No event-driven updates on CRUD operations
+
+**Current implementation:**
+- Provider instance is shared between module and router via singleton pattern
+- `refresh()` method is public and callable from router endpoints
+- After successful APIProduct create/delete operations, router immediately calls `provider.refresh()`
+- Catalog updates appear instantly without waiting for next scheduled sync
+
+**Changes made:**
+1. Made `APIProductEntityProvider.refresh()` method public (was private)
+2. Added singleton pattern in `module.ts` to export provider instance
+3. Added `getAPIProductEntityProvider()` function to retrieve instance
+4. Updated router to import provider getter and call `refresh()` after:
+   - POST `/apiproducts` (after successful create)
+   - DELETE `/apiproducts/:namespace/:name` (after successful delete)
+
+**Benefits:**
+- Improved developer experience with immediate feedback
+- Reduced wait time from up to 30 seconds to instant
+- Maintains periodic sync as backup for external changes
+- No breaking changes to existing functionality
+
+### PublishStatus for APIProducts (IMPLEMENTED)
+
+**Context:**
+- APIProducts need Draft/Published workflow
+- Only Published APIProducts should appear in Backstage catalog
+- Draft APIProducts are hidden until ready for consumption
+
+**Implementation:**
+- APIProduct CRD has `spec.publishStatus` field with enum values: `Draft`, `Published`
+- Default value is `Draft` (hidden from catalog)
+- Entity provider filters APIProducts, only syncing those with `publishStatus: Published`
+- CreateAPIProductDialog includes dropdown to select publish status (defaults to `Published`)
+
+**Changes made:**
+1. CRD already included `publishStatus` field with enum validation
+2. Entity provider filters out Draft APIProducts during sync
+3. Added publishStatus dropdown to CreateAPIProductDialog
+4. Updated demo resources to set `publishStatus: Published` by default
+
+**Benefits:**
+- API Owners can create draft APIProducts without exposing them to consumers
+- Clear workflow: draft → published
+- No accidental exposure of incomplete API products
+- Aligns with typical content publishing workflows
+
+### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
+
+**Context:**
+- APIProduct spec includes plans array that should be discovered from PlanPolicy
+- Full controller implementation not yet available
+- Without plans, API Keys tab shows "no plans available" error
+
+**Temporary implementation:**
+- Backend populates `spec.plans` during APIProduct creation
+- Finds PlanPolicy targeting the same HTTPRoute as the APIProduct
+- Copies plans array (tier, description, limits) from PlanPolicy to APIProduct
+- Non-blocking: continues without plans if PlanPolicy lookup fails
+
+**Changes made:**
+1. Added PlanPolicy lookup in POST `/apiproducts` endpoint
+2. Searches for PlanPolicy with matching `targetRef` (HTTPRoute)
+3. Copies plans from PlanPolicy into APIProduct before creating resource
+4. Wrapped in try-catch to avoid breaking creation if PlanPolicy missing
+
+**Limitations:**
+- Only populates plans at creation time (not updated if PlanPolicy changes)
+- Does not write to status (writes to spec instead, which is acceptable until controller exists)
+- Will be replaced by proper controller that maintains discoveredPlans in status
+
+**Benefits:**
+- Makes API Keys tab functional immediately
+- Allows developers to request API access with plan selection
+- Provides realistic testing environment for approval workflows
+- No changes needed when controller is implemented (controller will override spec with status)
+
 ## Important Notes
 
 ### System Dependencies
@@ -816,6 +1119,177 @@ When APIKeyRequest is created (POST /requests):
 - User requests API access → immediately approved
 - User sees API key instantly
 - No approval queue needed
+
+## Frontend Permission System (2025-11-05)
+
+### Overview
+
+The Kuadrant frontend uses Backstage's permission framework for fine-grained access control. All UI actions (create, delete, approve, etc.) check permissions before rendering buttons/forms.
+
+### Custom Permission Hook
+
+**`src/utils/permissions.ts`** provides `useKuadrantPermission` hook that:
+- Handles both BasicPermission and ResourcePermission types without type bypasses
+- Returns `{ allowed, loading, error }` for proper error handling
+- Eliminates `as any` type casting found in raw `usePermission` usage
+
+**Usage**:
+```typescript
+import { useKuadrantPermission } from '../../utils/permissions';
+import { kuadrantApiProductCreatePermission } from '../../permissions';
+
+const { allowed, loading, error } = useKuadrantPermission(
+  kuadrantApiProductCreatePermission
+);
+
+if (loading) return <Progress />;
+if (error) return <ErrorMessage error={error} />;
+if (!allowed) return null; // hide button
+```
+
+### Permission Error Handling
+
+All components show detailed error messages when permission checks fail:
+```typescript
+if (permissionError) {
+  return (
+    <Box p={2}>
+      <Typography color="error">
+        Unable to check permissions: {permissionError.message}
+      </Typography>
+      <Typography variant="body2" color="textSecondary">
+        Permission: kuadrant.apiproduct.create
+      </Typography>
+      <Typography variant="body2" color="textSecondary">
+        Please try again or contact your administrator
+      </Typography>
+    </Box>
+  );
+}
+```
+
+This helps users and administrators diagnose permission service failures vs actual permission denial.
+
+### Ownership-Aware Actions
+
+Delete buttons for API keys use ownership checking via `canDeleteResource` helper:
+```typescript
+import { canDeleteResource } from '../../utils/permissions';
+
+// in render
+const canDelete = canDeleteResource(
+  row.spec.requestedBy.userId,  // owner
+  currentUserId,                 // current user
+  canDeleteOwnKey,               // permission to delete own
+  canDeleteAllKeys               // permission to delete all
+);
+
+if (!canDelete) return null;
+```
+
+This prevents showing delete buttons on keys users can't actually delete, avoiding confusing "permission denied" errors.
+
+### ResourcePermission Handling
+
+`kuadrantApiKeyRequestCreatePermission` is a ResourcePermission (scoped to 'apiproduct'). The custom hook handles this automatically:
+
+```typescript
+// frontend - no special handling needed
+const { allowed } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission);
+
+// backend - uses resource reference
+const decision = await permissions.authorize([{
+  permission: kuadrantApiKeyRequestCreatePermission,
+  resourceRef: `apiproduct:${namespace}/${name}`,
+}], { credentials });
+```
+
+### Component Patterns
+
+**1. Page-level access via PermissionGate**:
+```typescript
+export const KuadrantPage = () => (
+  <PermissionGate
+    permission={kuadrantApiProductListPermission}
+    errorMessage="You don't have permission to view the Kuadrant page"
+  >
+    <ResourceList />
+  </PermissionGate>
+);
+```
+
+**2. Action button gating**:
+```typescript
+{canCreateApiProduct && (
+  <Button onClick={() => setCreateDialogOpen(true)}>
+    Create API Product
+  </Button>
+)}
+```
+
+**3. Conditional table columns**:
+```typescript
+{
+  title: 'Actions',
+  render: (row) => {
+    if (!canDelete) return null;
+    return <IconButton onClick={() => handleDelete(row)} />;
+  },
+}
+```
+
+### Permission Documentation
+
+All permissions in `src/permissions.ts` include JSDoc comments explaining:
+- What the permission controls
+- When to use it
+- Whether it's BasicPermission or ResourcePermission
+- The difference between `.own` vs `.all` variants
+
+Example:
+```typescript
+/**
+ * permission to delete API keys owned by the current user
+ * allows users to revoke their own access
+ */
+export const kuadrantApiKeyDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apikey.delete.own',
+  attributes: { action: 'delete' },
+});
+```
+
+### Common Patterns
+
+**Loading states**: Include permission loading in component loading logic:
+```typescript
+const loading = dataLoading || permissionLoading;
+if (loading) return <Progress />;
+```
+
+**Multiple permissions**: Check all permission errors:
+```typescript
+const permissionError = createError || deleteError || updateError;
+if (permissionError) {
+  // show error with failed permission name
+}
+```
+
+**Empty states**: Hide entire sections when users lack permissions:
+```typescript
+{canViewApprovalQueue && (
+  <Grid item>
+    <ApprovalQueueCard />
+  </Grid>
+)}
+```
+
+### Key Files
+
+- `src/utils/permissions.ts` - Custom hook and helper functions
+- `src/permissions.ts` - Permission definitions (must match backend)
+- `src/components/PermissionGate/PermissionGate.tsx` - Page-level access control
+- `src/components/KuadrantPage/KuadrantPage.tsx` - Example of multi-permission component
+- `src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx` - Example of ownership-aware actions
 
 ## API Key Management Model
 

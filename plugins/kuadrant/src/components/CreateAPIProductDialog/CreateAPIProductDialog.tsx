@@ -33,9 +33,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('v1');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
+  const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Published');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [selectedPlanPolicy, setSelectedPlanPolicy] = useState('');
+  const [selectedHTTPRoute, setSelectedHTTPRoute] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactTeam, setContactTeam] = useState('');
   const [docsURL, setDocsURL] = useState('');
@@ -43,12 +44,14 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const { value: planPolicies, loading: planPoliciesLoading } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+  const { value: httpRoutes, loading: httpRoutesLoading } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
     const data = await response.json();
-    // filter to only show planpolicies in the same namespace as the apiproduct
-    return (data.items || []).filter((policy: any) =>
-      !namespace || policy.metadata.namespace === namespace
+    // filter to only show httproutes in the same namespace as the apiproduct
+    // and those annotated for backstage exposure
+    return (data.items || []).filter((route: any) =>
+      (!namespace || route.metadata.namespace === namespace) &&
+      route.metadata.annotations?.['backstage.io/expose'] === 'true'
     );
   }, [backendUrl, fetchApi, open, namespace]);
 
@@ -68,15 +71,15 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setCreating(true);
 
     try {
-      if (!selectedPlanPolicy) {
-        throw new Error('Please select a PlanPolicy');
+      if (!selectedHTTPRoute) {
+        throw new Error('Please select an HTTPRoute');
       }
 
-      const [selectedPlanNamespace, selectedPlanName] = selectedPlanPolicy.split('/');
+      const [selectedRouteNamespace, selectedRouteName] = selectedHTTPRoute.split('/');
 
-      // Validate namespace matching
-      if (selectedPlanNamespace !== namespace) {
-        throw new Error(`PlanPolicy must be in the same namespace as the APIProduct (${namespace}). Selected PlanPolicy is in ${selectedPlanNamespace}.`);
+      // validate namespace matching
+      if (selectedRouteNamespace !== namespace) {
+        throw new Error(`HTTPRoute must be in the same namespace as the APIProduct (${namespace}). Selected HTTPRoute is in ${selectedRouteNamespace}.`);
       }
 
       const apiProduct = {
@@ -91,12 +94,14 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           description,
           version,
           approvalMode,
+          publishStatus,
           tags,
-          planPolicyRef: {
-            name: selectedPlanName,
-            namespace: selectedPlanNamespace,
+          targetRef: {
+            group: 'gateway.networking.k8s.io',
+            kind: 'HTTPRoute',
+            name: selectedRouteName,
+            namespace: selectedRouteNamespace,
           },
-          plans: [], // controller will inject plans from planPolicyRef
           ...(contactEmail || contactTeam ? {
             contact: {
               ...(contactEmail && { email: contactEmail }),
@@ -143,7 +148,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setApprovalMode('manual');
     setTags([]);
     setTagInput('');
-    setSelectedPlanPolicy('');
+    setSelectedHTTPRoute('');
     setContactEmail('');
     setContactTeam('');
     setDocsURL('');
@@ -224,6 +229,20 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           <Grid item xs={12}>
             <TextField
               fullWidth
+              select
+              label="Publish Status"
+              value={publishStatus}
+              onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
+              margin="normal"
+              helperText="Draft: hidden from catalog. Published: visible to consumers."
+            >
+              <MenuItem value="Draft">Draft</MenuItem>
+              <MenuItem value="Published">Published</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
               label="Description"
               value={description}
               onChange={e => setDescription(e.target.value)}
@@ -268,26 +287,26 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             <TextField
               fullWidth
               select
-              label="PlanPolicy"
-              value={selectedPlanPolicy}
-              onChange={e => setSelectedPlanPolicy(e.target.value)}
+              label="HTTPRoute"
+              value={selectedHTTPRoute}
+              onChange={e => setSelectedHTTPRoute(e.target.value)}
               margin="normal"
               required
-              helperText="Select an existing PlanPolicy resource"
-              disabled={planPoliciesLoading}
+              helperText="Select an HTTPRoute that has been annotated for Backstage (backstage.io/expose: true)"
+              disabled={httpRoutesLoading}
             >
-              {planPoliciesLoading && (
+              {httpRoutesLoading && (
                 <MenuItem value="">Loading...</MenuItem>
               )}
-              {!planPoliciesLoading && planPolicies && planPolicies.length === 0 && (
-                <MenuItem value="">No PlanPolicies available</MenuItem>
+              {!httpRoutesLoading && httpRoutes && httpRoutes.length === 0 && (
+                <MenuItem value="">No HTTPRoutes available</MenuItem>
               )}
-              {!planPoliciesLoading && planPolicies && planPolicies.map((policy: any) => (
+              {!httpRoutesLoading && httpRoutes && httpRoutes.map((route: any) => (
                 <MenuItem
-                  key={`${policy.metadata.namespace}/${policy.metadata.name}`}
-                  value={`${policy.metadata.namespace}/${policy.metadata.name}`}
+                  key={`${route.metadata.namespace}/${route.metadata.name}`}
+                  value={`${route.metadata.namespace}/${route.metadata.name}`}
                 >
-                  {policy.metadata.name} ({policy.metadata.namespace})
+                  {route.metadata.name} ({route.metadata.namespace})
                 </MenuItem>
               ))}
             </TextField>
@@ -341,7 +360,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           onClick={handleCreate}
           color="primary"
           variant="contained"
-          disabled={creating || !name || !namespace || !displayName || !description || !selectedPlanPolicy}
+          disabled={creating || !name || !namespace || !displayName || !description || !selectedHTTPRoute}
         >
           {creating ? 'Creating...' : 'Create'}
         </Button>

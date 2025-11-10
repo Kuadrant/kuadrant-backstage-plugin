@@ -35,6 +35,12 @@ import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import { APIKeyRequest } from '../../types/api-management';
+import {
+  kuadrantApiKeyRequestCreatePermission,
+  kuadrantApiKeyDeleteOwnPermission,
+  kuadrantApiKeyDeleteAllPermission,
+} from '../../permissions';
+import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
 
 interface APIProduct {
   metadata: {
@@ -75,9 +81,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
-  const httproute = entity.metadata.annotations?.['kuadrant.io/httproute'] || entity.metadata.name;
+  // get apiproduct name from entity annotation (set by entity provider)
+  const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'] || propNamespace || 'default';
-  const apiName = httproute;
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -95,10 +101,11 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       throw new Error('failed to fetch requests');
     }
     const data = await response.json();
+    // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiName === apiName && r.spec.apiNamespace === namespace
+      (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
     );
-  }, [userId, apiName, namespace, refresh, fetchApi]);
+  }, [userId, apiProductName, namespace, refresh, fetchApi]);
 
   const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -109,11 +116,32 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
     const product = data.items?.find((p: APIProduct) =>
       p.metadata.namespace === namespace &&
-      (p.metadata.name === apiName || p.metadata.name === `${apiName}-api`)
+      p.metadata.name === apiProductName
     );
 
     return product;
-  }, [namespace, apiName, fetchApi]);
+  }, [namespace, apiProductName, fetchApi]);
+
+  // check permissions with resource reference once we have the apiproduct
+  const resourceRef = apiProduct ? `apiproduct:${apiProduct.metadata.namespace}/${apiProduct.metadata.name}` : undefined;
+
+  const {
+    allowed: canCreateRequest,
+    loading: createRequestPermissionLoading,
+    error: createRequestPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission, resourceRef);
+
+  const {
+    allowed: canDeleteOwnKey,
+    loading: deleteOwnPermissionLoading,
+    error: deleteOwnPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteOwnPermission);
+
+  const {
+    allowed: canDeleteAllKeys,
+    loading: deleteAllPermissionLoading,
+    error: deleteAllPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
 
   const handleDeleteRequest = async (name: string) => {
     try {
@@ -154,7 +182,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiName,
+          apiName: apiProductName,
           apiNamespace: namespace,
           userId,
           userEmail,
@@ -190,10 +218,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           return <Box />;
         }
 
-        return <DetailPanelContent request={request} apiName={apiName} />;
+        return <DetailPanelContent request={request} apiName={apiProductName} />;
       },
     },
-  ], [apiName]);
+  ], [apiProductName]);
 
   // separate component to isolate state
   const DetailPanelContent = ({ request, apiName: api }: { request: APIKeyRequest; apiName: string }) => {
@@ -306,8 +334,9 @@ func main() {
     );
   };
 
-  const loading = requestsLoading || plansLoading;
+  const loading = requestsLoading || plansLoading || createRequestPermissionLoading || deleteOwnPermissionLoading || deleteAllPermissionLoading;
   const error = requestsError || plansError;
+  const permissionError = createRequestPermissionError || deleteOwnPermissionError || deleteAllPermissionError;
 
   if (loading) {
     return <Progress />;
@@ -315,6 +344,25 @@ func main() {
 
   if (error) {
     return <ResponseErrorPanel error={error} />;
+  }
+
+  if (permissionError) {
+    const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
+                            deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
+                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' : 'unknown';
+    return (
+      <Box p={2}>
+        <Typography color="error">
+          Unable to check permissions: {permissionError.message}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Permission: {failedPermission}
+        </Typography>
+        <Typography variant="body2" color="textSecondary">
+          Please try again or contact your administrator
+        </Typography>
+      </Box>
+    );
   }
 
   const myRequests = (requests || []) as APIKeyRequest[];
@@ -374,16 +422,21 @@ func main() {
       title: 'Actions',
       field: 'actions',
       searchable: false,
-      render: (row: APIKeyRequest) => (
-        <IconButton
-          size="small"
-          onClick={() => handleDeleteRequest(row.metadata.name)}
-          color="secondary"
-          title="Revoke access and delete key"
-        >
-          <DeleteIcon />
-        </IconButton>
-      ),
+      render: (row: APIKeyRequest) => {
+        const ownerId = row.spec.requestedBy.userId;
+        const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
+        if (!canDelete) return null;
+        return (
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteRequest(row.metadata.name)}
+            color="secondary"
+            title="Revoke access and delete key"
+          >
+            <DeleteIcon />
+          </IconButton>
+        );
+      },
     },
   ];
 
@@ -452,7 +505,9 @@ func main() {
       searchable: false,
       render: (row: APIKeyRequest) => {
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
-        if (!isPending) return null;
+        const ownerId = row.spec.requestedBy.userId;
+        const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
+        if (!isPending || !canDelete) return null;
         return (
           <IconButton
             size="small"
@@ -469,19 +524,35 @@ func main() {
   return (
     <Box p={2}>
       <Grid container spacing={3} direction="column">
-        <Grid item>
-          <Box display="flex" justifyContent="flex-end" mb={2}>
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => setOpen(true)}
-              disabled={plans.length === 0}
-            >
-              Request API Access
-            </Button>
-          </Box>
-        </Grid>
+        {canCreateRequest && (
+          <Grid item>
+            <Box display="flex" flexDirection="column" alignItems="flex-end" mb={2}>
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => setOpen(true)}
+                disabled={plans.length === 0}
+              >
+                Request API Access
+              </Button>
+              {plans.length === 0 && (
+                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                  {!apiProduct ? 'API product not found' : 'No plans available'}
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+        )}
+        {pendingRequests.length === 0 && rejectedRequests.length === 0 && approvedRequests.length === 0 && (
+          <Grid item>
+            <Box p={3} textAlign="center">
+              <Typography variant="body1" color="textSecondary">
+                No API keys yet. Request access to get started.
+              </Typography>
+            </Box>
+          </Grid>
+        )}
         {pendingRequests.length > 0 && (
           <Grid item>
             <Table

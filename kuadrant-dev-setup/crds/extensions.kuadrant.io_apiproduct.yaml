@@ -24,8 +24,7 @@ spec:
             type: object
             required:
             - displayName
-            - planPolicyRef
-            - plans
+            - targetRef
             properties:
               displayName:
                 type: string
@@ -46,21 +45,28 @@ spec:
                 description: tags for categorisation and search
                 items:
                   type: string
-              planPolicyRef:
+              targetRef:
                 type: object
-                description: reference to the planpolicy that defines rate limits
+                description: reference to the httproute that this api product represents
                 required:
+                - group
+                - kind
                 - name
-                - namespace
                 properties:
+                  group:
+                    type: string
+                    default: gateway.networking.k8s.io
+                  kind:
+                    type: string
+                    default: HTTPRoute
                   name:
                     type: string
                   namespace:
                     type: string
+                    description: namespace of httproute (defaults to apiproduct namespace)
               plans:
                 type: array
-                description: cached plan information from planpolicy (visible to consumers)
-                minItems: 1
+                description: discovered plan information from planpolicies attached to httproute (populated by controller)
                 items:
                   type: object
                   required:
@@ -163,13 +169,23 @@ spec:
                     lastTransitionTime:
                       type: string
                       format: date-time
-              planPolicyStatus:
+              httpRouteStatus:
                 type: string
-                description: status of referenced planpolicy (Accepted/Enforced/etc)
+                description: status of referenced httproute
+              discoveredPlans:
+                type: array
+                description: list of planpolicies discovered from httproute
+                items:
+                  type: object
+                  properties:
+                    name:
+                      type: string
+                    namespace:
+                      type: string
               lastSyncTime:
                 type: string
                 format: date-time
-                description: last time plan data was synced from planpolicy
+                description: last time plan data was synced from httproute
     additionalPrinterColumns:
     - name: Display Name
       type: string
@@ -177,10 +193,10 @@ spec:
     - name: Version
       type: string
       jsonPath: .spec.version
-    - name: Plan Policy
+    - name: HTTPRoute
       type: string
-      jsonPath: ".spec.planPolicyRef.name"
-      description: Referenced PlanPolicy name
+      jsonPath: ".spec.targetRef.name"
+      description: Referenced HTTPRoute name
     - name: Age
       type: date
       jsonPath: .metadata.creationTimestamp

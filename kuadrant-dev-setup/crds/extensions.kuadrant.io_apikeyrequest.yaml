@@ -30,10 +30,10 @@ spec:
             properties:
               apiName:
                 type: string
-                description: name of the api being requested
+                description: name of the apiproduct being requested
               apiNamespace:
                 type: string
-                description: namespace where the api exists
+                description: namespace where the apiproduct exists
               planTier:
                 type: string
                 enum: [gold, silver, bronze]

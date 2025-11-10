@@ -19,8 +19,15 @@ import useAsync from 'react-use/lib/useAsync';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { PermissionGate } from '../PermissionGate';
-import { useUserRole } from '../../hooks/useUserRole';
 import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
+import {
+  kuadrantApiProductCreatePermission,
+  kuadrantApiProductDeletePermission,
+  kuadrantApiProductListPermission,
+  kuadrantApiKeyRequestReadAllPermission,
+  kuadrantPlanPolicyListPermission,
+} from '../../permissions';
+import { useKuadrantPermission } from '../../utils/permissions';
 
 type KuadrantResource = {
   metadata: {
@@ -39,12 +46,35 @@ export const ResourceList = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
-  const { userInfo, loading: userLoading } = useUserRole();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+
+  const {
+    allowed: canCreateApiProduct,
+    loading: createPermissionLoading,
+    error: createPermissionError,
+  } = useKuadrantPermission(kuadrantApiProductCreatePermission);
+
+  const {
+    allowed: canViewApprovalQueue,
+    loading: approvalQueuePermissionLoading,
+    error: approvalQueuePermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestReadAllPermission);
+
+  const {
+    allowed: canDeleteApiProduct,
+    loading: deletePermissionLoading,
+    error: deletePermissionError,
+  } = useKuadrantPermission(kuadrantApiProductDeletePermission);
+
+  const {
+    allowed: canListPlanPolicies,
+    loading: planPolicyPermissionLoading,
+    error: planPolicyPermissionError,
+  } = useKuadrantPermission(kuadrantPlanPolicyListPermission);
 
   const { value: apiProducts, loading: apiProductsLoading, error: apiProductsError } = useAsync(async (): Promise<KuadrantList> => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -56,8 +86,9 @@ export const ResourceList = () => {
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
-  const loading = userLoading || apiProductsLoading || planPoliciesLoading;
+  const loading = apiProductsLoading || planPoliciesLoading || createPermissionLoading || approvalQueuePermissionLoading || deletePermissionLoading || planPolicyPermissionLoading;
   const error = apiProductsError || planPoliciesError;
+  const permissionError = createPermissionError || approvalQueuePermissionError || deletePermissionError || planPolicyPermissionError;
 
   const handleCreateSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
@@ -126,6 +157,11 @@ export const ResourceList = () => {
       render: (row: any) => row.spec?.version || '-',
     },
     {
+      title: 'HTTPRoute',
+      field: 'spec.targetRef.name',
+      render: (row: any) => row.spec?.targetRef?.name || '-',
+    },
+    {
       title: 'Plans',
       field: 'plans',
       render: (row: any) => {
@@ -152,15 +188,18 @@ export const ResourceList = () => {
     {
       title: 'Actions',
       field: 'actions',
-      render: (row: any) => (
-        <IconButton
-          size="small"
-          onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
-          title="delete apiproduct"
-        >
-          <DeleteIcon fontSize="small" />
-        </IconButton>
-      ),
+      render: (row: any) => {
+        if (!canDeleteApiProduct) return null;
+        return (
+          <IconButton
+            size="small"
+            onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+            title="delete apiproduct"
+          >
+            <DeleteIcon fontSize="small" />
+          </IconButton>
+        );
+      },
     },
   ];
 
@@ -206,19 +245,6 @@ export const ResourceList = () => {
     );
   };
 
-  const getRoleLabel = (role: string) => {
-    switch (role) {
-      case 'platform-engineer':
-        return { label: 'Platform Engineer', color: 'secondary' as const };
-      case 'api-owner':
-        return { label: 'API Owner', color: 'primary' as const };
-      case 'api-consumer':
-        return { label: 'API Consumer', color: 'default' as const };
-      default:
-        return { label: role, color: 'default' as const };
-    }
-  };
-
   return (
     <Page themeId="tool">
       <Header title="Kuadrant" subtitle="API Management for Kubernetes">
@@ -227,30 +253,37 @@ export const ResourceList = () => {
       <Content>
         <ContentHeader title="API Products">
           <Box display="flex" alignItems="center" style={{ gap: 16 }}>
-            {userInfo && (
-              <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-                <Typography variant="body2">Viewing as:</Typography>
-                <Chip label={userInfo.userId} color="primary" size="small" />
-                <Chip
-                  label={getRoleLabel(userInfo.role).label}
-                  color={getRoleLabel(userInfo.role).color}
-                  size="small"
-                />
-              </Box>
+            {canCreateApiProduct && (
+              <Button
+                variant="contained"
+                color="primary"
+                startIcon={<AddIcon />}
+                onClick={() => setCreateDialogOpen(true)}
+              >
+                Create API Product
+              </Button>
             )}
-            <Button
-              variant="contained"
-              color="primary"
-              startIcon={<AddIcon />}
-              onClick={() => setCreateDialogOpen(true)}
-            >
-              Create API Product
-            </Button>
           </Box>
         </ContentHeader>
         {loading && <Progress />}
         {error && <ResponseErrorPanel error={error} />}
-        {!loading && !error && (
+        {permissionError && (
+          <Box p={2}>
+            <Typography color="error">
+              Unable to check permissions: {permissionError.message}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
+                         deletePermissionError ? 'kuadrant.apiproduct.delete' :
+                         approvalQueuePermissionError ? 'kuadrant.apikeyrequest.read.all' :
+                         planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Please try again or contact your administrator
+            </Typography>
+          </Box>
+        )}
+        {!loading && !error && !permissionError && (
           <Grid container spacing={3} direction="column">
             <Grid item>
               <InfoCard title="API Products">
@@ -258,13 +291,15 @@ export const ResourceList = () => {
               </InfoCard>
             </Grid>
 
-            <Grid item>
-              <InfoCard title="Plan Policies">
-                {renderPlanPolicies(planPolicies?.items)}
-              </InfoCard>
-            </Grid>
+            {canListPlanPolicies && (
+              <Grid item>
+                <InfoCard title="Plan Policies">
+                  {renderPlanPolicies(planPolicies?.items)}
+                </InfoCard>
+              </Grid>
+            )}
 
-            {userInfo?.isApiOwner && (
+            {canViewApprovalQueue && (
               <Grid item>
                 <ApprovalQueueCard />
               </Grid>
@@ -300,7 +335,10 @@ export const ResourceList = () => {
 
 export const KuadrantPage = () => {
   return (
-    <PermissionGate requireAnyRole={['platform-engineer', 'api-owner']}>
+    <PermissionGate
+      permission={kuadrantApiProductListPermission}
+      errorMessage="you don't have permission to view the Kuadrant page"
+    >
       <ResourceList />
     </PermissionGate>
   );

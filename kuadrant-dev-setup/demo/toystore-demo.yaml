@@ -71,6 +71,8 @@ kind: HTTPRoute
 metadata:
   name: toystore
   namespace: toystore
+  annotations:
+    backstage.io/expose: "true"
 spec:
   parentRefs:
     - name: external
@@ -174,12 +176,15 @@ spec:
   description: simple toy store api for demonstration
   version: v1
   approvalMode: manual
+  publishStatus: Published
   tags:
     - demo
     - retail
     - toys
-  planPolicyRef:
-    name: toystore-plans
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: toystore
     namespace: toystore
   plans:
     - tier: gold
@@ -198,7 +203,7 @@ spec:
     openAPISpec: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
-    team: platform-engineers
-    email: platform@example.com
+    team: api-owners
+    email: api-owners@example.com
     slack: "#api-support"
 ---

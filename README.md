@@ -108,6 +108,31 @@ yarn lint:check                   # Check linting
 yarn test                         # Run tests
 ```
 
+### Testing Permissions
+
+The application uses RBAC with two roles: API Consumer and API Owner. Use these commands to switch roles:
+
+```bash
+yarn user:consumer      # Switch to API Consumer
+yarn user:owner         # Switch to API Owner
+yarn user:default       # Restore default permissions
+```
+
+After switching roles, restart with `yarn dev`.
+
+**API Consumer (restricted access):**
+- Can view API Products
+- Can request API keys
+- No "Create API Product" button
+- No "Plan Policies" or "Approval Queue" cards
+
+**API Owner (can publish APIs):**
+- Can create/delete API Products
+- Can approve/reject API key requests
+- Can view Plan Policies (read-only)
+
+Note: PlanPolicies are managed on the cluster by platform engineers. This plugin only provides read access to view existing policies.
+
 ## Project Structure
 
 ```
