@@ -12,7 +12,10 @@ p, role:default/api-owner, kuadrant.apikeyrequest.create, create, allow, apiprod
 p, role:default/api-owner, kuadrant.apikeyrequest.read.own, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.update, update, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.update.own, update, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.list, read, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.delete.own, delete, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.delete.all, delete, allow
 p, role:default/api-owner, kuadrant.apikey.read.own, read, allow
 p, role:default/api-owner, kuadrant.apikey.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikey.delete.own, delete, allow
@@ -27,6 +30,8 @@ p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
 # allow requesting access to any api (per-apiproduct access control can be added below)
 p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/api-consumer, kuadrant.apikeyrequest.read.own, read, allow
+p, role:default/api-consumer, kuadrant.apikeyrequest.update.own, update, allow
+p, role:default/api-consumer, kuadrant.apikeyrequest.delete.own, delete, allow
 p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow

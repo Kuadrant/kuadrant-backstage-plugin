@@ -1347,3 +1347,66 @@ Deleting a Secret left the APIKeyRequest, showing duplicate/stale data.
 - Secret fetching in `ApiKeyManagementTab.tsx`
 - "API Keys (from Secrets)" table component
 
+## Security Fixes Applied (2025-11-10)
+
+### Namespace Injection Vulnerability - FIXED
+
+**Issue:** `POST /requests` endpoint accepted `namespace` from request body without validation
+
+**Fix Applied:**
+APIKeyRequests are now always created in the same namespace as the APIProduct/HTTPRoute/PlanPolicy they reference. The `namespace` parameter was removed from the request schema, and `apiNamespace` is used directly:
+
+```typescript
+// BEFORE: namespace from untrusted request body
+const requestSchema = z.object({
+  namespace: z.string(),  // <-- REMOVED
+  apiNamespace: z.string(),
+  // ...
+});
+
+// AFTER: use apiNamespace from APIProduct
+const requestSchema = z.object({
+  apiNamespace: z.string(),  // API's namespace
+  // ...
+});
+
+const request = {
+  metadata: {
+    name: requestName,
+    namespace: apiNamespace,  // <-- ALWAYS MATCHES API NAMESPACE
+  },
+  spec: {
+    apiName,
+    apiNamespace,
+    // ...
+  }
+};
+```
+
+**Rationale:**
+Following Kuadrant's namespace organisation pattern (CLAUDE.md:1041), all resources for an API must live in the same namespace:
+- HTTPRoute
+- AuthPolicy
+- PlanPolicy
+- APIProduct
+- APIKeyRequest (requests for that API)
+- Secrets (API keys)
+
+This ensures:
+- AuthPolicy can reference Secrets in same namespace
+- Policies can target HTTPRoute by name (same namespace lookup)
+- Clear resource isolation per API
+- No cross-namespace pollution
+
+**Impact:**
+- ✅ Users can only create requests in the API's namespace
+- ✅ No namespace injection or pollution
+- ✅ Follows documented Kuadrant architecture
+- ⚠️ Users can still create APIKeyRequest objects in namespaces they don't own, but:
+  - They need RBAC permission for that specific APIProduct (resource-based)
+  - The APIProduct must exist in that namespace
+  - Consumers typically have zero cluster access otherwise
+  - Request appears in the API's approval queue (where it belongs)
+
+**Status:** FIXED (2025-11-10). Pragmatic solution that follows Kuadrant patterns.
+
