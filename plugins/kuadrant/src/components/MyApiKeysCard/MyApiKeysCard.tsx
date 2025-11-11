@@ -38,7 +38,7 @@ export const MyApiKeysCard = () => {
   const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [selectedTab, setSelectedTab] = useState(0);
-  const [userId, setUserId] = useState<string>('');
+  const [, setUserId] = useState<string>('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   useAsync(async () => {

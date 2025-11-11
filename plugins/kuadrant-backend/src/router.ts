@@ -11,7 +11,6 @@ import { KuadrantK8sClient } from './k8s-client';
 import { getAPIProductEntityProvider } from './module';
 import {
   kuadrantPermissions,
-  kuadrantApiKeyDeleteAllPermission,
   kuadrantPlanPolicyListPermission,
   kuadrantPlanPolicyReadPermission,
   kuadrantApiProductListPermission,
@@ -25,9 +24,6 @@ import {
   kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
-  kuadrantApiKeyReadOwnPermission,
-  kuadrantApiKeyReadAllPermission,
-  kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiProductUpdatePermission,
 } from './permissions';
 
@@ -356,17 +352,17 @@ export async function createRouter({
         parsed.data,
       );
 
-      res.json(updated);
+      return res.json(updated);
     } catch (error) {
       console.error('error updating apiproduct:', error);
       const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (error instanceof NotAllowedError) {
-        res.status(403).json({ error: error.message });
+        return res.status(403).json({ error: error.message });
       } else if (error instanceof InputError) {
-        res.status(400).json({ error: error.message });
+        return res.status(400).json({ error: error.message });
       } else {
-        res.status(500).json({ error: errorMessage });
+        return res.status(500).json({ error: errorMessage });
       }
     }
   });
@@ -583,7 +579,7 @@ export async function createRouter({
           await k8sClient.patchCustomResourceStatus(
             'extensions.kuadrant.io',
             'v1alpha1',
-            namespace,
+            apiNamespace,
             'apikeyrequests',
             requestName,
             status,

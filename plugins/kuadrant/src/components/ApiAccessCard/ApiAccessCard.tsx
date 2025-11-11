@@ -39,7 +39,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   const identityApi = useApi(identityApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
-  const [userId, setUserId] = useState<string>('guest');
+  const [, setUserId] = useState<string>('guest');
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
