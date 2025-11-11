@@ -2,31 +2,61 @@
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: guest
+  name: owner1
 spec:
   profile:
-    displayName: Guest User
-    email: guest@example.com
-  memberOf: [api-owners, api-consumers]
----
-apiVersion: backstage.io/v1alpha1
-kind: User
-metadata:
-  name: api-owner
-spec:
-  profile:
-    displayName: API Owner
-    email: api-owner@example.com
+    displayName: API Owner 1
+    email: owner1@kuadrant.local
   memberOf: [api-owners]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
 metadata:
-  name: api-consumer
+  name: owner2
 spec:
   profile:
-    displayName: API Consumer
-    email: api-consumer@example.com
+    displayName: API Owner 2
+    email: owner2@kuadrant.local
+  memberOf: [api-owners]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: consumer1
+spec:
+  profile:
+    displayName: API Consumer 1
+    email: consumer1@kuadrant.local
+  memberOf: [api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: consumer2
+spec:
+  profile:
+    displayName: API Consumer 2
+    email: consumer2@kuadrant.local
+  memberOf: [api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: admin
+spec:
+  profile:
+    displayName: Administrator
+    email: admin@kuadrant.local
+  memberOf: [api-owners, api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: User
+metadata:
+  name: guest
+spec:
+  profile:
+    displayName: Guest User
+    email: guest@kuadrant.local
   memberOf: [api-consumers]
 ---
 apiVersion: backstage.io/v1alpha1

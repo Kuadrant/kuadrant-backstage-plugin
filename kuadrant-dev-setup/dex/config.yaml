@@ -1,0 +1,55 @@
+issuer: http://localhost:5556
+
+storage:
+  type: memory
+
+web:
+  http: 0.0.0.0:5556
+
+frontend:
+  dir: /srv/dex/web
+
+logger:
+  level: info
+  format: text
+
+enablePasswordDB: true
+
+staticPasswords:
+  # owner users for testing isolation
+  - email: "owner1@kuadrant.local"
+    hash: "$2y$10$zH5AbFrQFW2jo.rNFc6.yen9laEzQW343jmZBDtQ3lI5.2AnQI1.a"
+    username: "owner1"
+    userID: "owner1"
+
+  - email: "owner2@kuadrant.local"
+    hash: "$2y$10$ssI59quy.x6MWGxpzBAxL.KoNAPs01c2T4JMOfEXoJURibkB1X.Gy"
+    username: "owner2"
+    userID: "owner2"
+
+  # consumer users for testing isolation
+  - email: "consumer1@kuadrant.local"
+    hash: "$2y$10$W2Fbd6LzK/Xo37epkj2Xo.Mdm0KTJ5OHZi21IeUjzl2JDfhyA5y2m"
+    username: "consumer1"
+    userID: "consumer1"
+
+  - email: "consumer2@kuadrant.local"
+    hash: "$2y$10$X4.648aMboWF3e2qg5RBcedCMgbSdaPPmrRurEGPy3iojG8J6M5F2"
+    username: "consumer2"
+    userID: "consumer2"
+
+  # admin role - both owner and consumer permissions
+  - email: "admin@kuadrant.local"
+    hash: "$2y$10$orqg5il93Qe/ANFAnzJCaeOyI3O35Lx3KMi5YwUphNg/an7mOlkdG"
+    username: "admin"
+    userID: "admin"
+
+staticClients:
+  - id: backstage
+    redirectURIs:
+      - "http://localhost:7007/api/auth/oidc/handler/frame"
+    name: "Backstage Local Dev"
+    secret: "backstage-dev-secret"
+
+oauth2:
+  skipApprovalScreen: true
