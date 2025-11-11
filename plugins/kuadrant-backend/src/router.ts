@@ -27,7 +27,8 @@ import {
   kuadrantApiKeyRequestDeleteAllPermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
-  kuadrantApiKeyDeleteOwnPermission, kuadrantApiProductUpdatePermission,
+  kuadrantApiKeyDeleteOwnPermission,
+  kuadrantApiProductUpdatePermission,
 } from './permissions';
 
 function generateApiKey(): string {
@@ -302,8 +303,38 @@ export async function createRouter({
   });
 
   router.patch('/apiproducts/:namespace/:name', async (req, res) => {
+    // whitelist allowed fields for patching
+    const patchSchema = z.object({
+      spec: z.object({
+        displayName: z.string().optional(),
+        description: z.string().optional(),
+        version: z.string().optional(),
+        publishStatus: z.enum(['Draft', 'Published']).optional(),
+        approvalMode: z.enum(['automatic', 'manual']).optional(),
+        tags: z.array(z.string()).optional(),
+        contact: z.object({
+          email: z.string().optional(),
+          team: z.string().optional(),
+          slack: z.string().optional(),
+        }).partial().optional(),
+        documentation: z.object({
+          docsURL: z.string().optional(),
+          openAPISpec: z.string().optional(),
+        }).partial().optional(),
+      }).partial(),
+    });
+
+    const parsed = patchSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: 'invalid patch: ' + parsed.error.toString() });
+    }
+
     try {
-      const credentials = await httpAuth.credentials(req, { allow: ['user', 'none'] });
+      const credentials = await httpAuth.credentials(req);
+
+      if (!credentials || !credentials.principal) {
+        throw new NotAllowedError('authentication required');
+      }
 
       const decision = await permissions.authorize(
         [{ permission: kuadrantApiProductUpdatePermission }],
@@ -315,7 +346,6 @@ export async function createRouter({
       }
 
       const { namespace, name } = req.params;
-      const patch = req.body;
 
       const updated = await k8sClient.patchCustomResource(
         'extensions.kuadrant.io',
@@ -323,7 +353,7 @@ export async function createRouter({
         namespace,
         'apiproducts',
         name,
-        patch,
+        parsed.data,
       );
 
       res.json(updated);
