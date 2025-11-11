@@ -34,6 +34,234 @@ The Kuadrant plugins enable developer portals for API access management using Ku
 - AuthPolicy and RateLimitPolicy support
 - Direct Backstage integration (no dynamic plugin complexity for dev)
 
+## Backend Security Principles
+
+All backend code in `plugins/kuadrant-backend/src/router.ts` must follow these security tenets:
+
+### 1. Never Trust Client Input
+
+**Principle:** All data from HTTP requests is untrusted and must be validated before use.
+
+**Implementation:**
+- Use Zod schemas to validate all request bodies
+- Define explicit whitelists of allowed fields
+- Reject requests that don't match the schema
+
+**Example:**
+```typescript
+// bad - accepts arbitrary client data
+const patch = req.body;
+await k8sClient.patchCustomResource(..., patch);
+
+// good - validates against whitelist
+const patchSchema = z.object({
+  spec: z.object({
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+  }).partial(),
+});
+
+const parsed = patchSchema.safeParse(req.body);
+if (!parsed.success) {
+  return res.status(400).json({ error: 'invalid patch: ' + parsed.error.toString() });
+}
+await k8sClient.patchCustomResource(..., parsed.data);
+```
+
+**Why:** Unvalidated input allows attackers to modify fields they shouldn't (privilege escalation, namespace injection, etc.).
+
+### 2. Authentication Required, No Fallbacks
+
+**Principle:** All endpoints must require valid authentication. No guest user fallbacks.
+
+**Implementation:**
+- Use `httpAuth.credentials(req)` without `{ allow: ['user', 'none'] }`
+- Explicitly check credentials exist before proceeding
+- Extract user identity from auth credentials, never from request parameters
+
+**Example:**
+```typescript
+// bad - allows unauthenticated access
+const credentials = await httpAuth.credentials(req, { allow: ['user', 'none'] });
+const userId = req.body.userId; // client-controlled!
+
+// good - requires authentication
+const credentials = await httpAuth.credentials(req);
+
+if (!credentials || !credentials.principal) {
+  throw new NotAllowedError('authentication required');
+}
+
+const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+```
+
+**Why:** Guest fallbacks and client-supplied identity allow user impersonation and privilege escalation.
+
+### 3. Pure RBAC Permission Model
+
+**Principle:** Authorization decisions must only use Backstage RBAC permissions, not group membership checks.
+
+**Implementation:**
+- Check permissions using `permissions.authorize()`
+- Use specific permission objects (create, read, update, delete, etc.)
+- Support both `.own` and `.all` permission variants where appropriate
+- Never bypass RBAC with group-based role flags
+
+**Example:**
+```typescript
+// bad - dual authorization paths
+const { isApiOwner } = await getUserIdentity(...);
+if (!isApiOwner) {
+  throw new NotAllowedError('must be api owner');
+}
+
+// good - pure RBAC
+const decision = await permissions.authorize(
+  [{ permission: kuadrantApiProductUpdatePermission }],
+  { credentials }
+);
+
+if (decision[0].result !== AuthorizeResult.ALLOW) {
+  throw new NotAllowedError('unauthorised');
+}
+```
+
+**Why:** Mixed authorization models create bypass opportunities and make security audits difficult.
+
+### 4. Validate Field Mutability
+
+**Principle:** Distinguish between mutable and immutable fields. Prevent modification of critical resource identifiers.
+
+**Implementation:**
+- In PATCH endpoints, only allow updating safe metadata fields
+- Exclude from validation schemas:
+  - `namespace`, `name` (Kubernetes identifiers)
+  - `targetRef` (infrastructure references)
+  - `userId`, `requestedBy` (ownership)
+  - Fields managed by controllers (e.g., `plans` in APIProduct)
+
+**Example:**
+```typescript
+// patch schema excludes immutable fields
+const patchSchema = z.object({
+  spec: z.object({
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+    // targetRef NOT included - immutable
+    // plans NOT included - managed by controller
+  }).partial(),
+});
+```
+
+**Why:** Allowing modification of references can break infrastructure relationships or grant unauthorised access.
+
+### 5. Ownership Validation for User Resources
+
+**Principle:** When users manage their own resources (API keys, requests), verify ownership before allowing modifications.
+
+**Implementation:**
+- Check `.all` permission first (admin/owner access)
+- If not allowed, check `.own` permission
+- Fetch existing resource and verify `requestedBy.userId` matches current user
+- Throw `NotAllowedError` if ownership check fails
+
+**Example:**
+```typescript
+const updateAllDecision = await permissions.authorize(
+  [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+  { credentials }
+);
+
+if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+  const updateOwnDecision = await permissions.authorize(
+    [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+    { credentials }
+  );
+
+  if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+    throw new NotAllowedError('unauthorised');
+  }
+
+  const existing = await k8sClient.getCustomResource(...);
+  if (existing.spec?.requestedBy?.userId !== userId) {
+    throw new NotAllowedError('you can only update your own requests');
+  }
+}
+```
+
+**Why:** Prevents users from modifying other users' resources even if they have the base permission.
+
+### 6. Follow Namespace Organisation Pattern
+
+**Principle:** Respect Kuadrant's namespace architecture where all API resources live in the same namespace.
+
+**Implementation:**
+- Never accept `namespace` from client input for resource creation
+- Use the namespace of the referenced resource (APIProduct, HTTPRoute)
+- Create APIKeyRequests in the API's namespace (spec.apiNamespace)
+- Create Secrets in the API's namespace (not user namespace)
+
+**Example:**
+```typescript
+// bad - client controls namespace
+const { namespace, apiName } = req.body;
+await k8sClient.createCustomResource('apikeyrequests', namespace, ...);
+
+// good - use API's namespace
+const { apiName, apiNamespace } = req.body;
+await k8sClient.createCustomResource('apikeyrequests', apiNamespace, ...);
+```
+
+**Why:** Cross-namespace creation can bypass RBAC, pollute namespaces, or break AuthPolicy references.
+
+### 7. Explicit Error Responses
+
+**Principle:** Return appropriate HTTP status codes and clear error messages.
+
+**Implementation:**
+- 400 for validation errors (`InputError`)
+- 403 for permission denied (`NotAllowedError`)
+- 500 for unexpected errors
+- Include error details in response body
+- Log errors server-side for debugging
+
+**Example:**
+```typescript
+try {
+  // endpoint logic
+} catch (error) {
+  console.error('error updating resource:', error);
+
+  if (error instanceof NotAllowedError) {
+    res.status(403).json({ error: error.message });
+  } else if (error instanceof InputError) {
+    res.status(400).json({ error: error.message });
+  } else {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'internal error'
+    });
+  }
+}
+```
+
+**Why:** Clear errors help legitimate users debug issues while avoiding information disclosure to attackers.
+
+### Reference Examples in Codebase
+
+**Good patterns to follow:**
+- `router.patch('/requests/:namespace/:name', ...)` (line ~1135) - Whitelist validation, ownership checks
+- `router.post('/requests/:namespace/:name/approve', ...)` (line ~620) - Zod validation, proper auth
+- `router.patch('/apiproducts/:namespace/:name', ...)` (line ~306) - Comprehensive field whitelist
+
+**Anti-patterns fixed in security audit:**
+- ❌ Accepting userId from request body (privilege escalation)
+- ❌ Guest user fallbacks (authentication bypass)
+- ❌ Group-based authorization alongside RBAC (dual auth paths)
+- ❌ Unvalidated PATCH bodies (field manipulation)
+- ❌ Client-controlled namespace (namespace injection)
+
+See "Security Fixes Applied (2025-11-10)" section for detailed fixes.
+
 ## Prerequisites
 
 **Node.js version:** 22.20.0 (specified in `.nvmrc`)
