@@ -24,7 +24,7 @@ import {
   kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
-  kuadrantApiKeyDeleteOwnPermission,
+  kuadrantApiKeyDeleteOwnPermission, kuadrantApiProductUpdatePermission,
 } from './permissions';
 
 function generateApiKey(): string {
@@ -330,6 +330,46 @@ export async function createRouter({
         res.status(403).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'failed to fetch httproutes' });
+      }
+    }
+  });
+
+  router.patch('/apiproducts/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req, { allow: ['user', 'none'] });
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductUpdatePermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+      const patch = req.body;
+
+      const updated = await k8sClient.patchCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apiproducts',
+        name,
+        patch,
+      );
+
+      res.json(updated);
+    } catch (error) {
+      console.error('error updating apiproduct:', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else if (error instanceof InputError) {
+        res.status(400).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: errorMessage });
       }
     }
   });

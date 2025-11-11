@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Typography, Grid, Box, Chip, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
+import EditIcon from '@material-ui/icons/Edit';
 import {
   InfoCard,
   Header,
@@ -23,11 +24,13 @@ import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 import {
   kuadrantApiProductCreatePermission,
   kuadrantApiProductDeletePermission,
+  kuadrantApiProductUpdatePermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantPlanPolicyListPermission,
 } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
+import { EditAPIProductDialog } from '../EditAPIProductDialog';
 
 type KuadrantResource = {
   metadata: {
@@ -47,9 +50,11 @@ export const ResourceList = () => {
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
+  const [apiProductToEdit, setApiProductToEdit] = useState<{ namespace: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   const {
@@ -69,6 +74,10 @@ export const ResourceList = () => {
     loading: deletePermissionLoading,
     error: deletePermissionError,
   } = useKuadrantPermission(kuadrantApiProductDeletePermission);
+
+  const {
+    allowed: canUpdateApiProduct,
+  } = useKuadrantPermission(kuadrantApiProductUpdatePermission);
 
   const {
     allowed: canListPlanPolicies,
@@ -91,6 +100,15 @@ export const ResourceList = () => {
   const permissionError = createPermissionError || approvalQueuePermissionError || deletePermissionError || planPolicyPermissionError;
 
   const handleCreateSuccess = () => {
+    setRefreshTrigger(prev => prev + 1);
+  };
+
+  const handleEditClick = (namespace: string, name: string) => {
+    setApiProductToEdit({ namespace, name });
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
   };
 
@@ -162,17 +180,16 @@ export const ResourceList = () => {
       render: (row: any) => row.spec?.targetRef?.name || '-',
     },
     {
-      title: 'Plans',
-      field: 'plans',
+      title: 'Publish Status',
+      field: 'spec.publishStatus',
       render: (row: any) => {
-        const plans = row.spec?.plans || [];
-        if (plans.length === 0) return '-';
+        const status = row.spec?.publishStatus || 'Draft';
         return (
-          <Box display="flex" style={{ gap: 4 }}>
-            {plans.map((plan: any, idx: number) => (
-              <Chip key={idx} label={plan.tier} size="small" />
-            ))}
-          </Box>
+          <Chip 
+            label={status} 
+            size="small" 
+            color={status === 'Published' ? 'primary' : 'default'}
+          />
         );
       },
     },
@@ -188,18 +205,29 @@ export const ResourceList = () => {
     {
       title: 'Actions',
       field: 'actions',
-      render: (row: any) => {
-        if (!canDeleteApiProduct) return null;
-        return (
-          <IconButton
-            size="small"
-            onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
-            title="delete apiproduct"
-          >
-            <DeleteIcon fontSize="small" />
-          </IconButton>
-        );
-      },
+      render: (row: any) => (
+        <Box display="flex" style={{ gap: 4 }}>
+          {canUpdateApiProduct && (
+            <IconButton
+              size="small"
+              onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
+              title="Edit API Product"
+            >
+              <EditIcon fontSize="small" />
+            </IconButton>
+          )}
+          
+          {canDeleteApiProduct && (
+            <IconButton
+              size="small"
+              onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+              title="Delete API Product"
+            >
+              <DeleteIcon fontSize="small" />
+            </IconButton>
+          )}
+        </Box>
+      ),
     },
   ];
 
@@ -310,6 +338,13 @@ export const ResourceList = () => {
           open={createDialogOpen}
           onClose={() => setCreateDialogOpen(false)}
           onSuccess={handleCreateSuccess}
+        />
+        <EditAPIProductDialog
+          open={editDialogOpen}
+          onClose={() => setEditDialogOpen(false)}
+          onSuccess={handleEditSuccess}
+          namespace={apiProductToEdit?.namespace || ''}
+          name={apiProductToEdit?.name || ''}
         />
         <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
           <DialogTitle>Delete API Product</DialogTitle>
