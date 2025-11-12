@@ -37,6 +37,9 @@ techdocs:
 
 auth:
   environment: development
+  session:
+    secret: local-dev-session-secret-change-in-production
+    absoluteTimeoutSeconds: 604800
   providers:
     guest:
       dangerouslyAllowOutsideDevelopment: true

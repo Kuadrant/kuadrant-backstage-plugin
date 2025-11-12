@@ -1,0 +1,13 @@
+# ignore default dex web files (they're in the docker image)
+# we only track customised templates
+web/static/
+web/themes/
+web/robots.txt
+web/templates/approval.html
+web/templates/device.html
+web/templates/device_success.html
+web/templates/error.html
+web/templates/footer.html
+web/templates/header.html
+web/templates/login.html
+web/templates/oob.html
