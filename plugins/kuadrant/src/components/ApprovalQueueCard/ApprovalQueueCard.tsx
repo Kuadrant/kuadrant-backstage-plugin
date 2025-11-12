@@ -185,14 +185,14 @@ export const ApprovalQueueCard = () => {
     );
     if (!response.ok) {
       console.log('ApprovalQueueCard: failed to fetch requests, status:', response.status);
-      return { pending: [], approved: [], rejected: [], reviewedBy };
+      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy };
     }
 
     // check content-type before parsing json
     const contentType = response.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       console.log('ApprovalQueueCard: received non-json response');
-      return { pending: [], approved: [], rejected: [], reviewedBy };
+      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy };
     }
 
     const data = await response.json();
@@ -571,7 +571,7 @@ export const ApprovalQueueCard = () => {
         return { data: approved, columns: approvedColumns, showSelection: false };
       case 1:
         // Add tableData.checked to control checkbox state
-        const pendingWithSelection = pending.map(row => {
+        const pendingWithSelection = pending.map((row: APIKeyRequest) => {
           const isSelected = selectedRequests.some(
             selected => selected.metadata.name === row.metadata.name &&
                        selected.metadata.namespace === row.metadata.namespace
