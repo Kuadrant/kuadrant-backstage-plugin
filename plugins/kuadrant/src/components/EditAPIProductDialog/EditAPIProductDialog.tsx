@@ -85,7 +85,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   // load planpolicies with full details to show associated plans
   const { value: planPolicies } = useAsync(async () => {
     if (!open) return null;
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies?includeDetails=true`);
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
     return await response.json();
   }, [backendUrl, fetchApi, open]);
 
@@ -94,7 +94,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
     if (!planPolicies?.items || !targetRef) return null;
 
     return planPolicies.items.find((pp: any) => {
-      const ref = pp.spec?.targetRef;
+      const ref = pp.targetRef;
       return (
         ref?.kind === 'HTTPRoute' &&
         ref?.name === targetRef.name &&
@@ -329,7 +329,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                           Associated PlanPolicy: <strong>{selectedPolicy.metadata.name}</strong>
                         </Typography>
 
-                        {selectedPolicy.spec?.plans && selectedPolicy.spec.plans.length > 0 ? (
+                        {selectedPolicy.plans && selectedPolicy.plans.length > 0 ? (
                           <>
                             <Typography
                               variant="caption"
@@ -341,7 +341,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                               Available Plans:
                             </Typography>
                             <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
-                              {selectedPolicy.spec.plans.map((plan: any, idx: number) => {
+                              {selectedPolicy.plans.map((plan: any, idx: number) => {
                                 const limitText = plan.limits?.daily
                                   ? `${plan.limits.daily}/day`
                                   : plan.limits?.monthly
@@ -361,9 +361,9 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                                 );
                               })}
                             </Box>
-                            {selectedPolicy.spec.plans.some((p: any) => p.description) && (
+                            {selectedPolicy.plans.some((p: any) => p.description) && (
                               <Box mt={1}>
-                                {selectedPolicy.spec.plans.filter((p: any) => p.description).map((plan: any, idx: number) => (
+                                {selectedPolicy.plans.filter((p: any) => p.description).map((plan: any, idx: number) => (
                                   <Typography key={idx} variant="caption" display="block" color="textSecondary">
                                     • <strong>{plan.tier}:</strong> {plan.description}
                                   </Typography>

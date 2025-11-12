@@ -383,36 +383,29 @@ export async function createRouter({
 
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'planpolicies');
 
-      // suport query parameter to include full detail
-      const includeDetails = req.query.includeDetails === 'true';
+      // only expose minimal info needed for UI association
+      const filtered = {
+        items: (data.items || []).map((policy: any) => ({
+          metadata: {
+            name: policy.metadata.name,
+            namespace: policy.metadata.namespace,
+          },
+          // only expose targetRef to allow UI to match PlanPolicy -> HTTPRoute
+          targetRef: policy.spec?.targetRef ? {
+            kind: policy.spec.targetRef.kind,
+            name: policy.spec.targetRef.name,
+            namespace: policy.spec.targetRef.namespace,
+          } : undefined,
+          // only expose plan tier info, no other spec details
+          plans: (policy.spec?.plans || []).map((plan: any) => ({
+            tier: plan.tier,
+            description: plan.description,
+            limits: plan.limits,
+          })),
+        })),
+      };
 
-      if (includeDetails) {
-        // return ful details including targetRef and plans
-        const fullData = {
-          items: (data.items || []).map((policy: any) => ({
-            metadata: {
-              name: policy.metadata.name,
-              namespace: policy.metadata.namespace,
-            },
-            spec: {
-              targetRef: policy.spec?.targetRef,
-              plans: policy.spec?.plans,
-            },
-          })),
-        };
-        res.json(fullData);
-      } else {
-        // default behavior - only return name and namespace
-        const filtered = {
-          items: (data.items || []).map((policy: any) => ({
-            metadata: {
-              name: policy.metadata.name,
-              namespace: policy.metadata.namespace,
-            },
-          })),
-        };
-        res.json(filtered);
-      }
+      res.json(filtered);
     } catch (error) {
       console.error('error fetching planpolicies:', error);
       if (error instanceof NotAllowedError) {
