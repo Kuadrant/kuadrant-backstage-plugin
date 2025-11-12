@@ -182,16 +182,15 @@ export async function createRouter({
 
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const apiProduct = req.body;
-      const namespace = apiProduct.metadata?.namespace;
       const targetRef = apiProduct.spec?.targetRef;
 
-      if (!namespace) {
-        throw new InputError('namespace is required in metadata');
+      if (!targetRef?.name || !targetRef?.kind || !targetRef?.namespace) {
+        throw new InputError('targetRef with name, kind, and namespace is required');
       }
 
-      if (!targetRef?.name || !targetRef?.kind) {
-        throw new InputError('targetRef with name and kind is required');
-      }
+      // derive namespace from httproute - apiproduct lives in same namespace as httproute
+      const namespace = targetRef.namespace;
+      apiProduct.metadata.namespace = namespace;
 
       // set the owner to the authenticated user
       if (!apiProduct.spec.contact) {
@@ -201,7 +200,7 @@ export async function createRouter({
 
       // temporary: populate plans from planpolicy until controller implements this
       // look up httproute and find planpolicy targeting it
-      const httpRouteNamespace = targetRef.namespace || namespace;
+      const httpRouteNamespace = namespace;
       const httpRouteName = targetRef.name;
 
       try {
