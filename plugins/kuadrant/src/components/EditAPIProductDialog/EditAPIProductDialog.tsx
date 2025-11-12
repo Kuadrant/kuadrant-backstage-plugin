@@ -16,6 +16,7 @@ import {
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
+import useAsync from 'react-use/lib/useAsync';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -80,6 +81,27 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
         });
     }
   }, [open, namespace, name, backendUrl, fetchApi]);
+
+  // load planpolicies with full details to show associated plans
+  const { value: planPolicies } = useAsync(async () => {
+    if (!open) return null;
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies?includeDetails=true`);
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
+  // find planpolicy associated with targetRef
+  const selectedPolicy = React.useMemo(() => {
+    if (!planPolicies?.items || !targetRef) return null;
+
+    return planPolicies.items.find((pp: any) => {
+      const ref = pp.spec?.targetRef;
+      return (
+        ref?.kind === 'HTTPRoute' &&
+        ref?.name === targetRef.name &&
+        (!ref?.namespace || ref?.namespace === (targetRef.namespace || namespace))
+      );
+    });
+  }, [planPolicies, targetRef, namespace]);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -281,6 +303,89 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 </Button>
               </Box>
             </Grid>
+            {targetRef && (
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="HTTPRoute"
+                    value={`${targetRef.namespace || namespace}/${targetRef.name}`}
+                    disabled
+                    helperText="Target HTTPRoute (immutable)"
+                    margin="normal"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <Box
+                    p={2}
+                    bgcolor="#f5f5f5"
+                    borderRadius={1}
+                    border="1px solid #e0e0e0"
+                  >
+                    {selectedPolicy ? (
+                      <>
+                        <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 600 }}>
+                          Associated PlanPolicy: <strong>{selectedPolicy.metadata.name}</strong>
+                        </Typography>
+
+                        {selectedPolicy.spec?.plans && selectedPolicy.spec.plans.length > 0 ? (
+                          <>
+                            <Typography
+                              variant="caption"
+                              display="block"
+                              gutterBottom
+                              color="textSecondary"
+                              style={{ marginTop: 8 }}
+                            >
+                              Available Plans:
+                            </Typography>
+                            <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
+                              {selectedPolicy.spec.plans.map((plan: any, idx: number) => {
+                                const limitText = plan.limits?.daily
+                                  ? `${plan.limits.daily}/day`
+                                  : plan.limits?.monthly
+                                    ? `${plan.limits.monthly}/month`
+                                    : plan.limits?.yearly
+                                      ? `${plan.limits.yearly}/year`
+                                      : 'No limit';
+
+                                return (
+                                  <Chip
+                                    key={idx}
+                                    label={`${plan.tier}: ${limitText}`}
+                                    size="small"
+                                    variant="outlined"
+                                    color="primary"
+                                  />
+                                );
+                              })}
+                            </Box>
+                            {selectedPolicy.spec.plans.some((p: any) => p.description) && (
+                              <Box mt={1}>
+                                {selectedPolicy.spec.plans.filter((p: any) => p.description).map((plan: any, idx: number) => (
+                                  <Typography key={idx} variant="caption" display="block" color="textSecondary">
+                                    • <strong>{plan.tier}:</strong> {plan.description}
+                                  </Typography>
+                                ))}
+                              </Box>
+                            )}
+                          </>
+                        ) : (
+                          <Typography variant="caption" color="textSecondary">
+                            No plans defined in this PlanPolicy
+                          </Typography>
+                        )}
+                      </>
+                    ) : (
+                      <Alert severity="info">
+                        No PlanPolicy found for this HTTPRoute.
+                      </Alert>
+                    )}
+                  </Box>
+                </Grid>
+              </>
+            )}
 
             <Grid item xs={6}>
               <TextField

@@ -60,6 +60,31 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     );
   }, [backendUrl, fetchApi, open]);
 
+  // load planpolicies with full details to show associated plans
+  const { value: planPolicies } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies?includeDetails=true`);
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
+  // find planpolicy associated with selected httproute
+  const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    if (!planPolicies?.items) return null;
+
+    return planPolicies.items.find((pp: any) => {
+      const ref = pp.spec?.targetRef;
+      return (
+        ref?.kind === 'HTTPRoute' &&
+        ref?.name === routeName &&
+        (!ref?.namespace || ref?.namespace === routeNamespace)
+      );
+    });
+  };
+
+  const selectedRouteInfo = selectedHTTPRoute ? selectedHTTPRoute.split('/') : null;
+  const selectedPolicy = selectedRouteInfo
+    ? getPlanPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
+
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
       setTags([...tags, tagInput.trim()]);
@@ -323,6 +348,77 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               ))}
             </TextField>
           </Grid>
+          {selectedHTTPRoute && (
+            <Grid item xs={12}>
+              <Box
+                mt={1}
+                p={2}
+                bgcolor="#f5f5f5"
+                borderRadius={1}
+                border="1px solid #e0e0e0"
+              >
+                {selectedPolicy ? (
+                  <>
+                    <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 600 }}>
+                      Associated PlanPolicy: <strong>{selectedPolicy.metadata.name}</strong>
+                    </Typography>
+
+                    {selectedPolicy.spec?.plans && selectedPolicy.spec.plans.length > 0 ? (
+                      <>
+                        <Typography
+                          variant="caption"
+                          display="block"
+                          gutterBottom
+                          color="textSecondary"
+                          style={{ marginTop: 8 }}
+                        >
+                          Available Plans:
+                        </Typography>
+                        <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
+                          {selectedPolicy.spec.plans.map((plan: any, idx: number) => {
+                            const limitText = plan.limits?.daily
+                              ? `${plan.limits.daily}/day`
+                              : plan.limits?.monthly
+                                ? `${plan.limits.monthly}/month`
+                                : plan.limits?.yearly
+                                  ? `${plan.limits.yearly}/year`
+                                  : 'No limit';
+
+                            return (
+                              <Chip
+                                key={idx}
+                                label={`${plan.tier}: ${limitText}`}
+                                size="small"
+                                variant="outlined"
+                                color="primary"
+                              />
+                            );
+                          })}
+                        </Box>
+                        {selectedPolicy.spec.plans.some((p: any) => p.description) && (
+                          <Box mt={1}>
+                            {selectedPolicy.spec.plans.filter((p: any) => p.description).map((plan: any, idx: number) => (
+                              <Typography key={idx} variant="caption" display="block" color="textSecondary">
+                                • <strong>{plan.tier}:</strong> {plan.description}
+                              </Typography>
+                            ))}
+                          </Box>
+                        )}
+                      </>
+                    ) : (
+                      <Typography variant="caption" color="textSecondary">
+                        No plans defined in this PlanPolicy
+                      </Typography>
+                    )}
+                  </>
+                ) : (
+                  <Alert severity="warning">
+                    No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available.
+                  </Alert>
+                )}
+              </Box>
+            </Grid>
+          )}
 
           <Grid item xs={6}>
             <TextField

@@ -383,17 +383,36 @@ export async function createRouter({
 
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'planpolicies');
 
-      // filter to only return name and namespace to avoid leaking plan details
-      const filtered = {
-        items: (data.items || []).map((policy: any) => ({
-          metadata: {
-            name: policy.metadata.name,
-            namespace: policy.metadata.namespace,
-          },
-        })),
-      };
+      // suport query parameter to include full detail
+      const includeDetails = req.query.includeDetails === 'true';
 
-      res.json(filtered);
+      if (includeDetails) {
+        // return ful details including targetRef and plans
+        const fullData = {
+          items: (data.items || []).map((policy: any) => ({
+            metadata: {
+              name: policy.metadata.name,
+              namespace: policy.metadata.namespace,
+            },
+            spec: {
+              targetRef: policy.spec?.targetRef,
+              plans: policy.spec?.plans,
+            },
+          })),
+        };
+        res.json(fullData);
+      } else {
+        // default behavior - only return name and namespace
+        const filtered = {
+          items: (data.items || []).map((policy: any) => ({
+            metadata: {
+              name: policy.metadata.name,
+              namespace: policy.metadata.namespace,
+            },
+          })),
+        };
+        res.json(filtered);
+      }
     } catch (error) {
       console.error('error fetching planpolicies:', error);
       if (error instanceof NotAllowedError) {
