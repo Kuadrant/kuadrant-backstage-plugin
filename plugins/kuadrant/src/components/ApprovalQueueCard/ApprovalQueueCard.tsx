@@ -570,7 +570,18 @@ export const ApprovalQueueCard = () => {
       case 0:
         return { data: approved, columns: approvedColumns, showSelection: false };
       case 1:
-        return { data: pending, columns: pendingColumns, showSelection: true };
+        // Add tableData.checked to control checkbox state
+        const pendingWithSelection = pending.map(row => {
+          const isSelected = selectedRequests.some(
+            selected => selected.metadata.name === row.metadata.name &&
+                       selected.metadata.namespace === row.metadata.namespace
+          );
+          return {
+            ...row,
+            tableData: { checked: isSelected },
+          };
+        });
+        return { data: pendingWithSelection, columns: pendingColumns, showSelection: true };
       case 2:
         return { data: rejected, columns: rejectedColumns, showSelection: false };
       default:
