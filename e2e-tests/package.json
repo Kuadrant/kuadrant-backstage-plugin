@@ -8,8 +8,6 @@
   },
   "scripts": {
     "test": "playwright test --project=kuadrant",
-    "test:dev": "playwright test --project=kuadrant",
-    "test:prod": "BASE_URL=http://localhost:7007 playwright test --project=kuadrant",
     "test:smoke": "playwright test --project=smoke-test",
     "lint:check": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . \"playwright/**/*.{ts,js}\" --fix",
