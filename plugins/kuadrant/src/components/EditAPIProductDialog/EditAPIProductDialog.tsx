@@ -168,7 +168,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 label="Namespace"
                 value={namespace}
                 disabled
-                helperText="Kubernetes namespace (immutable)"
+                helperText="Derived from HTTPRoute (immutable)"
                 margin="normal"
               />
             </Grid>

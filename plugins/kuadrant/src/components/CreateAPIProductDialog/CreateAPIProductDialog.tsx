@@ -28,7 +28,6 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const backendUrl = config.getString('backend.baseUrl');
 
   const [name, setName] = useState('');
-  const [namespace, setNamespace] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('v1');
@@ -47,13 +46,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const { value: httpRoutes, loading: httpRoutesLoading } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
     const data = await response.json();
-    // filter to only show httproutes in the same namespace as the apiproduct
-    // and those annotated for backstage exposure
+    // filter to only show httproutes annotated for backstage exposure
     return (data.items || []).filter((route: any) =>
-      (!namespace || route.metadata.namespace === namespace) &&
       route.metadata.annotations?.['backstage.io/expose'] === 'true'
     );
-  }, [backendUrl, fetchApi, open, namespace]);
+  }, [backendUrl, fetchApi, open]);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -77,10 +74,8 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
 
       const [selectedRouteNamespace, selectedRouteName] = selectedHTTPRoute.split('/');
 
-      // validate namespace matching
-      if (selectedRouteNamespace !== namespace) {
-        throw new Error(`HTTPRoute must be in the same namespace as the APIProduct (${namespace}). Selected HTTPRoute is in ${selectedRouteNamespace}.`);
-      }
+      // derive namespace from selected httproute
+      const namespace = selectedRouteNamespace;
 
       const apiProduct = {
         apiVersion: 'extensions.kuadrant.io/v1alpha1',
@@ -141,11 +136,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
 
   const handleClose = () => {
     setName('');
-    setNamespace('');
     setDisplayName('');
     setDescription('');
     setVersion('v1');
     setApprovalMode('manual');
+    setPublishStatus('Published');
     setTags([]);
     setTagInput('');
     setSelectedHTTPRoute('');
@@ -176,17 +171,6 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setName(e.target.value)}
               placeholder="my-api"
               helperText="Kubernetes resource name (lowercase, hyphens)"
-              margin="normal"
-              required
-            />
-          </Grid>
-          <Grid item xs={6}>
-            <TextField
-              fullWidth
-              label="Namespace"
-              value={namespace}
-              onChange={e => setNamespace(e.target.value)}
-              placeholder="default"
               margin="normal"
               required
             />
@@ -292,7 +276,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setSelectedHTTPRoute(e.target.value)}
               margin="normal"
               required
-              helperText="Select an HTTPRoute that has been annotated for Backstage (backstage.io/expose: true)"
+              helperText="Select an HTTPRoute (backstage.io/expose: true). APIProduct will be created in the same namespace."
               disabled={httpRoutesLoading}
             >
               {httpRoutesLoading && (
@@ -360,7 +344,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           onClick={handleCreate}
           color="primary"
           variant="contained"
-          disabled={creating || !name || !namespace || !displayName || !description || !selectedHTTPRoute}
+          disabled={creating || !name || !displayName || !description || !selectedHTTPRoute}
         >
           {creating ? 'Creating...' : 'Create'}
         </Button>
