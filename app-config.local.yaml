@@ -42,6 +42,10 @@ auth:
   session:
     secret: local-dev-session-secret-change-in-production
     absoluteTimeoutSeconds: 604800
+    cookie:
+      secure: false
+      sameSite: lax
+      path: /
   providers:
     guest:
       dangerouslyAllowOutsideDevelopment: true
@@ -51,7 +55,6 @@ auth:
         metadataUrl: http://localhost:5556/.well-known/openid-configuration
         clientId: backstage
         clientSecret: backstage-dev-secret
-        prompt: login
         title: OIDC
         signIn:
           resolvers:

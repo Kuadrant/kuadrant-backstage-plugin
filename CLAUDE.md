@@ -1638,3 +1638,75 @@ This ensures:
 
 **Status:** FIXED (2025-11-10). Pragmatic solution that follows Kuadrant patterns.
 
+## OIDC Session Persistence (2025-11-13)
+
+**Problem:** After logging in with OIDC (Dex), refreshing the page would kick users back to the login screen with "Missing session cookie" errors.
+
+**Root Cause:** Backstage wasn't requesting or receiving refresh tokens from the OIDC provider, so sessions couldn't persist across page refreshes.
+
+**Solution:** Configure the frontend to request `offline_access` scope, which tells the OIDC provider to issue refresh tokens.
+
+**Files Changed:**
+
+1. **`packages/app/src/apis.ts`** - Added `defaultScopes` to OIDC OAuth2 factory:
+```typescript
+factory: ({ discoveryApi, oauthRequestApi, configApi }) =>
+  OAuth2.create({
+    configApi,
+    discoveryApi,
+    oauthRequestApi: oauthRequestApi as any,
+    provider: {
+      id: 'oidc',
+      title: 'OIDC',
+      icon: () => null,
+    },
+    defaultScopes: ['openid', 'email', 'profile', 'offline_access'], // <-- CRITICAL FIX
+    environment: configApi.getOptionalString('auth.environment'),
+  }),
+```
+
+2. **`kuadrant-dev-setup/dex/config.yaml`** - Enabled refresh token grant type:
+```yaml
+oauth2:
+  skipApprovalScreen: true
+  responseTypes: ["code", "token", "id_token"]
+  grantTypes: ["authorization_code", "refresh_token"]  # <-- Enable refresh tokens
+
+staticClients:
+  - id: backstage
+    redirectURIs:
+      - "http://localhost:3000/api/auth/oidc/handler/frame"  # <-- Dev mode
+      - "http://localhost:7007/api/auth/oidc/handler/frame"  # <-- Production mode
+```
+
+3. **`app-config.local.yaml`** - Removed `prompt: login` (was forcing re-auth) and added explicit cookie config:
+```yaml
+auth:
+  session:
+    cookie:
+      secure: false
+      sameSite: lax
+      path: /
+  providers:
+    oidc:
+      development:
+        # prompt: login  <-- REMOVED (was forcing re-authentication)
+```
+
+**How It Works:**
+1. Frontend requests `offline_access` scope during OIDC login
+2. Dex issues a refresh token along with the access token
+3. Backstage stores the refresh token in an HTTP-only cookie (`oidc-refresh-token`)
+4. When the page refreshes, Backstage silently uses the refresh token to get a new access token
+5. User stays logged in without seeing the login page
+
+**Reference:** This follows standard OAuth2/OIDC patterns. The `offline_access` scope is required by OpenID Connect spec to obtain refresh tokens for maintaining sessions beyond the initial access token expiration.
+
+**Testing:**
+1. Clear browser cookies/storage
+2. Log in with OIDC (e.g., owner1@kuadrant.local / owner1)
+3. Refresh the page
+4. Should stay logged in without redirect to login page
+
+**Status:** FIXED (2025-11-13). Sessions now persist correctly across page refreshes.
+
