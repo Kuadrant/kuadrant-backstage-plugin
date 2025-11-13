@@ -1,5 +1,5 @@
 # api owner: publishes apis, approves requests
-# can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference), request api access
+# can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference), request api access, manage rbac
 # cannot do: create/update/delete planpolicy (managed on cluster by platform engineers)
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
@@ -21,6 +21,10 @@ p, role:default/api-owner, kuadrant.apikey.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-owner, kuadrant.apikey.delete.all, delete, allow
 p, role:default/api-owner, catalog.entity.read, read, allow
+p, role:default/api-owner, policy.entity.read, read, allow
+p, role:default/api-owner, policy.entity.create, create, allow
+p, role:default/api-owner, policy.entity.update, update, allow
+p, role:default/api-owner, policy.entity.delete, delete, allow
 
 # api consumer: browses apis, requests access
 # can do: read apiproducts, create requests, manage own api keys
