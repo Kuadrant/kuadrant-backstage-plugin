@@ -25,22 +25,25 @@ import {
   InputLabel,
   Tabs,
   Tab,
+  Menu,
 } from '@material-ui/core';
 import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
-import DeleteIcon from '@material-ui/icons/Delete';
 import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
+import MoreVertIcon from '@material-ui/icons/MoreVert';
 import { APIKeyRequest } from '../../types/api-management';
 import {
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
+  kuadrantApiKeyRequestUpdateOwnPermission,
 } from '../../permissions';
 import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
+import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
 
 interface APIProduct {
   metadata: {
@@ -80,9 +83,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [useCase, setUseCase] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [requestToDelete, setRequestToDelete] = useState<{ name: string; displayName: string } | null>(null);
-  const [deleting, setDeleting] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [requestToEdit, setRequestToEdit] = useState<APIKeyRequest | null>(null);
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -145,36 +149,59 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     error: deleteAllPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
 
-  const handleDeleteClick = (name: string, displayName: string) => {
-    setRequestToDelete({ name, displayName });
-    setDeleteDialogOpen(true);
-  };
+  const {
+    allowed: canUpdateRequest,
+    loading: updateRequestPermissionLoading,
+    error: updateRequestPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
 
-  const handleDeleteConfirm = async () => {
-    if (!requestToDelete) return;
-
-    setDeleting(true);
+  const handleDeleteRequest = async (name: string) => {
     try {
       const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${namespace}/${requestToDelete.name}`,
+        `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
         { method: 'DELETE' }
       );
       if (!response.ok) {
         throw new Error('failed to delete request');
       }
       setRefresh(r => r + 1);
-      setDeleteDialogOpen(false);
-      setRequestToDelete(null);
     } catch (err) {
       console.error('error deleting request:', err);
-    } finally {
-      setDeleting(false);
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialogOpen(false);
-    setRequestToDelete(null);
+  const handleEditRequest = (request: APIKeyRequest) => {
+    setRequestToEdit(request);
+    setEditDialogOpen(true);
+  };
+
+  const handleEditSuccess = () => {
+    setRefresh(r => r + 1);
+    setEditDialogOpen(false);
+    setRequestToEdit(null);
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setMenuRequest(null);
+  };
+
+  const handleMenuEdit = () => {
+    if (!menuRequest) return;
+    handleEditRequest(menuRequest);
+    handleMenuClose();
+  };
+
+  const handleMenuDelete = async () => {
+    if (!menuRequest) return;
+    const requestName = menuRequest.metadata.name;
+    handleMenuClose();
+
+    if (!window.confirm('Are you sure you want to delete this request?')) {
+      return;
+    }
+
+    await handleDeleteRequest(requestName);
   };
 
   const toggleVisibility = (keyName: string) => {
@@ -353,9 +380,9 @@ func main() {
     );
   };
 
-  const loading = requestsLoading || plansLoading || createRequestPermissionLoading || deleteOwnPermissionLoading || deleteAllPermissionLoading;
+  const loading = requestsLoading || plansLoading || createRequestPermissionLoading || deleteOwnPermissionLoading || deleteAllPermissionLoading || updateRequestPermissionLoading;
   const error = requestsError || plansError;
-  const permissionError = createRequestPermissionError || deleteOwnPermissionError || deleteAllPermissionError;
+  const permissionError = createRequestPermissionError || deleteOwnPermissionError || deleteAllPermissionError || updateRequestPermissionError;
 
   if (loading) {
     return <Progress />;
@@ -368,7 +395,8 @@ func main() {
   if (permissionError) {
     const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
                             deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
-                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' : 'unknown';
+                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
+                            updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
     return (
       <Box p={2}>
         <Typography color="error">
@@ -438,7 +466,7 @@ func main() {
       },
     },
     {
-      title: 'Actions',
+      title: '',
       field: 'actions',
       searchable: false,
       render: (row: APIKeyRequest) => {
@@ -448,12 +476,18 @@ func main() {
         return (
           <IconButton
             size="small"
-            onClick={() => handleDeleteClick(row.metadata.name, apiProductName)}
-            color="secondary"
-            title="Revoke access and delete key"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({ top: rect.bottom, left: rect.left });
+              setMenuRequest(row);
+            }}
+            title="Actions"
+            aria-controls={menuAnchor ? 'actions-menu' : undefined}
+            aria-haspopup="true"
           >
-            <DeleteIcon />
-          </IconButton>
+              <MoreVertIcon />
+            </IconButton>
         );
       },
     },
@@ -519,22 +553,30 @@ func main() {
       ),
     },
     {
-      title: 'Actions',
+      title: '',
       field: 'actions',
       searchable: false,
       render: (row: APIKeyRequest) => {
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
-        if (!isPending || !canDelete) return null;
+        const canEdit = canUpdateRequest && ownerId === userId;
+        if (!isPending || (!canEdit && !canDelete)) return null;
         return (
           <IconButton
             size="small"
-            onClick={() => handleDeleteClick(row.metadata.name, apiProductName)}
-            color="secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({ top: rect.bottom, left: rect.left });
+              setMenuRequest(row);
+            }}
+            title="Actions"
+            aria-controls={menuAnchor ? 'actions-menu' : undefined}
+            aria-haspopup="true"
           >
-            <DeleteIcon />
-          </IconButton>
+              <MoreVertIcon />
+            </IconButton>
         );
       },
     },
@@ -665,25 +707,39 @@ func main() {
         </DialogActions>
       </Dialog>
 
-      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
-        <DialogTitle>Confirm Delete</DialogTitle>
-        <DialogContent>
-          <Typography>
-            Are you sure you want to revoke access and delete your API key for <strong>{requestToDelete?.displayName}</strong>?
-          </Typography>
-          <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
-            This action cannot be undone. You will need to request access again if you want to use this API in the future.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={handleDeleteCancel} color="primary">
-            Cancel
-          </Button>
-          <Button onClick={handleDeleteConfirm} color="secondary" disabled={deleting}>
-            {deleting ? 'Deleting...' : 'Delete'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <Menu
+        id="actions-menu"
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={menuAnchor || { top: 0, left: 0 }}
+      >
+        {menuRequest && (() => {
+          const isPending = !menuRequest.status?.phase || menuRequest.status.phase === 'Pending';
+          const ownerId = menuRequest.spec.requestedBy.userId;
+          const canEdit = canUpdateRequest && ownerId === userId && isPending;
+
+          const items = [];
+          if (canEdit) {
+            items.push(<MenuItem key="edit" onClick={handleMenuEdit}>Edit</MenuItem>);
+          }
+          items.push(<MenuItem key="delete" onClick={handleMenuDelete}>Delete</MenuItem>);
+          return items;
+        })()}
+      </Menu>
+
+      {requestToEdit && (
+        <EditAPIKeyRequestDialog
+          open={editDialogOpen}
+          onClose={() => {
+            setEditDialogOpen(false);
+            setRequestToEdit(null);
+          }}
+          onSuccess={handleEditSuccess}
+          request={requestToEdit}
+          availablePlans={plans}
+        />
+      )}
     </Box>
   );
 };

@@ -11,8 +11,8 @@ p, role:default/api-owner, kuadrant.apiproduct.list, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/api-owner, kuadrant.apikeyrequest.read.own, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.read.all, read, allow
-p, role:default/api-owner, kuadrant.apikeyrequest.update, update, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.update.own, update, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.update.all, update, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.list, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.delete.own, delete, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.delete.all, delete, allow
@@ -27,7 +27,7 @@ p, role:default/api-owner, policy.entity.update, update, allow
 p, role:default/api-owner, policy.entity.delete, delete, allow
 
 # api consumer: browses apis, requests access
-# can do: read apiproducts, create requests, manage own api keys
+# can do: read apiproducts, create requests, manage own api keys, edit own pending requests
 # cannot do: approve requests, create apis, modify rate limits
 p, role:default/api-consumer, kuadrant.apiproduct.read, read, allow
 p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow

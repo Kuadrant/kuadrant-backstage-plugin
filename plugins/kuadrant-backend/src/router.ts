@@ -19,8 +19,8 @@ import {
   kuadrantApiProductDeletePermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestUpdatePermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
+  kuadrantApiKeyRequestUpdateAllPermission,
   kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
@@ -697,7 +697,7 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
@@ -841,7 +841,7 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
@@ -899,7 +899,7 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
@@ -1057,7 +1057,7 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
@@ -1202,6 +1202,7 @@ export async function createRouter({
     const patchSchema = z.object({
       spec: z.object({
         useCase: z.string().optional(),
+        planTier: z.string().optional(),
       }).partial(),
     });
 
@@ -1215,7 +1216,7 @@ export async function createRouter({
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
-      // get existing request to check ownership
+      // get existing request to check ownership and status
       const existing = await k8sClient.getCustomResource(
         'extensions.kuadrant.io',
         'v1alpha1',
@@ -1224,9 +1225,17 @@ export async function createRouter({
         name,
       );
 
+      const requestUserId = existing.spec?.requestedBy?.userId;
+      const currentPhase = existing.status?.phase || 'Pending';
+
+      // only pending requests can be edited
+      if (currentPhase !== 'Pending') {
+        throw new NotAllowedError('only pending requests can be edited');
+      }
+
       // check if user can update all requests or just their own
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials }
       );
 
@@ -1242,7 +1251,7 @@ export async function createRouter({
         }
 
         // verify ownership
-        if (existing.spec?.requestedBy?.userId !== userId) {
+        if (requestUserId !== userId) {
           throw new NotAllowedError('you can only update your own api key requests');
         }
       }
