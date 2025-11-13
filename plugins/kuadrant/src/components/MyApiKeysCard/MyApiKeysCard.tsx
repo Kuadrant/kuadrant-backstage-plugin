@@ -76,7 +76,7 @@ export const MyApiKeysCard = () => {
 
   const allRequests = requests || [];
   const approvedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Approved');
-  const pendingRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Pending');
+  const pendingRequests = allRequests.filter((r: APIKeyRequest) => !r.status?.phase || r.status.phase === 'Pending');
   const rejectedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Rejected');
 
   const toggleKeyVisibility = (keyName: string) => {
