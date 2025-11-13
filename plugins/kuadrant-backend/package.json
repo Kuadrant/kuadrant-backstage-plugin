@@ -21,6 +21,14 @@
       "@kuadrant/kuadrant-backstage-plugin-backend"
     ]
   },
+  "scalprum": {
+    "name": "internal.plugin-kuadrant-backend",
+    "exposedModules": {
+      "PluginRoot": "./src/index.ts",
+      "KuadrantAlpha": "./src/module.ts",
+      "KuadrantRBAC": "./src/rbac-module.ts"
+    }
+  },
   "exports": {
     ".": "./src/index.ts",
     "./alpha": "./src/module.ts",
@@ -35,7 +43,9 @@
     "clean": "backstage-cli package clean",
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack",
-    "tsc": "tsc"
+    "tsc": "tsc",
+    "export-dynamic": "janus-cli package export-dynamic-plugin --in-place",
+    "export-dynamic:clean": "run export-dynamic --clean"
   },
   "dependencies": {
     "@backstage/backend-defaults": "^0.12.1",
@@ -56,6 +66,7 @@
   "devDependencies": {
     "@backstage/backend-test-utils": "^1.9.0",
     "@backstage/cli": "^0.34.2",
+    "@janus-idp/cli": "^1.13.0",
     "@types/express": "^4.17.6",
     "@types/supertest": "^2.0.12",
     "supertest": "^6.2.4",
@@ -64,6 +75,7 @@
   "files": [
     "dist",
     "alpha",
-    "rbac"
+    "rbac",
+    "dist-dynamic"
   ]
 }

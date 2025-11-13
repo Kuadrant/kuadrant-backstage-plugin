@@ -61,6 +61,14 @@ jobs:
       - name: Build packages
         run: yarn build
 
+      - name: Export dynamic plugins
+        run: |
+          cd plugins/kuadrant
+          yarn export-dynamic
+
+          cd ../kuadrant-backend
+          yarn export-dynamic
+
       - name: Update versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
