@@ -16,6 +16,7 @@ import {
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
+import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -59,6 +60,31 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       route.metadata.annotations?.['backstage.io/expose'] === 'true'
     );
   }, [backendUrl, fetchApi, open]);
+
+  // load planpolicies with full details to show associated plans
+  const { value: planPolicies } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
+  // find planpolicy associated with selected httproute
+  const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    if (!planPolicies?.items) return null;
+
+    return planPolicies.items.find((pp: any) => {
+      const ref = pp.targetRef;
+      return (
+        ref?.kind === 'HTTPRoute' &&
+        ref?.name === routeName &&
+        (!ref?.namespace || ref?.namespace === routeNamespace)
+      );
+    });
+  };
+
+  const selectedRouteInfo = selectedHTTPRoute ? selectedHTTPRoute.split('/') : null;
+  const selectedPolicy = selectedRouteInfo
+    ? getPlanPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -323,6 +349,16 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               ))}
             </TextField>
           </Grid>
+          {selectedHTTPRoute && (
+            <Grid item xs={12}>
+              <PlanPolicyDetails
+                selectedPolicy={selectedPolicy}
+                alertSeverity="warning"
+                alertMessage="No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available."
+                includeTopMargin={true}
+              />
+            </Grid>
+          )}
 
           <Grid item xs={6}>
             <TextField

@@ -16,6 +16,8 @@ import {
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
+import useAsync from 'react-use/lib/useAsync';
+import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -80,6 +82,27 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
         });
     }
   }, [open, namespace, name, backendUrl, fetchApi]);
+
+  // load planpolicies with full details to show associated plans
+  const { value: planPolicies } = useAsync(async () => {
+    if (!open) return null;
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
+  // find planpolicy associated with targetRef
+  const selectedPolicy = React.useMemo(() => {
+    if (!planPolicies?.items || !targetRef) return null;
+
+    return planPolicies.items.find((pp: any) => {
+      const ref = pp.targetRef;
+      return (
+        ref?.kind === 'HTTPRoute' &&
+        ref?.name === targetRef.name &&
+        (!ref?.namespace || ref?.namespace === (targetRef.namespace || namespace))
+      );
+    });
+  }, [planPolicies, targetRef, namespace]);
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -281,6 +304,29 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 </Button>
               </Box>
             </Grid>
+            {targetRef && (
+              <>
+                <Grid item xs={12}>
+                  <TextField
+                    fullWidth
+                    label="HTTPRoute"
+                    value={`${targetRef.namespace || namespace}/${targetRef.name}`}
+                    disabled
+                    helperText="Target HTTPRoute (immutable)"
+                    margin="normal"
+                  />
+                </Grid>
+
+                <Grid item xs={12}>
+                  <PlanPolicyDetails
+                    selectedPolicy={selectedPolicy}
+                    alertSeverity="info"
+                    alertMessage="No PlanPolicy found for this HTTPRoute."
+                    includeTopMargin={false}
+                  />
+                </Grid>
+              </>
+            )}
 
             <Grid item xs={6}>
               <TextField
