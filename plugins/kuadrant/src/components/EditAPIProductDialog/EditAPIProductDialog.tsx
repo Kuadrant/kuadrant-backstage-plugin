@@ -11,10 +11,17 @@ import {
   Chip,
   Grid,
   MenuItem,
+  makeStyles,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
+
+const useStyles = makeStyles({
+  asterisk: {
+    color: '#f44336',
+  },
+});
 
 interface EditAPIProductDialogProps {
   open: boolean;
@@ -25,6 +32,7 @@ interface EditAPIProductDialogProps {
 }
 
 export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}: EditAPIProductDialogProps) => {
+  const classes = useStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
@@ -181,6 +189,11 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 placeholder="My API"
                 margin="normal"
                 required
+                InputLabelProps={{
+                  classes: {
+                    asterisk: classes.asterisk,
+                  },
+                }}
               />
             </Grid>
             <Grid item xs={6}>
@@ -232,6 +245,11 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 multiline
                 rows={2}
                 required
+                InputLabelProps={{
+                  classes: {
+                    asterisk: classes.asterisk,
+                  },
+                }}
               />
             </Grid>
 

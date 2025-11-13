@@ -36,8 +36,7 @@ spec:
                 description: namespace where the apiproduct exists
               planTier:
                 type: string
-                enum: [gold, silver, bronze]
-                description: requested plan tier
+                description: requested plan tier (arbitrary string defined in planpolicy)
               useCase:
                 type: string
                 description: user's use case for requesting access

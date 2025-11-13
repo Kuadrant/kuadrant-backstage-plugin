@@ -113,6 +113,7 @@ export const apis: AnyApiFactory[] = [
           title: 'OIDC',
           icon: () => null,
         },
+        defaultScopes: ['openid', 'email', 'profile', 'offline_access'],
         environment: configApi.getOptionalString('auth.environment'),
       }),
   }),

@@ -38,7 +38,7 @@ export const MyApiKeysCard = () => {
   const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [selectedTab, setSelectedTab] = useState(0);
-  const [userId, setUserId] = useState<string>('');
+  const [, setUserId] = useState<string>('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
 
   useAsync(async () => {
@@ -47,16 +47,15 @@ export const MyApiKeysCard = () => {
   }, [identityApi]);
 
   const { value: requests, loading, error } = useAsync(async () => {
-    if (!userId) return [];
     const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests/my?userId=${userId}`
+      `${backendUrl}/api/kuadrant/requests/my`
     );
     if (!response.ok) {
       throw new Error('failed to fetch requests');
     }
     const data = await response.json();
     return data.items || [];
-  }, [userId, backendUrl, fetchApi]);
+  }, [backendUrl, fetchApi]);
 
   if (loading) {
     return (

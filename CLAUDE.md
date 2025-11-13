@@ -34,6 +34,234 @@ The Kuadrant plugins enable developer portals for API access management using Ku
 - AuthPolicy and RateLimitPolicy support
 - Direct Backstage integration (no dynamic plugin complexity for dev)
 
+## Backend Security Principles
+
+All backend code in `plugins/kuadrant-backend/src/router.ts` must follow these security tenets:
+
+### 1. Never Trust Client Input
+
+**Principle:** All data from HTTP requests is untrusted and must be validated before use.
+
+**Implementation:**
+- Use Zod schemas to validate all request bodies
+- Define explicit whitelists of allowed fields
+- Reject requests that don't match the schema
+
+**Example:**
+```typescript
+// bad - accepts arbitrary client data
+const patch = req.body;
+await k8sClient.patchCustomResource(..., patch);
+
+// good - validates against whitelist
+const patchSchema = z.object({
+  spec: z.object({
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+  }).partial(),
+});
+
+const parsed = patchSchema.safeParse(req.body);
+if (!parsed.success) {
+  return res.status(400).json({ error: 'invalid patch: ' + parsed.error.toString() });
+}
+await k8sClient.patchCustomResource(..., parsed.data);
+```
+
+**Why:** Unvalidated input allows attackers to modify fields they shouldn't (privilege escalation, namespace injection, etc.).
+
+### 2. Authentication Required, No Fallbacks
+
+**Principle:** All endpoints must require valid authentication. No guest user fallbacks.
+
+**Implementation:**
+- Use `httpAuth.credentials(req)` without `{ allow: ['user', 'none'] }`
+- Explicitly check credentials exist before proceeding
+- Extract user identity from auth credentials, never from request parameters
+
+**Example:**
+```typescript
+// bad - allows unauthenticated access
+const credentials = await httpAuth.credentials(req, { allow: ['user', 'none'] });
+const userId = req.body.userId; // client-controlled!
+
+// good - requires authentication
+const credentials = await httpAuth.credentials(req);
+
+if (!credentials || !credentials.principal) {
+  throw new NotAllowedError('authentication required');
+}
+
+const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+```
+
+**Why:** Guest fallbacks and client-supplied identity allow user impersonation and privilege escalation.
+
+### 3. Pure RBAC Permission Model
+
+**Principle:** Authorization decisions must only use Backstage RBAC permissions, not group membership checks.
+
+**Implementation:**
+- Check permissions using `permissions.authorize()`
+- Use specific permission objects (create, read, update, delete, etc.)
+- Support both `.own` and `.all` permission variants where appropriate
+- Never bypass RBAC with group-based role flags
+
+**Example:**
+```typescript
+// bad - dual authorization paths
+const { isApiOwner } = await getUserIdentity(...);
+if (!isApiOwner) {
+  throw new NotAllowedError('must be api owner');
+}
+
+// good - pure RBAC
+const decision = await permissions.authorize(
+  [{ permission: kuadrantApiProductUpdatePermission }],
+  { credentials }
+);
+
+if (decision[0].result !== AuthorizeResult.ALLOW) {
+  throw new NotAllowedError('unauthorised');
+}
+```
+
+**Why:** Mixed authorization models create bypass opportunities and make security audits difficult.
+
+### 4. Validate Field Mutability
+
+**Principle:** Distinguish between mutable and immutable fields. Prevent modification of critical resource identifiers.
+
+**Implementation:**
+- In PATCH endpoints, only allow updating safe metadata fields
+- Exclude from validation schemas:
+  - `namespace`, `name` (Kubernetes identifiers)
+  - `targetRef` (infrastructure references)
+  - `userId`, `requestedBy` (ownership)
+  - Fields managed by controllers (e.g., `plans` in APIProduct)
+
+**Example:**
+```typescript
+// patch schema excludes immutable fields
+const patchSchema = z.object({
+  spec: z.object({
+    displayName: z.string().optional(),
+    description: z.string().optional(),
+    // targetRef NOT included - immutable
+    // plans NOT included - managed by controller
+  }).partial(),
+});
+```
+
+**Why:** Allowing modification of references can break infrastructure relationships or grant unauthorised access.
+
+### 5. Ownership Validation for User Resources
+
+**Principle:** When users manage their own resources (API keys, requests), verify ownership before allowing modifications.
+
+**Implementation:**
+- Check `.all` permission first (admin/owner access)
+- If not allowed, check `.own` permission
+- Fetch existing resource and verify `requestedBy.userId` matches current user
+- Throw `NotAllowedError` if ownership check fails
+
+**Example:**
+```typescript
+const updateAllDecision = await permissions.authorize(
+  [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+  { credentials }
+);
+
+if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+  const updateOwnDecision = await permissions.authorize(
+    [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+    { credentials }
+  );
+
+  if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+    throw new NotAllowedError('unauthorised');
+  }
+
+  const existing = await k8sClient.getCustomResource(...);
+  if (existing.spec?.requestedBy?.userId !== userId) {
+    throw new NotAllowedError('you can only update your own requests');
+  }
+}
+```
+
+**Why:** Prevents users from modifying other users' resources even if they have the base permission.
+
+### 6. Follow Namespace Organisation Pattern
+
+**Principle:** Respect Kuadrant's namespace architecture where all API resources live in the same namespace.
+
+**Implementation:**
+- Never accept `namespace` from client input for resource creation
+- Use the namespace of the referenced resource (APIProduct, HTTPRoute)
+- Create APIKeyRequests in the API's namespace (spec.apiNamespace)
+- Create Secrets in the API's namespace (not user namespace)
+
+**Example:**
+```typescript
+// bad - client controls namespace
+const { namespace, apiName } = req.body;
+await k8sClient.createCustomResource('apikeyrequests', namespace, ...);
+
+// good - use API's namespace
+const { apiName, apiNamespace } = req.body;
+await k8sClient.createCustomResource('apikeyrequests', apiNamespace, ...);
+```
+
+**Why:** Cross-namespace creation can bypass RBAC, pollute namespaces, or break AuthPolicy references.
+
+### 7. Explicit Error Responses
+
+**Principle:** Return appropriate HTTP status codes and clear error messages.
+
+**Implementation:**
+- 400 for validation errors (`InputError`)
+- 403 for permission denied (`NotAllowedError`)
+- 500 for unexpected errors
+- Include error details in response body
+- Log errors server-side for debugging
+
+**Example:**
+```typescript
+try {
+  // endpoint logic
+} catch (error) {
+  console.error('error updating resource:', error);
+
+  if (error instanceof NotAllowedError) {
+    res.status(403).json({ error: error.message });
+  } else if (error instanceof InputError) {
+    res.status(400).json({ error: error.message });
+  } else {
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'internal error'
+    });
+  }
+}
+```
+
+**Why:** Clear errors help legitimate users debug issues while avoiding information disclosure to attackers.
+
+### Reference Examples in Codebase
+
+**Good patterns to follow:**
+- `router.patch('/requests/:namespace/:name', ...)` (line ~1135) - Whitelist validation, ownership checks
+- `router.post('/requests/:namespace/:name/approve', ...)` (line ~620) - Zod validation, proper auth
+- `router.patch('/apiproducts/:namespace/:name', ...)` (line ~306) - Comprehensive field whitelist
+
+**Anti-patterns fixed in security audit:**
+- ❌ Accepting userId from request body (privilege escalation)
+- ❌ Guest user fallbacks (authentication bypass)
+- ❌ Group-based authorization alongside RBAC (dual auth paths)
+- ❌ Unvalidated PATCH bodies (field manipulation)
+- ❌ Client-controlled namespace (namespace injection)
+
+See "Security Fixes Applied (2025-11-10)" section for detailed fixes.
+
 ## Prerequisites
 
 **Node.js version:** 22.20.0 (specified in `.nvmrc`)
@@ -1346,4 +1574,139 @@ Deleting a Secret left the APIKeyRequest, showing duplicate/stale data.
 - `GET /apikeys` endpoint (no longer called)
 - Secret fetching in `ApiKeyManagementTab.tsx`
 - "API Keys (from Secrets)" table component
+
+## Security Fixes Applied (2025-11-10)
+
+### Namespace Injection Vulnerability - FIXED
+
+**Issue:** `POST /requests` endpoint accepted `namespace` from request body without validation
+
+**Fix Applied:**
+APIKeyRequests are now always created in the same namespace as the APIProduct/HTTPRoute/PlanPolicy they reference. The `namespace` parameter was removed from the request schema, and `apiNamespace` is used directly:
+
+```typescript
+// BEFORE: namespace from untrusted request body
+const requestSchema = z.object({
+  namespace: z.string(),  // <-- REMOVED
+  apiNamespace: z.string(),
+  // ...
+});
+
+// AFTER: use apiNamespace from APIProduct
+const requestSchema = z.object({
+  apiNamespace: z.string(),  // API's namespace
+  // ...
+});
+
+const request = {
+  metadata: {
+    name: requestName,
+    namespace: apiNamespace,  // <-- ALWAYS MATCHES API NAMESPACE
+  },
+  spec: {
+    apiName,
+    apiNamespace,
+    // ...
+  }
+};
+```
+
+**Rationale:**
+Following Kuadrant's namespace organisation pattern (CLAUDE.md:1041), all resources for an API must live in the same namespace:
+- HTTPRoute
+- AuthPolicy
+- PlanPolicy
+- APIProduct
+- APIKeyRequest (requests for that API)
+- Secrets (API keys)
+
+This ensures:
+- AuthPolicy can reference Secrets in same namespace
+- Policies can target HTTPRoute by name (same namespace lookup)
+- Clear resource isolation per API
+- No cross-namespace pollution
+
+**Impact:**
+- ✅ Users can only create requests in the API's namespace
+- ✅ No namespace injection or pollution
+- ✅ Follows documented Kuadrant architecture
+- ⚠️ Users can still create APIKeyRequest objects in namespaces they don't own, but:
+  - They need RBAC permission for that specific APIProduct (resource-based)
+  - The APIProduct must exist in that namespace
+  - Consumers typically have zero cluster access otherwise
+  - Request appears in the API's approval queue (where it belongs)
+
+**Status:** FIXED (2025-11-10). Pragmatic solution that follows Kuadrant patterns.
+
+## OIDC Session Persistence (2025-11-13)
+
+**Problem:** After logging in with OIDC (Dex), refreshing the page would kick users back to the login screen with "Missing session cookie" errors.
+
+**Root Cause:** Backstage wasn't requesting or receiving refresh tokens from the OIDC provider, so sessions couldn't persist across page refreshes.
+
+**Solution:** Configure the frontend to request `offline_access` scope, which tells the OIDC provider to issue refresh tokens.
+
+**Files Changed:**
+
+1. **`packages/app/src/apis.ts`** - Added `defaultScopes` to OIDC OAuth2 factory:
+```typescript
+factory: ({ discoveryApi, oauthRequestApi, configApi }) =>
+  OAuth2.create({
+    configApi,
+    discoveryApi,
+    oauthRequestApi: oauthRequestApi as any,
+    provider: {
+      id: 'oidc',
+      title: 'OIDC',
+      icon: () => null,
+    },
+    defaultScopes: ['openid', 'email', 'profile', 'offline_access'], // <-- CRITICAL FIX
+    environment: configApi.getOptionalString('auth.environment'),
+  }),
+```
+
+2. **`kuadrant-dev-setup/dex/config.yaml`** - Enabled refresh token grant type:
+```yaml
+oauth2:
+  skipApprovalScreen: true
+  responseTypes: ["code", "token", "id_token"]
+  grantTypes: ["authorization_code", "refresh_token"]  # <-- Enable refresh tokens
+
+staticClients:
+  - id: backstage
+    redirectURIs:
+      - "http://localhost:3000/api/auth/oidc/handler/frame"  # <-- Dev mode
+      - "http://localhost:7007/api/auth/oidc/handler/frame"  # <-- Production mode
+```
+
+3. **`app-config.local.yaml`** - Removed `prompt: login` (was forcing re-auth) and added explicit cookie config:
+```yaml
+auth:
+  session:
+    cookie:
+      secure: false
+      sameSite: lax
+      path: /
+  providers:
+    oidc:
+      development:
+        # prompt: login  <-- REMOVED (was forcing re-authentication)
+```
+
+**How It Works:**
+1. Frontend requests `offline_access` scope during OIDC login
+2. Dex issues a refresh token along with the access token
+3. Backstage stores the refresh token in an HTTP-only cookie (`oidc-refresh-token`)
+4. When the page refreshes, Backstage silently uses the refresh token to get a new access token
+5. User stays logged in without seeing the login page
+
+**Reference:** This follows standard OAuth2/OIDC patterns. The `offline_access` scope is required by OpenID Connect spec to obtain refresh tokens for maintaining sessions beyond the initial access token expiration.
+
+**Testing:**
+1. Clear browser cookies/storage
+2. Log in with OIDC (e.g., owner1@kuadrant.local / owner1)
+3. Refresh the page
+4. Should stay logged in without redirect to login page
+
+**Status:** FIXED (2025-11-13). Sessions now persist correctly across page refreshes.
 

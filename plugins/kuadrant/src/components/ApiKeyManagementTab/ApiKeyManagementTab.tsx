@@ -80,6 +80,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [useCase, setUseCase] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [requestToDelete, setRequestToDelete] = useState<{ name: string; displayName: string } | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -93,9 +96,8 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   }, [identityApi]);
 
   const { value: requests, loading: requestsLoading, error: requestsError } = useAsync(async () => {
-    if (!userId) return [];
     const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests/my?userId=${userId}&namespace=${namespace}`
+      `${backendUrl}/api/kuadrant/requests/my?namespace=${namespace}`
     );
     if (!response.ok) {
       throw new Error('failed to fetch requests');
@@ -105,7 +107,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     return (data.items || []).filter(
       (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
     );
-  }, [userId, apiProductName, namespace, refresh, fetchApi]);
+  }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
   const { value: apiProduct, loading: plansLoading, error: plansError } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -143,19 +145,36 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     error: deleteAllPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyDeleteAllPermission);
 
-  const handleDeleteRequest = async (name: string) => {
+  const handleDeleteClick = (name: string, displayName: string) => {
+    setRequestToDelete({ name, displayName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!requestToDelete) return;
+
+    setDeleting(true);
     try {
       const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
+        `${backendUrl}/api/kuadrant/requests/${namespace}/${requestToDelete.name}`,
         { method: 'DELETE' }
       );
       if (!response.ok) {
         throw new Error('failed to delete request');
       }
       setRefresh(r => r + 1);
+      setDeleteDialogOpen(false);
+      setRequestToDelete(null);
     } catch (err) {
       console.error('error deleting request:', err);
+    } finally {
+      setDeleting(false);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogOpen(false);
+    setRequestToDelete(null);
   };
 
   const toggleVisibility = (keyName: string) => {
@@ -429,7 +448,7 @@ func main() {
         return (
           <IconButton
             size="small"
-            onClick={() => handleDeleteRequest(row.metadata.name)}
+            onClick={() => handleDeleteClick(row.metadata.name, apiProductName)}
             color="secondary"
             title="Revoke access and delete key"
           >
@@ -511,7 +530,7 @@ func main() {
         return (
           <IconButton
             size="small"
-            onClick={() => handleDeleteRequest(row.metadata.name)}
+            onClick={() => handleDeleteClick(row.metadata.name, apiProductName)}
             color="secondary"
           >
             <DeleteIcon />
@@ -642,6 +661,26 @@ func main() {
             disabled={!selectedPlan || creating}
           >
             {creating ? 'Submitting...' : 'Submit Request'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
+        <DialogTitle>Confirm Delete</DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to revoke access and delete your API key for <strong>{requestToDelete?.displayName}</strong>?
+          </Typography>
+          <Typography variant="body2" color="textSecondary" style={{ marginTop: 8 }}>
+            This action cannot be undone. You will need to request access again if you want to use this API in the future.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleDeleteCancel} color="primary">
+            Cancel
+          </Button>
+          <Button onClick={handleDeleteConfirm} color="secondary" disabled={deleting}>
+            {deleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogActions>
       </Dialog>

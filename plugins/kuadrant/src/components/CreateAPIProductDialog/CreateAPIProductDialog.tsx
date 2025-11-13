@@ -11,10 +11,17 @@ import {
   Chip,
   Grid,
   MenuItem,
+  makeStyles,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
+
+const useStyles = makeStyles({
+  asterisk: {
+    color: '#f44336',
+  },
+});
 
 interface CreateAPIProductDialogProps {
   open: boolean;
@@ -23,6 +30,7 @@ interface CreateAPIProductDialogProps {
 }
 
 export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIProductDialogProps) => {
+  const classes = useStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
@@ -173,6 +181,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               helperText="Kubernetes resource name (lowercase, hyphens)"
               margin="normal"
               required
+              InputLabelProps={{
+                classes: {
+                  asterisk: classes.asterisk,
+                },
+              }}
             />
           </Grid>
           <Grid item xs={6}>
@@ -184,6 +197,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               placeholder="My API"
               margin="normal"
               required
+              InputLabelProps={{
+                classes: {
+                  asterisk: classes.asterisk,
+                },
+              }}
             />
           </Grid>
           <Grid item xs={6}>
@@ -235,6 +253,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               multiline
               rows={2}
               required
+              InputLabelProps={{
+                classes: {
+                  asterisk: classes.asterisk,
+                },
+              }}
             />
           </Grid>
 
@@ -278,6 +301,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               required
               helperText="Select an HTTPRoute (backstage.io/expose: true). APIProduct will be created in the same namespace."
               disabled={httpRoutesLoading}
+              InputLabelProps={{
+                classes: {
+                  asterisk: classes.asterisk,
+                },
+              }}
             >
               {httpRoutesLoading && (
                 <MenuItem value="">Loading...</MenuItem>

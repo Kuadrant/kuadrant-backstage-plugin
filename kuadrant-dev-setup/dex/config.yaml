@@ -47,9 +47,12 @@ staticPasswords:
 staticClients:
   - id: backstage
     redirectURIs:
+      - "http://localhost:3000/api/auth/oidc/handler/frame"
       - "http://localhost:7007/api/auth/oidc/handler/frame"
     name: "Backstage Local Dev"
     secret: "backstage-dev-secret"
 
 oauth2:
   skipApprovalScreen: true
+  responseTypes: ["code", "token", "id_token"]
+  grantTypes: ["authorization_code", "refresh_token"]
