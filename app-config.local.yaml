@@ -2,6 +2,8 @@ app:
   title: Red Hat Developer Hub
   baseUrl: http://localhost:3000
 
+signInPage: oidc
+
 organization:
   name: My Org
 
@@ -37,10 +39,23 @@ techdocs:
 
 auth:
   environment: development
+  session:
+    secret: local-dev-session-secret-change-in-production
+    absoluteTimeoutSeconds: 604800
   providers:
     guest:
       dangerouslyAllowOutsideDevelopment: true
       userEntityRef: user:default/guest
+    oidc:
+      development:
+        metadataUrl: http://localhost:5556/.well-known/openid-configuration
+        clientId: backstage
+        clientSecret: backstage-dev-secret
+        prompt: login
+        title: OIDC
+        signIn:
+          resolvers:
+            - resolver: emailMatchingUserEntityProfileEmail
 
 permission:
   enabled: true

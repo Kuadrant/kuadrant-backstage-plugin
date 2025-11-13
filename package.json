@@ -8,7 +8,11 @@
   "scripts": {
     "prepare": "husky install",
     "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
-    "dev": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend --filter=app",
+    "dev": "yarn dev:setup-dex && concurrently \"yarn:dev:*\"",
+    "dev:setup-dex": "bash scripts/setup-dex.sh",
+    "dev:dex": "docker run --rm --name kuadrant-dex -p 5556:5556 -v \"$(pwd)/kuadrant-dev-setup/dex/config.yaml:/etc/dex/config.yaml:ro\" -v \"$(pwd)/kuadrant-dev-setup/dex/web:/srv/dex/web:ro\" ghcr.io/dexidp/dex:latest dex serve /etc/dex/config.yaml",
+    "dev:backend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
+    "dev:frontend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=app",
     "build": "turbo run build",
     "build:dockerfile": "bash ./scripts/update-Dockerfile.sh",
     "tsc": "turbo run tsc",
@@ -44,6 +48,7 @@
     "@backstage/frontend-test-utils": "0.3.5",
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
     "@manypkg/cli": "0.25.1",
+    "concurrently": "^9.2.1",
     "glob": "11.0.3",
     "husky": "8.0.3",
     "jsdom": "^26.1.0",
@@ -63,5 +68,8 @@
   "jest": {
     "testTimeout": 20000
   },
-  "packageManager": "yarn@3.8.7"
+  "packageManager": "yarn@3.8.7",
+  "dependencies": {
+    "@backstage/plugin-auth-backend-module-oidc-provider": "^0.4.8"
+  }
 }
