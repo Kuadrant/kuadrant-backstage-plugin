@@ -9,7 +9,7 @@
     "prepare": "husky install",
     "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
     "dev": "yarn dev:setup-dex && concurrently \"yarn:dev:*\"",
-    "dev:setup-dex": "test -f kuadrant-dev-setup/dex/web/robots.txt || docker run --rm -v \"$(pwd)/kuadrant-dev-setup/dex:/tmp/out\" ghcr.io/dexidp/dex:latest sh -c 'cp -r /srv/dex/web/static /srv/dex/web/themes /srv/dex/web/robots.txt /tmp/out/web/ && for f in /srv/dex/web/templates/*.html; do [ \"$(basename $f)\" != \"password.html\" ] && cp $f /tmp/out/web/templates/; done'",
+    "dev:setup-dex": "(test -f kuadrant-dev-setup/dex/web/robots.txt || (mkdir -p kuadrant-dev-setup/dex/web/templates && docker run --rm --user $(id -u):$(id -g) -v \"$(pwd)/kuadrant-dev-setup/dex:/tmp/out\" ghcr.io/dexidp/dex:latest sh -c 'cp -r /srv/dex/web/static /srv/dex/web/themes /srv/dex/web/robots.txt /tmp/out/web/ && for f in /srv/dex/web/templates/*.html; do [ \"$(basename $f)\" != \"password.html\" ] && cp $f /tmp/out/web/templates/; done')) || true",
     "dev:dex": "docker run --rm --name kuadrant-dex -p 5556:5556 -v \"$(pwd)/kuadrant-dev-setup/dex/config.yaml:/etc/dex/config.yaml:ro\" -v \"$(pwd)/kuadrant-dev-setup/dex/web:/srv/dex/web:ro\" ghcr.io/dexidp/dex:latest dex serve /etc/dex/config.yaml",
     "dev:backend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
     "dev:frontend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=app",
