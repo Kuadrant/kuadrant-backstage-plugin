@@ -1,5 +1,39 @@
-# Readme for e2e tests
+# Kuadrant E2E Tests
 
-The readme for the e2e framework is located [here](../docs/e2e-tests/README.md)
-The contribution guidelines are [here](../docs/e2e-tests/CONTRIBUTING.MD)
-The example and bootstraps to create tests are [here](../docs/e2e-tests/examples.md)
+End-to-end tests for the Kuadrant Backstage plugins using Playwright.
+
+## Running Tests
+
+Start the app in another terminal:
+
+```bash
+yarn dev
+```
+
+Then run the tests:
+
+```bash
+cd e2e-tests
+yarn test
+```
+
+Or just smoke test:
+
+```bash
+yarn test:smoke
+```
+
+## Prerequisites
+
+- Kind cluster running with Kuadrant:
+  ```bash
+  cd kuadrant-dev-setup
+  make kind-create
+  ```
+
+## What's Tested
+
+- Smoke test: app loads and displays homepage
+- Kuadrant plugin: navigation, page rendering, API products display
+
+Tests run in CI automatically on every PR and push to main.

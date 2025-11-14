@@ -6,6 +6,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-validate:
     runs-on: ubuntu-latest
@@ -46,3 +50,81 @@ jobs:
 
       - name: Verify backend plugin bundle
         run: test -f plugins/kuadrant-backend/dist/index.cjs.js
+
+  e2e-tests:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'yarn'
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Install e2e-tests dependencies
+        run: |
+          cd e2e-tests
+          yarn install --immutable
+
+      - name: Install Playwright browsers
+        run: |
+          cd e2e-tests
+          yarn playwright install --with-deps chromium
+
+      - name: Create kind cluster
+        uses: helm/kind-action@v1
+        with:
+          cluster_name: kuadrant-test
+          wait: 60s
+
+      - name: Setup RBAC and Kuadrant on kind cluster
+        run: |
+          cd kuadrant-dev-setup
+          kubectl apply -f rbac/rhdh-rbac.yaml
+          make kuadrant-install
+          make demo-install
+          cd ..
+
+      - name: Start Backstage
+        run: |
+          yarn dev &
+          echo $! > backstage.pid
+          # wait for backstage to be ready (webpack dev server)
+          timeout 120 bash -c 'until curl -f http://localhost:3000 > /dev/null 2>&1; do sleep 2; done'
+
+      - name: Run e2e tests
+        run: |
+          cd e2e-tests
+          yarn test
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: e2e-tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload test videos
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-videos
+          path: e2e-tests/test-results/
+          retention-days: 7
+
+      - name: Stop Backstage
+        if: always()
+        run: |
+          if [ -f backstage.pid ]; then
+            kill $(cat backstage.pid) || true
+          fi
