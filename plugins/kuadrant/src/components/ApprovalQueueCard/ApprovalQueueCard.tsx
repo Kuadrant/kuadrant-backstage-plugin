@@ -23,9 +23,13 @@ import {
   Tabs,
   Tab,
   Tooltip,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
+import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
 import { APIKeyRequest } from '../../types/api-management';
 
 interface ApprovalDialogProps {
@@ -633,6 +637,22 @@ export const ApprovalQueueCard = () => {
 
   const tabData = getTabData();
 
+  // group requests by api product
+  const groupByApiProduct = (requests: APIKeyRequest[]) => {
+    const grouped = new Map<string, APIKeyRequest[]>();
+    requests.forEach(request => {
+      const apiName = request.spec.apiName;
+      if (!grouped.has(apiName)) {
+        grouped.set(apiName, []);
+      }
+      grouped.get(apiName)!.push(request);
+    });
+    return grouped;
+  };
+
+  const groupedData = groupByApiProduct(tabData.data);
+  const apiProducts = Array.from(groupedData.keys()).sort();
+
   return (
     <>
       <InfoCard
@@ -692,19 +712,48 @@ export const ApprovalQueueCard = () => {
             </Typography>
           </Box>
         ) : (
-          <Table
-            options={{
-              selection: canUpdateRequests && tabData.showSelection,
-              paging: tabData.data.length > 10,
-              pageSize: 10,
-              search: false,
-              showTextRowsSelected: false,
-              toolbar: false,
-            }}
-            data={tabData.data}
-            columns={tabData.columns}
-            onSelectionChange={(rows) => setSelectedRequests(rows as APIKeyRequest[])}
-          />
+          <Box>
+            {apiProducts.map(apiName => {
+              const requests = groupedData.get(apiName) || [];
+              return (
+                <Accordion key={apiName} defaultExpanded={apiProducts.length === 1}>
+                  <AccordionSummary expandIcon={<ExpandMoreIcon />}>
+                    <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
+                      <Typography variant="h6">{apiName}</Typography>
+                      <Chip
+                        label={`${requests.length} request${requests.length !== 1 ? 's' : ''}`}
+                        size="small"
+                        color="primary"
+                        style={{ marginRight: 16 }}
+                      />
+                    </Box>
+                  </AccordionSummary>
+                  <AccordionDetails>
+                    <Box width="100%">
+                      <Table
+                        options={{
+                          selection: canUpdateRequests && tabData.showSelection,
+                          paging: false,
+                          search: false,
+                          showTextRowsSelected: false,
+                          toolbar: false,
+                        }}
+                        data={requests}
+                        columns={tabData.columns}
+                        onSelectionChange={(rows) => {
+                          // merge selections from this api product with selections from other products
+                          const otherSelections = selectedRequests.filter(
+                            r => r.spec.apiName !== apiName
+                          );
+                          setSelectedRequests([...otherSelections, ...(rows as APIKeyRequest[])]);
+                        }}
+                      />
+                    </Box>
+                  </AccordionDetails>
+                </Accordion>
+              );
+            })}
+          </Box>
         )}
       </InfoCard>
       <ApprovalDialog
