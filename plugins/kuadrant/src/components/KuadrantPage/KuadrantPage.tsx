@@ -23,8 +23,10 @@ import { PermissionGate } from '../PermissionGate';
 import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 import {
   kuadrantApiProductCreatePermission,
-  kuadrantApiProductDeletePermission,
-  kuadrantApiProductUpdatePermission,
+  kuadrantApiProductDeleteOwnPermission,
+  kuadrantApiProductDeleteAllPermission,
+  kuadrantApiProductUpdateOwnPermission,
+  kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantPlanPolicyListPermission,
@@ -70,14 +72,27 @@ export const ResourceList = () => {
   } = useKuadrantPermission(kuadrantApiKeyRequestReadAllPermission);
 
   const {
-    allowed: canDeleteApiProduct,
-    loading: deletePermissionLoading,
-    error: deletePermissionError,
-  } = useKuadrantPermission(kuadrantApiProductDeletePermission);
+    allowed: canDeleteOwnApiProduct,
+    loading: deleteOwnPermissionLoading,
+  } = useKuadrantPermission(kuadrantApiProductDeleteOwnPermission);
 
   const {
-    allowed: canUpdateApiProduct,
-  } = useKuadrantPermission(kuadrantApiProductUpdatePermission);
+    allowed: canDeleteAllApiProducts,
+    loading: deleteAllPermissionLoading,
+    error: deletePermissionError,
+  } = useKuadrantPermission(kuadrantApiProductDeleteAllPermission);
+
+  const {
+    allowed: canUpdateOwnApiProduct,
+  } = useKuadrantPermission(kuadrantApiProductUpdateOwnPermission);
+
+  const {
+    allowed: canUpdateAllApiProducts,
+  } = useKuadrantPermission(kuadrantApiProductUpdateAllPermission);
+
+  const canDeleteApiProduct = canDeleteOwnApiProduct || canDeleteAllApiProducts;
+  const canUpdateApiProduct = canUpdateOwnApiProduct || canUpdateAllApiProducts;
+  const deletePermissionLoading = deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
     allowed: canListPlanPolicies,

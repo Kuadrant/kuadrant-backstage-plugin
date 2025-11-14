@@ -32,10 +32,7 @@
     "new": "backstage-cli new --scope internal",
     "repo:fix": "backstage-cli repo fix --publish",
     "versions:metadata": "node ./scripts/update-metadata.mjs",
-    "versions:bump": "node ./scripts/update-backstage.mjs",
-    "user:consumer": "node scripts/switch-user-role.mjs consumer",
-    "user:owner": "node scripts/switch-user-role.mjs owner",
-    "user:default": "node scripts/switch-user-role.mjs default"
+    "versions:bump": "node ./scripts/update-backstage.mjs"
   },
   "workspaces": {
     "packages": [

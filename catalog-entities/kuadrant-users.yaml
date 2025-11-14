@@ -47,7 +47,7 @@ spec:
   profile:
     displayName: Administrator
     email: admin@kuadrant.local
-  memberOf: [api-owners, api-consumers]
+  memberOf: [api-admins, api-owners, api-consumers]
 ---
 apiVersion: backstage.io/v1alpha1
 kind: User
@@ -58,6 +58,15 @@ spec:
     displayName: Guest User
     email: guest@kuadrant.local
   memberOf: [api-consumers]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: api-admins
+  description: platform engineers who manage all api products
+spec:
+  type: team
+  children: []
 ---
 apiVersion: backstage.io/v1alpha1
 kind: Group

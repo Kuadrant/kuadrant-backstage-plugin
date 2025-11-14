@@ -843,6 +843,146 @@ Plan tier names are **not hardcoded** (gold/silver/bronze) - they are arbitrary 
 
 PlanPolicy predicates (CEL expressions) are evaluated by the gateway at runtime, not by Backstage. Backstage should not duplicate Authorino's auth logic. Access control in Backstage is for portal UX (who can see/request APIs), not runtime enforcement (who can call APIs with which rate limits).
 
+### APIProduct Ownership-Based Permissions (Issue #82)
+
+**Problem:** API Owners could see and modify ALL API Products, violating organizational boundaries.
+
+**Solution:** Ownership-based access control with three-tier role hierarchy.
+
+#### Role Hierarchy
+
+```
+API Consumer (read-only, request access)
+    ↓
+API Owner (owns specific APIProducts)
+    ↓
+API Admin (platform engineer, owns all)
+```
+
+#### Ownership Tracking
+
+APIProducts track ownership via Kubernetes annotations (keeping CRD clean for non-Backstage users):
+```yaml
+metadata:
+  annotations:
+    backstage.io/created-by-user-id: "jmadigan"
+    backstage.io/created-by-user-ref: "user:default/jmadigan"
+    backstage.io/created-at: "2025-11-14T10:30:00Z"
+```
+
+**Immutability:** Ownership annotations are set on creation and cannot be modified (prevents ownership hijacking).
+
+#### Permission Model
+
+**APIProduct permissions follow `.own` / `.all` pattern:**
+
+| Permission | API Consumer | API Owner | API Admin |
+|-----------|--------------|-----------|-----------|
+| `apiproduct.create` | ❌ | ✅ | ✅ |
+| `apiproduct.read.own` | ❌ | ✅ | n/a |
+| `apiproduct.read.all` | ❌ | ❌ | ✅ |
+| `apiproduct.update.own` | ❌ | ✅ | n/a |
+| `apiproduct.update.all` | ❌ | ❌ | ✅ |
+| `apiproduct.delete.own` | ❌ | ✅ | n/a |
+| `apiproduct.delete.all` | ❌ | ❌ | ✅ |
+| `apiproduct.list` | ✅ (read) | ✅ (filtered) | ✅ (all) |
+
+**APIKeyRequest permissions cascade from APIProduct ownership:**
+
+- To approve/reject a request, must have permission for the associated APIProduct
+- API Owners can only approve requests for their own APIProducts
+- API Admins can approve requests for any APIProduct
+
+#### Backend Enforcement Pattern
+
+All read/update/delete endpoints use tiered permission checks:
+
+```typescript
+// try .all permission first (explicit admin access)
+const allDecision = await permissions.authorize(
+  [{ permission: kuadrantApiProductUpdateAllPermission }],
+  { credentials }
+);
+
+if (allDecision[0].result !== AuthorizeResult.ALLOW) {
+  // fallback to .own permission
+  const ownDecision = await permissions.authorize(
+    [{ permission: kuadrantApiProductUpdateOwnPermission }],
+    { credentials }
+  );
+
+  if (ownDecision[0].result !== AuthorizeResult.ALLOW) {
+    throw new NotAllowedError('unauthorised');
+  }
+
+  // verify ownership
+  const apiProduct = await k8sClient.getCustomResource(...);
+  const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+  if (createdByUserId !== userId) {
+    throw new NotAllowedError('you can only update your own api products');
+  }
+}
+
+// proceed with operation
+```
+
+**List endpoint filtering:**
+```typescript
+// GET /apiproducts returns different results based on permissions
+if (hasReadAllPermission) {
+  return allApiProducts;
+} else if (hasReadOwnPermission) {
+  return allApiProducts.filter(p =>
+    p.metadata?.annotations?.['backstage.io/created-by-user-id'] === userId
+  );
+} else {
+  throw new NotAllowedError('unauthorised');
+}
+```
+
+#### Catalog Integration
+
+Entity provider sets `spec.owner` from ownership annotation:
+
+```typescript
+// APIProductEntityProvider.ts transformToEntity()
+const owner = product.metadata.annotations?.['backstage.io/created-by-user-ref'];
+if (!owner) {
+  console.warn(`skipping apiproduct ${namespace}/${name} - no ownership annotation`);
+  return null;  // skip from catalog sync
+}
+
+const entity: ApiEntity = {
+  spec: {
+    owner,  // "user:default/jmadigan"
+    // ...
+  }
+};
+```
+
+**No fallbacks**: APIProducts without ownership annotations are excluded from catalog. This ensures clean separation between Backstage-managed and kubectl-managed resources.
+
+Access control is enforced through Kuadrant plugin permissions (not catalog conditional policies).
+
+#### RBAC Configuration
+
+**API Admin role** (`role:default/api-admin`):
+- All `.all` permissions (read/update/delete all APIProducts)
+- Can approve any APIKeyRequest
+- Full RBAC policy management
+
+**API Owner role** (`role:default/api-owner`):
+- All `.own` permissions (read/update/delete own APIProducts)
+- Can create new APIProducts (which they will own)
+- Can approve APIKeyRequests for their own APIProducts
+
+**API Consumer role** (`role:default/api-consumer`):
+- Read-only access to APIProducts
+- Can request API keys
+- Can manage own API keys
+
+See `docs/api-product-ownership-plan.md` for complete implementation details.
+
 ### Backstage Table detailPanel with Interactive Content
 
 When using the Backstage `Table` component's `detailPanel` feature with interactive elements (tabs, buttons, etc.), there's a critical pattern to avoid re-render issues:
