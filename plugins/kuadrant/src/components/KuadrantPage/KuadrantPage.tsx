@@ -200,10 +200,24 @@ export const ResourceList = () => {
       render: (row: any) => {
         const status = row.spec?.publishStatus || 'Draft';
         return (
-          <Chip 
-            label={status} 
-            size="small" 
+          <Chip
+            label={status}
+            size="small"
             color={status === 'Published' ? 'primary' : 'default'}
+          />
+        );
+      },
+    },
+    {
+      title: 'Approval Mode',
+      field: 'spec.approvalMode',
+      render: (row: any) => {
+        const mode = row.spec?.approvalMode || 'manual';
+        return (
+          <Chip
+            label={mode}
+            size="small"
+            color={mode === 'automatic' ? 'secondary' : 'default'}
           />
         );
       },
