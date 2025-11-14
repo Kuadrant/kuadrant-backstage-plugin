@@ -29,6 +29,7 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestReadAllPermission,
+  kuadrantApiKeyRequestReadOwnPermission,
   kuadrantPlanPolicyListPermission,
 } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
@@ -66,10 +67,18 @@ export const ResourceList = () => {
   } = useKuadrantPermission(kuadrantApiProductCreatePermission);
 
   const {
-    allowed: canViewApprovalQueue,
-    loading: approvalQueuePermissionLoading,
-    error: approvalQueuePermissionError,
+    allowed: canViewAllRequests,
+    loading: approvalQueueAllPermissionLoading,
   } = useKuadrantPermission(kuadrantApiKeyRequestReadAllPermission);
+
+  const {
+    allowed: canViewOwnRequests,
+    loading: approvalQueueOwnPermissionLoading,
+    error: approvalQueuePermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestReadOwnPermission);
+
+  const canViewApprovalQueue = canViewAllRequests || canViewOwnRequests;
+  const approvalQueuePermissionLoading = approvalQueueAllPermissionLoading || approvalQueueOwnPermissionLoading;
 
   const {
     allowed: canDeleteOwnApiProduct,

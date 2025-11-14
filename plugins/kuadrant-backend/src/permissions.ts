@@ -104,11 +104,6 @@ export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
   attributes: { action: 'update' },
 });
 
-export const kuadrantApiKeyRequestListPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.list',
-  attributes: { action: 'read' },
-});
-
 export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
   name: 'kuadrant.apikeyrequest.delete.own',
   attributes: { action: 'delete' },
@@ -162,7 +157,6 @@ export const kuadrantPermissions = [
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
   kuadrantApiKeyReadOwnPermission,

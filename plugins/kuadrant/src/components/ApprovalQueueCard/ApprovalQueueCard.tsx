@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useApi, fetchApiRef, identityApiRef, configApiRef } from '@backstage/core-plugin-api';
 import { useAsync } from 'react-use';
 import {
@@ -8,7 +8,7 @@ import {
   ResponseErrorPanel,
   InfoCard,
 } from '@backstage/core-components';
-import { kuadrantApiKeyRequestUpdateAllPermission } from '../../permissions';
+import { kuadrantApiKeyRequestUpdateAllPermission, kuadrantApiKeyRequestUpdateOwnPermission } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
 import {
   Button,
@@ -43,9 +43,16 @@ interface ApprovalDialogProps {
 const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalDialogProps) => {
   const [comment, setComment] = useState('');
 
+  // reset comment when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setComment('');
+    }
+  }, [open]);
+
   const handleConfirm = () => {
     onConfirm(comment);
-    setComment('');
+    onClose();
   };
 
   return (
@@ -105,9 +112,16 @@ interface BulkActionDialogProps {
 const BulkActionDialog = ({ open, requests, action, onClose, onConfirm }: BulkActionDialogProps) => {
   const [comment, setComment] = useState('');
 
+  // reset comment when dialog closes
+  useEffect(() => {
+    if (!open) {
+      setComment('');
+    }
+  }, [open]);
+
   const handleConfirm = () => {
     onConfirm(comment);
-    setComment('');
+    onClose();
   };
 
   const isApprove = action === 'approve';
@@ -182,10 +196,20 @@ export const ApprovalQueueCard = () => {
   });
 
   const {
-    allowed: canUpdateRequests,
-    loading: updatePermissionLoading,
-    error: updatePermissionError,
+    allowed: canUpdateAllRequests,
+    loading: updateAllPermissionLoading,
+    error: updateAllPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyRequestUpdateAllPermission);
+
+  const {
+    allowed: canUpdateOwnRequests,
+    loading: updateOwnPermissionLoading,
+    error: updateOwnPermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
+
+  const canUpdateRequests = canUpdateAllRequests || canUpdateOwnRequests;
+  const updatePermissionLoading = updateAllPermissionLoading || updateOwnPermissionLoading;
+  const updatePermissionError = updateAllPermissionError || updateOwnPermissionError;
 
   const { value, loading, error } = useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();

@@ -32,6 +32,8 @@ export {
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
+  kuadrantApiKeyRequestDeleteOwnPermission,
+  kuadrantApiKeyRequestDeleteAllPermission,
   kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,

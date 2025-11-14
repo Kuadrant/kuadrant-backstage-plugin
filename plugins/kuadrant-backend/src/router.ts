@@ -23,9 +23,9 @@ import {
   kuadrantApiProductDeleteAllPermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
+  kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
 } from './permissions';
@@ -714,13 +714,24 @@ export async function createRouter({
     try {
       const credentials = await httpAuth.credentials(req);
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestListPermission }],
+      // check if user can read all requests or only own
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestReadAllPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+      const canReadAll = readAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canReadAll) {
+        // try read own permission
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+          { credentials }
+        );
+
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
       }
 
       const status = req.query.status as string;
@@ -734,6 +745,25 @@ export async function createRouter({
       }
 
       let filteredItems = data.items || [];
+
+      // if user only has read.own permission, filter by api product ownership
+      if (!canReadAll) {
+        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+
+        // get all apiproducts owned by this user
+        const apiproducts = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+        const ownedApiProducts = (apiproducts.items || [])
+          .filter((product: any) =>
+            product.metadata.annotations?.['backstage.io/created-by-user-id'] === userId
+          )
+          .map((product: any) => product.metadata.name);
+
+        // filter requests to only those for owned api products
+        filteredItems = filteredItems.filter((req: any) =>
+          ownedApiProducts.includes(req.spec?.apiName)
+        );
+      }
+
       if (status) {
         filteredItems = filteredItems.filter((req: any) => {
           const phase = req.status?.phase || 'Pending';
@@ -805,15 +835,6 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
-        { credentials },
-      );
-
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
-
       const { namespace, name } = req.params;
       const { comment } = parsed.data;
       const reviewedBy = `user:default/${userId}`;
@@ -841,14 +862,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiProductUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiProductUpdateOwnPermission }],
+          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
           { credentials },
         );
 
@@ -983,15 +1004,6 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
-        { credentials },
-      );
-
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
-
       const { namespace, name } = req.params;
       const { comment } = parsed.data;
       const reviewedBy = `user:default/${userId}`;
@@ -1020,14 +1032,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiProductUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiProductUpdateOwnPermission }],
+          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
           { credentials },
         );
 

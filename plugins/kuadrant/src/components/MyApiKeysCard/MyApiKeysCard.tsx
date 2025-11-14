@@ -191,12 +191,13 @@ export const MyApiKeysCard = () => {
     {
       title: 'Reason',
       render: (row: APIKeyRequest) => {
-        if (row.status?.phase === 'Rejected' && row.status.reason) {
+        if (row.status?.reason) {
+          const color = row.status.phase === 'Rejected' ? 'error' : 'textPrimary';
           return (
             <Tooltip title={row.status.reason} placement="top">
               <Typography
                 variant="body2"
-                color="error"
+                color={color}
                 style={{
                   maxWidth: '200px',
                   overflow: 'hidden',
