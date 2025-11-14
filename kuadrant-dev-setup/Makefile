@@ -131,6 +131,7 @@ kuadrant-install: $(LOCALBIN)/helm-$(HELM_VERSION)
 demo-install:
 	@echo "installing toystore demo resources..."
 	@kubectl apply -f demo/toystore-demo.yaml
+	@kubectl apply -f demo/additional-demos.yaml
 	@echo ""
 	@echo "demo resources installed!"
 	@echo ""
@@ -141,6 +142,7 @@ demo-install:
 demo-uninstall:
 	@echo "uninstalling demo resources..."
 	@kubectl delete -f demo/toystore-demo.yaml --ignore-not-found
+	@kubectl delete -f demo/additional-demos.yaml --ignore-not-found
 	@echo "demo resources removed"
 
 clean: kind-delete
