@@ -8,7 +8,7 @@ import {
   ResponseErrorPanel,
   InfoCard,
 } from '@backstage/core-components';
-import { kuadrantApiKeyRequestUpdatePermission } from '../../permissions';
+import { kuadrantApiKeyRequestUpdateAllPermission } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
 import {
   Button,
@@ -172,7 +172,7 @@ export const ApprovalQueueCard = () => {
     allowed: canUpdateRequests,
     loading: updatePermissionLoading,
     error: updatePermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestUpdatePermission);
+  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateAllPermission);
 
   const { value, loading, error } = useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -319,7 +319,7 @@ export const ApprovalQueueCard = () => {
           Unable to check permissions: {updatePermissionError.message}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Permission: kuadrant.apikeyrequest.update
+          Permission: kuadrant.apikeyrequest.update.all
         </Typography>
         <Typography variant="body2" color="textSecondary">
           Please try again or contact your administrator
@@ -566,9 +566,12 @@ export const ApprovalQueueCard = () => {
   ];
 
   const getTabData = () => {
+    const addIds = (data: APIKeyRequest[]) =>
+      data.map(item => ({ ...item, id: item.metadata.name }));
+
     switch (selectedTab) {
       case 0:
-        return { data: approved, columns: approvedColumns, showSelection: false };
+        return { data: addIds(approved), columns: approvedColumns, showSelection: false };
       case 1:
         // Add tableData.checked to control checkbox state
         const pendingWithSelection = pending.map((row: APIKeyRequest) => {
@@ -583,9 +586,9 @@ export const ApprovalQueueCard = () => {
         });
         return { data: pendingWithSelection, columns: pendingColumns, showSelection: true };
       case 2:
-        return { data: rejected, columns: rejectedColumns, showSelection: false };
+        return { data: addIds(rejected), columns: rejectedColumns, showSelection: false };
       default:
-        return { data: approved, columns: approvedColumns, showSelection: false };
+        return { data: addIds(approved), columns: approvedColumns, showSelection: false };
     }
   };
 

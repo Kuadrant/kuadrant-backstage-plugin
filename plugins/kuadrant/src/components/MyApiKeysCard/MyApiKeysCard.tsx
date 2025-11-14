@@ -2,35 +2,12 @@ import React, { useState } from 'react';
 import { InfoCard, Table, TableColumn, Link } from '@backstage/core-components';
 import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
-import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip } from '@material-ui/core';
+import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem } from '@material-ui/core';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
-
-interface APIKeyRequest {
-  metadata: {
-    name: string;
-    namespace: string;
-    creationTimestamp: string;
-  };
-  spec: {
-    apiName: string;
-    apiNamespace: string;
-    planTier: string;
-    useCase?: string;
-    requestedBy: {
-      userId: string;
-      email?: string;
-    };
-  };
-  status?: {
-    phase: 'Pending' | 'Approved' | 'Rejected';
-    apiKey?: string;
-    apiHostname?: string;
-    reason?: string;
-    reviewedBy?: string;
-    reviewedAt?: string;
-  };
-}
+import MoreVertIcon from '@material-ui/icons/MoreVert';
+import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
+import { APIKeyRequest } from '../../types/api-management';
 
 export const MyApiKeysCard = () => {
   const config = useApi(configApiRef);
@@ -40,10 +17,20 @@ export const MyApiKeysCard = () => {
   const [selectedTab, setSelectedTab] = useState(0);
   const [, setUserId] = useState<string>('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
+  const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
+  const [editDialogState, setEditDialogState] = useState<{ open: boolean; request: APIKeyRequest | null; plans: any[] }>({
+    open: false,
+    request: null,
+    plans: [],
+  });
+  const [refresh, setRefresh] = useState(0);
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
-    setUserId(identity.userEntityRef.split('/')[1] || 'guest');
+    const extractedUserId = identity.userEntityRef.split('/')[1] || 'guest';
+    console.log(`MyApiKeysCard: setting userId from userEntityRef: ${identity.userEntityRef} -> "${extractedUserId}"`);
+    setUserId(extractedUserId);
   }, [identityApi]);
 
   const { value: requests, loading, error } = useAsync(async () => {
@@ -55,7 +42,7 @@ export const MyApiKeysCard = () => {
     }
     const data = await response.json();
     return data.items || [];
-  }, [backendUrl, fetchApi]);
+  }, [backendUrl, fetchApi, refresh]);
 
   if (loading) {
     return (
@@ -88,6 +75,64 @@ export const MyApiKeysCard = () => {
       }
       return newSet;
     });
+  };
+
+  const handleMenuClose = () => {
+    setMenuAnchor(null);
+    setMenuRequest(null);
+  };
+
+  const handleEdit = async () => {
+    if (!menuRequest) return;
+
+    const request = menuRequest;
+    handleMenuClose();
+
+    // Fetch available plans for this API
+    try {
+      const apiProductResponse = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiNamespace}/${request.spec.apiName}`
+      );
+
+      if (apiProductResponse.ok) {
+        const apiProduct = await apiProductResponse.json();
+        const plans = apiProduct.spec?.plans || [];
+        setEditDialogState({ open: true, request, plans });
+      } else {
+        console.error('Failed to fetch API product');
+        setEditDialogState({ open: true, request, plans: [] });
+      }
+    } catch (err) {
+      console.error('Error fetching plans:', err);
+      setEditDialogState({ open: true, request, plans: [] });
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!menuRequest) return;
+
+    const request = menuRequest;
+    handleMenuClose();
+
+    if (!window.confirm('Are you sure you want to delete this request?')) {
+      return;
+    }
+
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}`,
+        { method: 'DELETE' }
+      );
+
+      if (!response.ok) {
+        throw new Error('Failed to delete request');
+      }
+
+      setRefresh(r => r + 1);
+    } catch (err) {
+      console.error('Error deleting request:', err);
+      alert('Failed to delete request');
+    }
   };
 
   const columns: TableColumn<APIKeyRequest>[] = [
@@ -190,8 +235,31 @@ export const MyApiKeysCard = () => {
       title: 'Requested',
       field: 'metadata.creationTimestamp',
       render: (row: APIKeyRequest) => {
+        if (!row.metadata.creationTimestamp) {
+          return <Typography variant="body2">-</Typography>;
+        }
         const date = new Date(row.metadata.creationTimestamp);
-        return date.toLocaleDateString();
+        return <Typography variant="body2">{date.toLocaleDateString()}</Typography>;
+      },
+    },
+    {
+      title: '',
+      render: (row: APIKeyRequest) => {
+        return (
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              e.stopPropagation();
+              const rect = e.currentTarget.getBoundingClientRect();
+              setMenuAnchor({ top: rect.bottom, left: rect.left });
+              setMenuRequest(row);
+            }}
+            aria-controls={menuAnchor ? 'myapikeys-menu' : undefined}
+            aria-haspopup="true"
+          >
+            <MoreVertIcon />
+          </IconButton>
+        );
       },
     },
   ];
@@ -210,44 +278,80 @@ export const MyApiKeysCard = () => {
   };
 
   const tabData = getTabData();
+  const isPending = (row: APIKeyRequest) => !row.status || row.status.phase === 'Pending';
 
   return (
-    <InfoCard
-      title="My API Keys"
-      subheader={`${approvedRequests.length} active, ${pendingRequests.length} pending`}
-    >
-      <Box mb={2}>
-        <Tabs
-          value={selectedTab}
-          onChange={(_, newValue) => setSelectedTab(newValue)}
-          indicatorColor="primary"
-          textColor="primary"
-        >
-          <Tab label={`Active (${approvedRequests.length})`} />
-          <Tab label={`Pending (${pendingRequests.length})`} />
-          <Tab label={`Rejected (${rejectedRequests.length})`} />
-        </Tabs>
-      </Box>
-      {tabData.length === 0 ? (
-        <Box p={3} textAlign="center">
-          <Typography variant="body1" color="textSecondary">
-            {selectedTab === 0 && 'No active API keys. Request access to an API to get started.'}
-            {selectedTab === 1 && 'No pending requests.'}
-            {selectedTab === 2 && 'No rejected requests.'}
-          </Typography>
+    <>
+      <InfoCard
+        title="My API Keys"
+        subheader={`${approvedRequests.length} active, ${pendingRequests.length} pending`}
+      >
+        <Box mb={2}>
+          <Tabs
+            value={selectedTab}
+            onChange={(_, newValue) => setSelectedTab(newValue)}
+            indicatorColor="primary"
+            textColor="primary"
+          >
+            <Tab label={`Active (${approvedRequests.length})`} />
+            <Tab label={`Pending (${pendingRequests.length})`} />
+            <Tab label={`Rejected (${rejectedRequests.length})`} />
+          </Tabs>
         </Box>
-      ) : (
-        <Table
-          options={{
-            paging: tabData.length > 10,
-            pageSize: 10,
-            search: false,
-            toolbar: false,
+        {tabData.length === 0 ? (
+          <Box p={3} textAlign="center">
+            <Typography variant="body1" color="textSecondary">
+              {selectedTab === 0 && 'No active API keys. Request access to an API to get started.'}
+              {selectedTab === 1 && 'No pending requests.'}
+              {selectedTab === 2 && 'No rejected requests.'}
+            </Typography>
+          </Box>
+        ) : (
+          <Table
+            options={{
+              paging: tabData.length > 10,
+              pageSize: 10,
+              search: false,
+              toolbar: false,
+            }}
+            columns={columns}
+            data={tabData.map((item: APIKeyRequest) => ({
+              ...item,
+              id: item.metadata.name,
+            }))}
+          />
+        )}
+      </InfoCard>
+
+      <Menu
+        id="myapikeys-menu"
+        open={Boolean(menuAnchor)}
+        onClose={handleMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={menuAnchor || { top: 0, left: 0 }}
+      >
+        {menuRequest && (() => {
+          const items = [];
+          if (isPending(menuRequest)) {
+            items.push(<MenuItem key="edit" onClick={handleEdit}>Edit</MenuItem>);
+          }
+          items.push(<MenuItem key="delete" onClick={handleDelete}>Delete</MenuItem>);
+          return items;
+        })()}
+      </Menu>
+
+      {editDialogState.request && (
+        <EditAPIKeyRequestDialog
+          open={editDialogState.open}
+          request={editDialogState.request}
+          availablePlans={editDialogState.plans}
+          onClose={() => setEditDialogState({ open: false, request: null, plans: [] })}
+          onSuccess={() => {
+            setEditDialogState({ open: false, request: null, plans: [] });
+            setRefresh(r => r + 1);
           }}
-          columns={columns}
-          data={tabData}
         />
       )}
-    </InfoCard>
+    </>
   );
 };
