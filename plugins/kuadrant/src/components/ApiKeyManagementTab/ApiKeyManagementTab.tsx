@@ -276,6 +276,18 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
     return (
       <Box p={3} bgcolor="background.default" onClick={(e) => e.stopPropagation()}>
+        {request.spec.useCase && (
+          <Box mb={3}>
+            <Typography variant="h6" gutterBottom>
+              Use Case
+            </Typography>
+            <Box p={2} bgcolor="background.paper" borderRadius={1} border="1px solid rgba(0, 0, 0, 0.12)">
+              <Typography variant="body2" style={{ whiteSpace: 'pre-wrap' }}>
+                {request.spec.useCase}
+              </Typography>
+            </Box>
+          </Box>
+        )}
         <Typography variant="h6" gutterBottom>
           Usage Examples
         </Typography>
