@@ -301,7 +301,25 @@ export const MyApiKeysCard = () => {
     }
   };
 
+  const getTabColumns = () => {
+    switch (selectedTab) {
+      case 0: // Active - no Reason
+        return columns.filter(col => col.title !== 'Reason');
+      case 1: // Pending - no Reason, Reviewed By, API Key
+        return columns.filter(col =>
+          col.title !== 'Reason' &&
+          col.title !== 'Reviewed By' &&
+          col.title !== 'API Key'
+        );
+      case 2: // Rejected - no API Key
+        return columns.filter(col => col.title !== 'API Key');
+      default:
+        return columns;
+    }
+  };
+
   const tabData = getTabData();
+  const tabColumns = getTabColumns();
   const isPending = (row: APIKeyRequest) => !row.status || row.status.phase === 'Pending';
 
   return (
@@ -338,7 +356,7 @@ export const MyApiKeysCard = () => {
               search: false,
               toolbar: false,
             }}
-            columns={columns}
+            columns={tabColumns}
             data={tabData.map((item: APIKeyRequest) => ({
               ...item,
               id: item.metadata.name,

@@ -636,6 +636,11 @@ func main() {
     },
   ];
 
+  // Filter columns for pending requests (no Reviewed or Reason)
+  const pendingRequestColumns = requestColumns.filter(
+    col => col.title !== 'Reviewed' && col.title !== 'Reason'
+  );
+
   return (
     <Box p={2}>
       <Grid container spacing={3} direction="column">
@@ -676,7 +681,7 @@ func main() {
                 paging: false,
                 search: false,
               }}
-              columns={requestColumns}
+              columns={pendingRequestColumns}
               data={pendingRequests}
             />
           </Grid>
