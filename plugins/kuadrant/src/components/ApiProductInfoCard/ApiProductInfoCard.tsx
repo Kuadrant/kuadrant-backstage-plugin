@@ -82,6 +82,22 @@ export const ApiProductInfoCard = () => {
                 </Box>
               )}
             </Box>
+            <Box mt={2}>
+              <Typography variant="body2" component="div">
+                <strong>Approval Mode:</strong>{' '}
+                <Chip
+                  label={(spec.approvalMode || 'manual') === 'automatic' ? 'Automatic' : 'Manual'}
+                  size="small"
+                  color={(spec.approvalMode || 'manual') === 'automatic' ? 'primary' : 'default'}
+                  style={{ marginLeft: 8 }}
+                />
+              </Typography>
+              <Typography variant="caption" color="textSecondary" style={{ marginTop: 4, display: 'block' }}>
+                {(spec.approvalMode || 'manual') === 'automatic'
+                  ? 'API keys are created immediately when requested'
+                  : 'API keys require manual approval before creation'}
+              </Typography>
+            </Box>
           </Box>
         </InfoCard>
       </Grid>
