@@ -158,10 +158,23 @@ export const MyApiKeysCard = () => {
       title: 'Use Case',
       field: 'spec.useCase',
       render: (row: APIKeyRequest) => {
+        if (!row.spec.useCase) {
+          return <Typography variant="body2">-</Typography>;
+        }
         return (
-          <Typography variant="body2">
-            {row.spec.useCase || '-'}
-          </Typography>
+          <Tooltip title={row.spec.useCase} placement="top">
+            <Typography
+              variant="body2"
+              style={{
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.spec.useCase}
+            </Typography>
+          </Tooltip>
         );
       },
     },
@@ -180,9 +193,20 @@ export const MyApiKeysCard = () => {
       render: (row: APIKeyRequest) => {
         if (row.status?.phase === 'Rejected' && row.status.reason) {
           return (
-            <Typography variant="body2" color="error">
-              {row.status.reason}
-            </Typography>
+            <Tooltip title={row.status.reason} placement="top">
+              <Typography
+                variant="body2"
+                color="error"
+                style={{
+                  maxWidth: '200px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                {row.status.reason}
+              </Typography>
+            </Tooltip>
           );
         }
         return <Typography variant="body2" color="textSecondary">-</Typography>;

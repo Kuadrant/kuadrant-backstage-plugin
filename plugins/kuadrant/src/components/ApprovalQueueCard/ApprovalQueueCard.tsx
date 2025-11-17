@@ -22,6 +22,7 @@ import {
   Box,
   Tabs,
   Tab,
+  Tooltip,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
@@ -54,7 +55,15 @@ const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalD
             <p><strong>User:</strong> {request.spec.requestedBy.userId}</p>
             <p><strong>API:</strong> {request.spec.apiName}</p>
             <p><strong>Plan:</strong> {request.spec.planTier}</p>
-            <p><strong>Use Case:</strong> {request.spec.useCase || '-'}</p>
+            <Box mb={2}>
+              <Typography variant="body2" component="span" style={{ fontWeight: 'bold' }}>
+                Use Case:
+              </Typography>
+              {' '}
+              <Typography variant="body2" component="span" style={{ whiteSpace: 'pre-wrap' }}>
+                {request.spec.useCase || '-'}
+              </Typography>
+            </Box>
             <TextField
               label="Comment (optional)"
               multiline
@@ -377,11 +386,26 @@ export const ApprovalQueueCard = () => {
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row) => (
-        <Typography variant="body2" style={{ maxWidth: 200 }} noWrap title={row.spec.useCase}>
-          {row.spec.useCase || '-'}
-        </Typography>
-      ),
+      render: (row) => {
+        if (!row.spec.useCase) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        return (
+          <Tooltip title={row.spec.useCase} placement="top">
+            <Typography
+              variant="body2"
+              style={{
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.spec.useCase}
+            </Typography>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Requested',
@@ -557,11 +581,26 @@ export const ApprovalQueueCard = () => {
     {
       title: 'Reason',
       field: 'status.reason',
-      render: (row) => (
-        <Typography variant="body2" style={{ maxWidth: 200 }} noWrap title={row.status?.reason}>
-          {row.status?.reason || '-'}
-        </Typography>
-      ),
+      render: (row) => {
+        if (!row.status?.reason) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        return (
+          <Tooltip title={row.status.reason} placement="top">
+            <Typography
+              variant="body2"
+              style={{
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.status.reason}
+            </Typography>
+          </Tooltip>
+        );
+      },
     },
   ];
 
