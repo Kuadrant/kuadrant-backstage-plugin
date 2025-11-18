@@ -183,10 +183,10 @@ export const ApiProductInfoCard = () => {
                 ))}
               </TableBody>
             </Table>
-            {spec.planPolicyRef && (
+            {spec.targetRef && (
               <Box mt={2}>
                 <Typography variant="caption" color="textSecondary">
-                  Managed by PlanPolicy: <strong>{spec.planPolicyRef.name}</strong> ({spec.planPolicyRef.namespace})
+                  HTTPRoute: <strong>{spec.targetRef.name}</strong>
                 </Typography>
               </Box>
             )}

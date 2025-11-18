@@ -187,23 +187,9 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
-    docsURL: http://api.toystore.com/docs
+    openAPISpecURL: https://raw.githubusercontent.com/Kuadrant/kuadrantctl/main/examples/oas3/petstore.yaml
+    docsURL: https://github.com/Kuadrant/kuadrantctl/blob/main/examples/oas3/petstore.yaml
   contact:
     team: api-owners
     email: api-owners@example.com

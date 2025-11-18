@@ -15,9 +15,10 @@ export interface PlanLimits {
 export interface APIKeySpec {
   apiProductRef: {
     name: string;
+    namespace: string;
   };
   planTier: PlanTier;
-  useCase?: string;
+  useCase: string;
   requestedBy: {
     userId: string;
     email: string;
@@ -26,15 +27,10 @@ export interface APIKeySpec {
 
 export interface APIKeyStatus {
   phase?: RequestPhase;
-  requestedAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
-  reason?: string; // rejection reason or approval comment (also in conditions)
-  apiKey?: string; // the actual API key value (for approved requests)
   apiHostname?: string;
-  apiBasePath?: string;
-  apiDescription?: string;
-  planLimits?: PlanLimits;
+  limits?: PlanLimits;
   secretRef?: {
     name: string;
     key: string;
@@ -71,20 +67,22 @@ export interface Plan {
 
 export interface APIProductSpec {
   displayName: string;
-  description: string;
-  version: string;
+  description?: string;
+  version?: string;
   tags?: string[];
-  planPolicyRef?: {
+  targetRef: {
+    group: string;
+    kind: string;
     name: string;
-    namespace: string;
   };
-  plans: Plan[];
-  publishStatus?: 'Draft' | 'Published';
+  approvalMode: 'automatic' | 'manual';
+  publishStatus: 'Draft' | 'Published';
   documentation?: {
-    openAPISpec?: string;
+    openAPISpecURL?: string;
     swaggerUI?: string;
     docsURL?: string;
     gitRepository?: string;
+    techdocsRef?: string;
   };
   contact?: {
     team?: string;
@@ -95,6 +93,12 @@ export interface APIProductSpec {
 }
 
 export interface APIProductStatus {
+  observedGeneration?: number;
+  discoveredPlans?: Plan[];
+  openapi?: {
+    raw: string;
+    lastSyncTime: string;
+  };
   conditions?: Array<{
     type: string;
     status: 'True' | 'False' | 'Unknown';
@@ -102,8 +106,6 @@ export interface APIProductStatus {
     message?: string;
     lastTransitionTime?: string;
   }>;
-  planPolicyStatus?: string;
-  lastSyncTime?: string;
 }
 
 export interface APIProduct {

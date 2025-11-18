@@ -21,6 +21,7 @@ interface APIKey {
   spec: {
     apiProductRef: {
       name: string;
+      namespace: string;
     };
     planTier: string;
   };

@@ -579,35 +579,31 @@ After switching roles, restart with `yarn dev`.
 - No accidental exposure of incomplete API products
 - Aligns with typical content publishing workflows
 
-### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
+### Plan Discovery via APIProduct Controller (IMPLEMENTED)
 
 **Context:**
-- APIProduct spec includes plans array that should be discovered from PlanPolicy
-- Full controller implementation not yet available
-- Without plans, API Keys tab shows "no plans available" error
+- APIProduct controller automatically discovers plans from PlanPolicy
+- Plans are written to `status.discoveredPlans` by the controller
+- Controller watches for changes to APIProduct, HTTPRoute, and PlanPolicy resources
 
-**Temporary implementation:**
-- Backend populates `spec.plans` during APIProduct creation
-- Finds PlanPolicy targeting the same HTTPRoute as the APIProduct
-- Copies plans array (tier, description, limits) from PlanPolicy to APIProduct
-- Non-blocking: continues without plans if PlanPolicy lookup fails
+**Controller behaviour:**
+- Finds PlanPolicy targeting the HTTPRoute (or its Gateway parent)
+- Copies plan tiers and limits to `status.discoveredPlans`
+- Sets status conditions:
+  - `Ready`: True when HTTPRoute exists and is accepted by gateway
+  - `PlanPolicyDiscovered`: True when PlanPolicy is found
+- Automatically reconciles when PlanPolicy or HTTPRoute changes
 
-**Changes made:**
-1. Added PlanPolicy lookup in POST `/apiproducts` endpoint
-2. Searches for PlanPolicy with matching `targetRef` (HTTPRoute)
-3. Copies plans from PlanPolicy into APIProduct before creating resource
-4. Wrapped in try-catch to avoid breaking creation if PlanPolicy missing
-
-**Limitations:**
-- Only populates plans at creation time (not updated if PlanPolicy changes)
-- Does not write to status (writes to spec instead, which is acceptable until controller exists)
-- Will be replaced by proper controller that maintains discoveredPlans in status
+**Frontend integration:**
+- `ApiKeyManagementTab` reads from `apiProduct.status.discoveredPlans`
+- Displays helpful error messages from status conditions when plans unavailable
+- Shows specific reason: HTTPRoute not ready vs no PlanPolicy found
 
 **Benefits:**
-- Makes API Keys tab functional immediately
-- Allows developers to request API access with plan selection
-- Provides realistic testing environment for approval workflows
-- No changes needed when controller is implemented (controller will override spec with status)
+- Automatic plan synchronisation when PlanPolicy changes
+- Proper Kubernetes status reporting via conditions
+- No manual backend logic needed for plan population
+- Observability into why plans might be missing
 
 ## Important Notes
 
@@ -985,11 +981,11 @@ APIProducts support two approval modes for API key requests:
 ### Approval Modes
 
 1. **Manual** (default): Requests require explicit approval by API owner
-2. **Automatic**: Requests immediately create API keys without review
+2. **Automatic**: Requests immediately approved by controller
 
 ### Implementation
 
-**CRD field** (`devportal.kuadrant.io_apiproduct.yaml:39-43`):
+**CRD field** (`devportal.kuadrant.io_apiproduct.yaml`):
 ```yaml
 approvalMode:
   type: string
@@ -998,32 +994,28 @@ approvalMode:
   description: Whether access requests are auto-approved or require manual review
 ```
 
-**Frontend** (`CreateAPIProductDialog.tsx:35, 202-214`):
-- Dropdown selector in create form
-- Defaults to manual
-- Includes helper text explaining behaviour
+**Controller logic** (developer-portal-controller):
+- Watches APIKey resources
+- For automatic mode: sets phase to Approved with `reviewedBy: 'system'`
+- Creates Secret with API key when phase is Approved
+- Sets `status.secretRef` pointing to the created Secret
 
-**Backend logic** (`router.ts:509-581`):
-When APIKey is created (POST /requests):
-1. Create APIKey resource in Kubernetes
-2. Fetch associated APIProduct
-3. If `apiProduct.spec.approvalMode === 'automatic'`:
-   - Immediately generate API key
-   - Create Secret in API namespace
-   - Update APIKey status to 'Approved' with `reviewedBy: 'system'`
-4. If manual, request stays in 'Pending' state
+**Backend logic** (`router.ts`):
+- POST /requests: Creates APIKey resource, controller handles the rest
+- POST /requests/:namespace/:name/approve: Sets phase to Approved
+- GET /requests/:namespace/:name/secret: Fetches API key value from Secret
 
 ### User Experience
 
-**Manual mode** (toystore demo):
+**Manual mode**:
 - User requests API access → status: Pending
 - API Owner reviews → clicks approve → status: Approved
-- User sees API key
+- Controller creates Secret → user sees API key
 
 **Automatic mode**:
-- User requests API access → immediately approved
-- User sees API key instantly
-- No approval queue needed
+- User requests API access
+- Controller auto-approves and creates Secret
+- User sees API key
 
 ## Frontend Permission System (2025-11-05)
 
@@ -1044,54 +1036,46 @@ APIKeys are the source of truth for API keys, not Kubernetes Secrets.
 ### Resource Relationship
 
 ```
-APIKey (CRD)          Secret (Kubernetes)
-├── metadata.name            Created when approved
-├── spec.planTier            annotations:
-├── spec.apiName               - secret.kuadrant.io/plan-id
-├── spec.requestedBy.userId    - secret.kuadrant.io/user-id
-└── status.apiKey            labels:
-                               - app: <apiName>
+APIKey (CRD)                    Secret (Kubernetes)
+├── metadata.name               Created by controller when approved
+├── spec.planTier               Name: {apikey-name}-apikey-secret
+├── spec.apiProductRef.name     annotations:
+├── spec.requestedBy.userId       - secret.kuadrant.io/plan-id
+└── status.secretRef              - secret.kuadrant.io/user-id
+    ├── name                    labels:
+    └── key                       - app: <apiProductName>
+                                  - authorino.kuadrant.io/managed-by: authorino
 ```
+
+**Key points:**
+- Controller creates Secret when APIKey phase is Approved
+- Controller sets OwnerReference on Secret → garbage collected when APIKey deleted
+- `status.secretRef` points to the Secret (name + key)
+- Frontend fetches actual key via GET /requests/:namespace/:name/secret
 
 ### UI Behaviour
 
 **What users see**:
 - Pending Requests - awaiting approval
 - Rejected Requests - denied access
-- API Keys - approved requests showing the key from APIKey.status.apiKey
+- Approved API Keys - click eye icon to reveal key (fetched on demand from Secret)
 
 **What users don't see**:
 - Kubernetes Secrets directly
 - Secret names or metadata
 
+**API key display pattern:**
+- Key hidden by default (shows `••••••••••••`)
+- Click eye icon to fetch from Secret via `GET /requests/:namespace/:name/secret`
+- Click again to hide and clear from memory
+- Fresh fetch every time to avoid caching sensitive data
+
 ### Deletion Flow
 
-When user deletes an approved API key (`router.ts:905-930`):
-1. Backend finds matching Secret by annotations:
-   - `secret.kuadrant.io/user-id` === requestUserId
-   - `secret.kuadrant.io/plan-id` === planTier
-   - `app` label === apiName
-2. Deletes Secret from API namespace
-3. Deletes APIKey resource
-4. Both disappear from Kubernetes
-
-### Why Secrets Aren't Listed
-
-**Problem**: Previously showed two sections:
-- "Approved Requests" (from APIKeys)
-- "API Keys (from Secrets)" (from Kubernetes Secrets)
-
-Deleting a Secret left the APIKey, showing duplicate/stale data.
-
-**Solution**:
-- UI only shows APIKeys (single source of truth)
-- Secrets are implementation details managed by backend
-- Delete button on approved requests triggers both deletions
-
-**Removed code**:
-- `GET /apikeys` endpoint (no longer called)
-- Secret fetching in `ApiKeyManagementTab.tsx`
-- "API Keys (from Secrets)" table component
+When user deletes an approved API key:
+1. Backend deletes APIKey resource
+2. Controller's OwnerReference causes Secret to be garbage collected
+3. Both disappear from Kubernetes
 
 ## Delete Confirmation Patterns
 

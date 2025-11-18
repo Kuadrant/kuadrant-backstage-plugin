@@ -80,6 +80,10 @@ jobs:
           cd e2e-tests
           yarn playwright install --with-deps chromium
 
+      # TEMPORARY: clone controller until it's published to a registry
+      - name: Clone developer-portal-controller
+        run: git clone https://github.com/Kuadrant/developer-portal-controller.git ../developer-portal-controller
+
       - name: Create kind cluster
         uses: helm/kind-action@v1
         with:
@@ -91,7 +95,7 @@ jobs:
           cd kuadrant-dev-setup
           kubectl apply -f rbac/rhdh-rbac.yaml
           ./scripts/kube-env-setup.sh
-          make kuadrant-install
+          make kuadrant-install CLUSTER_NAME=kuadrant-test
           make demo-install
           cd ..
 

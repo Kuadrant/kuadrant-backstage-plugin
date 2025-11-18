@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useApi, fetchApiRef, identityApiRef, configApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { useAsync } from 'react-use';
 import {
@@ -16,7 +16,6 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
   Chip,
   Typography,
   Box,
@@ -39,23 +38,10 @@ interface ApprovalDialogProps {
   action: 'approve' | 'reject';
   processing: boolean;
   onClose: () => void;
-  onConfirm: (comment: string) => void;
+  onConfirm: () => void;
 }
 
 const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm }: ApprovalDialogProps) => {
-  const [comment, setComment] = useState('');
-
-  // reset comment when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setComment('');
-    }
-  }, [open]);
-
-  const handleConfirm = () => {
-    onConfirm(comment);
-  };
-
   const actionLabel = action === 'approve' ? 'Approve' : 'Reject';
   const processingLabel = action === 'approve' ? 'Approving...' : 'Rejecting...';
 
@@ -79,23 +65,13 @@ const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm 
                 {request.spec.useCase || '-'}
               </Typography>
             </Box>
-            <TextField
-              label="Comment (optional)"
-              multiline
-              rows={3}
-              fullWidth
-              margin="normal"
-              value={comment}
-              onChange={(e) => setComment(e.target.value)}
-              disabled={processing}
-            />
           </>
         )}
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={processing}>Cancel</Button>
         <Button
-          onClick={handleConfirm}
+          onClick={onConfirm}
           color={action === 'approve' ? 'primary' : 'secondary'}
           variant="contained"
           disabled={processing}
@@ -114,23 +90,10 @@ interface BulkActionDialogProps {
   action: 'approve' | 'reject';
   processing: boolean;
   onClose: () => void;
-  onConfirm: (comment: string) => void;
+  onConfirm: () => void;
 }
 
 const BulkActionDialog = ({ open, requests, action, processing, onClose, onConfirm }: BulkActionDialogProps) => {
-  const [comment, setComment] = useState('');
-
-  // reset comment when dialog closes
-  useEffect(() => {
-    if (!open) {
-      setComment('');
-    }
-  }, [open]);
-
-  const handleConfirm = () => {
-    onConfirm(comment);
-  };
-
   const isApprove = action === 'approve';
   const actionLabel = isApprove ? 'Approve All' : 'Reject All';
   const processingLabel = isApprove ? 'Approving...' : 'Rejecting...';
@@ -153,21 +116,11 @@ const BulkActionDialog = ({ open, requests, action, processing, onClose, onConfi
             </Box>
           ))}
         </Box>
-        <TextField
-          label="Comment (optional)"
-          multiline
-          fullWidth
-          margin="normal"
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          helperText={`This comment will be applied to all ${isApprove ? 'approved' : 'rejected'} requests`}
-          disabled={processing}
-        />
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={processing}>Cancel</Button>
         <Button
-          onClick={handleConfirm}
+          onClick={onConfirm}
           color={isApprove ? 'primary' : 'secondary'}
           variant="contained"
           disabled={processing}
@@ -267,7 +220,7 @@ export const ApprovalQueueCard = () => {
       for (const product of apiProductsData.items || []) {
         const owner = product.metadata?.annotations?.['backstage.io/owner'];
         if (owner === reviewedBy) {
-          // key is namespace/name to match against request's apiNamespace/apiName
+          // key is namespace/name to match against request's namespace/apiProductRef.name
           ownedApiProducts.add(`${product.metadata.namespace}/${product.metadata.name}`);
         }
       }
@@ -307,7 +260,7 @@ export const ApprovalQueueCard = () => {
     setDialogState({ open: true, request, action: 'reject', processing: false });
   };
 
-  const handleConfirm = async (comment: string) => {
+  const handleConfirm = async () => {
     if (!dialogState.request || !value) return;
 
     setDialogState(prev => ({ ...prev, processing: true }));
@@ -321,7 +274,6 @@ export const ApprovalQueueCard = () => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          comment,
           reviewedBy: value.reviewedBy,
         }),
       });
@@ -351,7 +303,7 @@ export const ApprovalQueueCard = () => {
     setBulkDialogState({ open: true, requests: selectedRequests, action: 'reject', processing: false });
   };
 
-  const handleBulkConfirm = async (comment: string) => {
+  const handleBulkConfirm = async () => {
     if (!value || bulkDialogState.requests.length === 0) return;
 
     setBulkDialogState(prev => ({ ...prev, processing: true }));
@@ -370,7 +322,6 @@ export const ApprovalQueueCard = () => {
             namespace: r.metadata.namespace,
             name: r.metadata.name,
           })),
-          comment,
           reviewedBy: value.reviewedBy,
         }),
       });
@@ -488,10 +439,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'status.requestedAt',
+      field: 'metadata.creationTimestamp',
       render: (row) => (
         <Typography variant="body2">
-          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
+          {row.metadata.creationTimestamp ? formatDate(row.metadata.creationTimestamp) : '-'}
         </Typography>
       ),
     },
@@ -562,10 +513,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'status.requestedAt',
+      field: 'metadata.creationTimestamp',
       render: (row) => (
         <Typography variant="body2">
-          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
+          {row.metadata.creationTimestamp ? formatDate(row.metadata.creationTimestamp) : '-'}
         </Typography>
       ),
     },
@@ -636,10 +587,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'status.requestedAt',
+      field: 'metadata.creationTimestamp',
       render: (row) => (
         <Typography variant="body2">
-          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
+          {row.metadata.creationTimestamp ? formatDate(row.metadata.creationTimestamp) : '-'}
         </Typography>
       ),
     },
@@ -660,30 +611,6 @@ export const ApprovalQueueCard = () => {
           {row.status?.reviewedBy || '-'}
         </Typography>
       ),
-    },
-    {
-      title: 'Reason',
-      field: 'status.reason',
-      render: (row) => {
-        if (!row.status?.reason) {
-          return <Typography variant="body2">-</Typography>;
-        }
-        return (
-          <Tooltip title={row.status.reason} placement="top">
-            <Typography
-              variant="body2"
-              style={{
-                maxWidth: '200px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {row.status.reason}
-            </Typography>
-          </Tooltip>
-        );
-      },
     },
   ];
 
