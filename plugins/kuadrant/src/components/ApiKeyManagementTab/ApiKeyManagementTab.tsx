@@ -26,6 +26,7 @@ import {
   Tabs,
   Tab,
   Menu,
+  Tooltip,
 } from '@material-ui/core';
 import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
@@ -276,6 +277,25 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
 
     return (
       <Box p={3} bgcolor="background.default" onClick={(e) => e.stopPropagation()}>
+        {request.spec.useCase && (
+          <Box mb={3}>
+            <Typography variant="h6" gutterBottom>
+              Use Case
+            </Typography>
+            <Box p={2} bgcolor="background.paper" borderRadius={1} border="1px solid rgba(0, 0, 0, 0.12)">
+              <Typography
+                variant="body2"
+                style={{
+                  whiteSpace: 'pre-wrap',
+                  wordBreak: 'break-word',
+                  overflowWrap: 'break-word',
+                }}
+              >
+                {request.spec.useCase}
+              </Typography>
+            </Box>
+          </Box>
+        )}
         <Typography variant="h6" gutterBottom>
           Usage Examples
         </Typography>
@@ -520,9 +540,26 @@ func main() {
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row: APIKeyRequest) => (
-        <Typography variant="body2">{row.spec.useCase || '-'}</Typography>
-      ),
+      render: (row: APIKeyRequest) => {
+        if (!row.spec.useCase) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        return (
+          <Tooltip title={row.spec.useCase} placement="top">
+            <Typography
+              variant="body2"
+              style={{
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.spec.useCase}
+            </Typography>
+          </Tooltip>
+        );
+      },
     },
     {
       title: 'Requested',
@@ -548,9 +585,26 @@ func main() {
     {
       title: 'Reason',
       field: 'status.reason',
-      render: (row: APIKeyRequest) => (
-        <Typography variant="body2">{row.status?.reason || '-'}</Typography>
-      ),
+      render: (row: APIKeyRequest) => {
+        if (!row.status?.reason) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        return (
+          <Tooltip title={row.status.reason} placement="top">
+            <Typography
+              variant="body2"
+              style={{
+                maxWidth: '200px',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {row.status.reason}
+            </Typography>
+          </Tooltip>
+        );
+      },
     },
     {
       title: '',
@@ -581,6 +635,11 @@ func main() {
       },
     },
   ];
+
+  // Filter columns for pending requests (no Reviewed or Reason)
+  const pendingRequestColumns = requestColumns.filter(
+    col => col.title !== 'Reviewed' && col.title !== 'Reason'
+  );
 
   return (
     <Box p={2}>
@@ -622,7 +681,7 @@ func main() {
                 paging: false,
                 search: false,
               }}
-              columns={requestColumns}
+              columns={pendingRequestColumns}
               data={pendingRequests}
             />
           </Grid>
