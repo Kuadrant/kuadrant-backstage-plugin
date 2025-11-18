@@ -52,10 +52,20 @@ interface APIProduct {
     namespace: string;
   };
   spec: {
-    plans?: Array<{
+    displayName?: string;
+  };
+  status?: {
+    discoveredPlans?: Array<{
       tier: string;
       description?: string;
       limits?: any;
+    }>;
+    conditions?: Array<{
+      type: string;
+      status: 'True' | 'False' | 'Unknown';
+      reason?: string;
+      message?: string;
+      lastTransitionTime?: string;
     }>;
   };
 }
@@ -433,7 +443,7 @@ func main() {
   }
 
   const myRequests = (requests || []) as APIKeyRequest[];
-  const plans = (apiProduct?.spec?.plans || []) as Plan[];
+  const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
@@ -658,7 +668,18 @@ func main() {
               </Button>
               {plans.length === 0 && (
                 <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-                  {!apiProduct ? 'API product not found' : 'No plans available'}
+                  {!apiProduct ? 'API product not found' : (() => {
+                    const readyCondition = apiProduct.status?.conditions?.find(c => c.type === 'Ready');
+                    const planCondition = apiProduct.status?.conditions?.find(c => c.type === 'PlanPolicyDiscovered');
+
+                    if (readyCondition?.status !== 'True') {
+                      return `HTTPRoute not ready: ${readyCondition?.message || 'unknown'}`;
+                    }
+                    if (planCondition?.status !== 'True') {
+                      return `No plans discovered: ${planCondition?.message || 'no PlanPolicy found'}`;
+                    }
+                    return 'No plans available';
+                  })()}
                 </Typography>
               )}
             </Box>
