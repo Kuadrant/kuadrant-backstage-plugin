@@ -579,35 +579,31 @@ After switching roles, restart with `yarn dev`.
 - No accidental exposure of incomplete API products
 - Aligns with typical content publishing workflows
 
-### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
+### Plan Discovery via APIProduct Controller (IMPLEMENTED)
 
 **Context:**
-- APIProduct spec includes plans array that should be discovered from PlanPolicy
-- Full controller implementation not yet available
-- Without plans, API Keys tab shows "no plans available" error
+- APIProduct controller automatically discovers plans from PlanPolicy
+- Plans are written to `status.discoveredPlans` by the controller
+- Controller watches for changes to APIProduct, HTTPRoute, and PlanPolicy resources
 
-**Temporary implementation:**
-- Backend populates `spec.plans` during APIProduct creation
-- Finds PlanPolicy targeting the same HTTPRoute as the APIProduct
-- Copies plans array (tier, description, limits) from PlanPolicy to APIProduct
-- Non-blocking: continues without plans if PlanPolicy lookup fails
+**Controller behaviour:**
+- Finds PlanPolicy targeting the HTTPRoute (or its Gateway parent)
+- Copies plan tiers and limits to `status.discoveredPlans`
+- Sets status conditions:
+  - `Ready`: True when HTTPRoute exists and is accepted by gateway
+  - `PlanPolicyDiscovered`: True when PlanPolicy is found
+- Automatically reconciles when PlanPolicy or HTTPRoute changes
 
-**Changes made:**
-1. Added PlanPolicy lookup in POST `/apiproducts` endpoint
-2. Searches for PlanPolicy with matching `targetRef` (HTTPRoute)
-3. Copies plans from PlanPolicy into APIProduct before creating resource
-4. Wrapped in try-catch to avoid breaking creation if PlanPolicy missing
-
-**Limitations:**
-- Only populates plans at creation time (not updated if PlanPolicy changes)
-- Does not write to status (writes to spec instead, which is acceptable until controller exists)
-- Will be replaced by proper controller that maintains discoveredPlans in status
+**Frontend integration:**
+- `ApiKeyManagementTab` reads from `apiProduct.status.discoveredPlans`
+- Displays helpful error messages from status conditions when plans unavailable
+- Shows specific reason: HTTPRoute not ready vs no PlanPolicy found
 
 **Benefits:**
-- Makes API Keys tab functional immediately
-- Allows developers to request API access with plan selection
-- Provides realistic testing environment for approval workflows
-- No changes needed when controller is implemented (controller will override spec with status)
+- Automatic plan synchronisation when PlanPolicy changes
+- Proper Kubernetes status reporting via conditions
+- No manual backend logic needed for plan population
+- Observability into why plans might be missing
 
 ## Important Notes
 
