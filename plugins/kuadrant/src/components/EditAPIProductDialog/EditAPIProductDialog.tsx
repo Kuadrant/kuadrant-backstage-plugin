@@ -61,7 +61,13 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
       setError('');
 
       fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`)
-        .then(res => res.json())
+        .then(async res => {
+          if (!res.ok) {
+            const errorData = await res.json();
+            throw new Error(errorData.error || `Failed to fetch API product: ${res.status}`);
+          }
+          return res.json();
+        })
         .then(data => {
           setDisplayName(data.spec.displayName || '');
           setDescription(data.spec.description || '');
@@ -77,7 +83,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           setLoading(false);
         })
         .catch(err => {
-          setError(err.message || 'Failed to load API Product');
+          setError(err.message || 'Failed to load API product');
           setLoading(false);
         });
     }

@@ -22,6 +22,12 @@ export const ApiProductInfoCard = () => {
     const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`
     );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch API product: ${response.status}`);
+    }
+
     return await response.json();
   }, [backendUrl, fetchApi, namespace, apiProductName]);
 
