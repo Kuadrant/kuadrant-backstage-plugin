@@ -1,6 +1,6 @@
 ---
 # owner1's payment api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-payment-api
@@ -23,22 +23,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium payment processing with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard payment processing with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic payment processing with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team
@@ -46,7 +32,7 @@ spec:
     slack: "#owner1-support"
 ---
 # owner1's inventory api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-inventory-api
@@ -69,22 +55,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium inventory access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard inventory access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic inventory access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team
@@ -92,7 +64,7 @@ spec:
     slack: "#owner1-support"
 ---
 # owner2's shipping api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner2-shipping-api
@@ -115,22 +87,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium shipping access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard shipping access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic shipping access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner2-team
@@ -138,7 +96,7 @@ spec:
     slack: "#owner2-support"
 ---
 # owner2's customer api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner2-customer-api
@@ -161,22 +119,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium customer access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard customer access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic customer access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner2-team
@@ -184,7 +128,7 @@ spec:
     slack: "#owner2-support"
 ---
 # admin's analytics api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: admin-analytics-api
@@ -207,22 +151,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium analytics access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard analytics access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic analytics access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: admin-team
@@ -230,7 +160,7 @@ spec:
     slack: "#admin-support"
 ---
 # draft api (not visible in catalog)
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-draft-api
@@ -253,22 +183,8 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
+    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team

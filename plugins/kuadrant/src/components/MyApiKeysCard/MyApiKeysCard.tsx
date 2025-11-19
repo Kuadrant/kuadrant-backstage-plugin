@@ -91,7 +91,7 @@ export const MyApiKeysCard = () => {
     // Fetch available plans for this API
     try {
       const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiNamespace}/${request.spec.apiName}`
+        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiProductRef.namespace}/${request.spec.apiProductRef.name}`
       );
 
       if (apiProductResponse.ok) {
@@ -138,10 +138,10 @@ export const MyApiKeysCard = () => {
   const columns: TableColumn<APIKeyRequest>[] = [
     {
       title: 'API Product',
-      field: 'spec.apiName',
+      field: 'spec.apiProductRef.name',
       render: (row: APIKeyRequest) => (
-        <Link to={`/catalog/default/api/${row.spec.apiName}/api-keys`}>
-          <strong>{row.spec.apiName}</strong>
+        <Link to={`/catalog/default/api/${row.spec.apiProductRef.name}/api-keys`}>
+          <strong>{row.spec.apiProductRef.name}</strong>
         </Link>
       ),
     },
