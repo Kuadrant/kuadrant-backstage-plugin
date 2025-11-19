@@ -13,15 +13,16 @@ export interface PlanLimits {
 }
 
 export interface APIKeyRequestSpec {
-  apiName: string;
-  apiNamespace: string;
+  apiProductRef: {
+    name: string;
+    namespace: string;
+  };
   planTier: PlanTier;
   useCase?: string;
   requestedBy: {
     userId: string;
     email: string;
   };
-  requestedAt?: string;
 }
 
 export interface APIKeyRequestStatus {
@@ -47,8 +48,8 @@ export interface APIKeyRequestStatus {
 }
 
 export interface APIKeyRequest {
-  apiVersion: 'extensions.kuadrant.io/v1alpha1';
-  kind: 'APIKeyRequest';
+  apiVersion: 'devportal.kuadrant.io/v1alpha1';
+  kind: 'APIKey';
   metadata: {
     name: string;
     namespace: string;
