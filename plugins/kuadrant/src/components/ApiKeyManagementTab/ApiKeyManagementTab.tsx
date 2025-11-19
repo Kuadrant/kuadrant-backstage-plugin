@@ -120,7 +120,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     const data = await response.json();
     // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
+      (r: APIKeyRequest) => r.spec.apiProductRef.name === apiProductName && r.spec.apiProductRef.namespace === namespace
     );
   }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
@@ -573,10 +573,10 @@ func main() {
     },
     {
       title: 'Requested',
-      field: 'spec.requestedAt',
+      field: 'metadata.creationTimestamp',
       render: (row: APIKeyRequest) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? new Date(row.spec.requestedAt).toLocaleDateString() : '-'}
+          {row.metadata.creationTimestamp ? new Date(row.metadata.creationTimestamp).toLocaleDateString() : '-'}
         </Typography>
       ),
     },
@@ -669,8 +669,8 @@ func main() {
               {plans.length === 0 && (
                 <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
                   {!apiProduct ? 'API product not found' : (() => {
-                    const readyCondition = apiProduct.status?.conditions?.find(c => c.type === 'Ready');
-                    const planCondition = apiProduct.status?.conditions?.find(c => c.type === 'PlanPolicyDiscovered');
+                    const readyCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'Ready');
+                    const planCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'PlanPolicyDiscovered');
 
                     if (readyCondition?.status !== 'True') {
                       return `HTTPRoute not ready: ${readyCondition?.message || 'unknown'}`;
