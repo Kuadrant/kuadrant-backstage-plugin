@@ -42,6 +42,12 @@ interface APIProduct {
       slack?: string;
     };
   };
+  status: {
+    openapi?: {
+      raw?: string;
+      lastSyncTime?: string;
+    };
+  }
 }
 
 export class APIProductEntityProvider implements EntityProvider {
@@ -143,7 +149,7 @@ export class APIProductEntityProvider implements EntityProvider {
     const tags = product.spec.tags || [];
 
     // OpenAPI spec URL
-    const definition = product.spec.documentation?.openAPISpec ? `$openapi: ${product.spec.documentation.openAPISpec}`
+    const definition = product.status.openapi?.raw ? `${product.status.openapi.raw}`
       : `# no openapi spec configured
       openapi: 3.0.0
       info:
