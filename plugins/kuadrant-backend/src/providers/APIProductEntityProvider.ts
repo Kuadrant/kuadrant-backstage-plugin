@@ -42,6 +42,12 @@ interface APIProduct {
       slack?: string;
     };
   };
+  status: {
+    openapi?: {
+      raw?: string;
+      lastSyncTime?: string;
+    };
+  }
 }
 
 export class APIProductEntityProvider implements EntityProvider {
@@ -142,6 +148,16 @@ export class APIProductEntityProvider implements EntityProvider {
     // build tags from product tags
     const tags = product.spec.tags || [];
 
+    // OpenAPI spec URL
+    const definition = product.status.openapi?.raw ? `${product.status.openapi.raw}`
+      : `# no openapi spec configured
+      openapi: 3.0.0
+      info:
+        title: ${displayName}
+        version: ${product.spec.version || '1.0.0'}
+        description: ${description}
+    `;
+
     // create entity with proper backstage structure
     const entity: ApiEntity = {
       apiVersion: 'backstage.io/v1alpha1',
@@ -188,9 +204,7 @@ export class APIProductEntityProvider implements EntityProvider {
         type: 'openapi',
         lifecycle,
         owner,
-        definition: product.spec.documentation?.openAPISpec
-          ? `# openapi spec available at: ${product.spec.documentation.openAPISpec}\n\nopenapi: 3.0.0\ninfo:\n  title: ${displayName}\n  version: ${product.spec.version || '1.0.0'}\n  description: ${description}\n`
-          : `# no openapi spec configured\n\nopenapi: 3.0.0\ninfo:\n  title: ${displayName}\n  version: ${product.spec.version || '1.0.0'}\n  description: ${description}\n`,
+        definition: definition,
       },
     };
 
