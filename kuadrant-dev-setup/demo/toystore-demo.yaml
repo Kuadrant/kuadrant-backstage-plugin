@@ -171,6 +171,10 @@ kind: APIProduct
 metadata:
   name: toystore-api
   namespace: toystore
+  annotations:
+    backstage.io/created-by-user-id: guest
+    backstage.io/created-by-user-ref: user:default/guest
+    backstage.io/created-at: "2025-01-01T00:00:00Z"
 spec:
   displayName: Toystore API
   description: simple toy store api for demonstration

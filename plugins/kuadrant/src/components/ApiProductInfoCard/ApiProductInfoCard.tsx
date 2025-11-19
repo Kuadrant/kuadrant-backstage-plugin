@@ -1,18 +1,30 @@
 import React from 'react';
 import { useEntity } from '@backstage/plugin-catalog-react';
-import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import { InfoCard, Link, Progress, ResponseErrorPanel } from '@backstage/core-components';
 import { Grid, Chip, Typography, Box, Table, TableBody, TableCell, TableHead, TableRow } from '@material-ui/core';
 import useAsync from 'react-use/lib/useAsync';
+import { useKuadrantPermission } from '../../utils/permissions';
+import { kuadrantApiProductReadAllPermission } from '../../permissions';
 
 export const ApiProductInfoCard = () => {
   const { entity } = useEntity();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
+
+  const { allowed: canReadAll, loading: permLoading } = useKuadrantPermission(
+    kuadrantApiProductReadAllPermission
+  );
 
   const namespace = entity.metadata.annotations?.['kuadrant.io/namespace'];
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'];
+
+  const { value: currentUserId } = useAsync(async () => {
+    const identity = await identityApi.getBackstageIdentity();
+    return identity.userEntityRef.split('/')[1] || 'guest';
+  }, [identityApi]);
 
   const { value: apiProduct, loading, error } = useAsync(async () => {
     if (!namespace || !apiProductName) {
@@ -22,8 +34,18 @@ export const ApiProductInfoCard = () => {
     const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`
     );
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || `Failed to fetch API product: ${response.status}`);
+    }
+
     return await response.json();
   }, [backendUrl, fetchApi, namespace, apiProductName]);
+
+  // check if user has permission to view this api product
+  const ownerUserId = apiProduct?.metadata?.annotations?.['backstage.io/created-by-user-id'];
+  const canView = canReadAll || (currentUserId && ownerUserId === currentUserId);
 
   if (!namespace || !apiProductName) {
     return (
@@ -33,10 +55,36 @@ export const ApiProductInfoCard = () => {
     );
   }
 
-  if (loading) {
+  if (loading || permLoading) {
     return (
       <InfoCard title="API Product Information">
         <Progress />
+      </InfoCard>
+    );
+  }
+
+  // show permission message if user doesn't have permission
+  if (apiProduct && !canView) {
+    return (
+      <InfoCard title="API Product Information">
+        <Box p={2}>
+          <Typography variant="body2" color="textSecondary">
+            You don't have permission to view this API product's details. Only the API owner or users with admin permissions can view this information.
+          </Typography>
+        </Box>
+      </InfoCard>
+    );
+  }
+
+  // also show permission message if we got a permission error from the backend
+  if (error && error.message.includes('you can only read your own')) {
+    return (
+      <InfoCard title="API Product Information">
+        <Box p={2}>
+          <Typography variant="body2" color="textSecondary">
+            You don't have permission to view this API product's details. Only the API owner or users with admin permissions can view this information.
+          </Typography>
+        </Box>
       </InfoCard>
     );
   }

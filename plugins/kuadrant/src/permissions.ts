@@ -49,26 +49,74 @@ export const kuadrantPlanPolicyListPermission = createPermission({
 });
 
 // apiproduct permissions
+
+/**
+ * permission to create new API products
+ * granted to api owners and admins
+ */
 export const kuadrantApiProductCreatePermission = createPermission({
   name: 'kuadrant.apiproduct.create',
   attributes: { action: 'create' },
 });
 
-export const kuadrantApiProductReadPermission = createPermission({
-  name: 'kuadrant.apiproduct.read',
+/**
+ * permission to read API products owned by the current user
+ * for api owners to view their own products
+ */
+export const kuadrantApiProductReadOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.read.own',
   attributes: { action: 'read' },
 });
 
-export const kuadrantApiProductUpdatePermission = createPermission({
-  name: 'kuadrant.apiproduct.update',
+/**
+ * permission to read all API products regardless of ownership
+ * for platform engineers/admins who need to view all products
+ */
+export const kuadrantApiProductReadAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.read.all',
+  attributes: { action: 'read' },
+});
+
+/**
+ * permission to update API products owned by the current user
+ * for api owners to modify their own products
+ */
+export const kuadrantApiProductUpdateOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.update.own',
   attributes: { action: 'update' },
 });
 
-export const kuadrantApiProductDeletePermission = createPermission({
-  name: 'kuadrant.apiproduct.delete',
+/**
+ * permission to update any API product regardless of ownership
+ * for platform engineers/admins
+ */
+export const kuadrantApiProductUpdateAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.update.all',
+  attributes: { action: 'update' },
+});
+
+/**
+ * permission to delete API products owned by the current user
+ * for api owners to remove their own products
+ */
+export const kuadrantApiProductDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.delete.own',
   attributes: { action: 'delete' },
 });
 
+/**
+ * permission to delete any API product regardless of ownership
+ * for platform engineers/admins
+ */
+export const kuadrantApiProductDeleteAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.delete.all',
+  attributes: { action: 'delete' },
+});
+
+/**
+ * permission to list API products
+ * backend filters results based on .own vs .all read permissions
+ */
 export const kuadrantApiProductListPermission = createPermission({
   name: 'kuadrant.apiproduct.list',
   attributes: { action: 'read' },
@@ -127,6 +175,24 @@ export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
   attributes: { action: 'update' },
 });
 
+/**
+ * permission to delete API key requests created by the current user
+ * allows users to cancel their own pending requests
+ */
+export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apikeyrequest.delete.own',
+  attributes: { action: 'delete' },
+});
+
+/**
+ * permission to delete any API key request regardless of ownership
+ * for platform engineers/admins
+ */
+export const kuadrantApiKeyRequestDeleteAllPermission = createPermission({
+  name: 'kuadrant.apikeyrequest.delete.all',
+  attributes: { action: 'delete' },
+});
+
 export const kuadrantApiKeyRequestListPermission = createPermission({
   name: 'kuadrant.apikeyrequest.list',
   attributes: { action: 'read' },
@@ -177,15 +243,20 @@ export const kuadrantPermissions = [
   kuadrantPlanPolicyDeletePermission,
   kuadrantPlanPolicyListPermission,
   kuadrantApiProductCreatePermission,
-  kuadrantApiProductReadPermission,
-  kuadrantApiProductUpdatePermission,
-  kuadrantApiProductDeletePermission,
+  kuadrantApiProductReadOwnPermission,
+  kuadrantApiProductReadAllPermission,
+  kuadrantApiProductUpdateOwnPermission,
+  kuadrantApiProductUpdateAllPermission,
+  kuadrantApiProductDeleteOwnPermission,
+  kuadrantApiProductDeleteAllPermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
+  kuadrantApiKeyRequestDeleteOwnPermission,
+  kuadrantApiKeyRequestDeleteAllPermission,
   kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,

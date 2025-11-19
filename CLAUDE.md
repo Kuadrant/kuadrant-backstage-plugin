@@ -36,6 +36,13 @@ The Kuadrant plugins enable developer portals for API access management using Ku
 
 ## Backend Security Principles
 
+**When implementing or modifying permissions, RBAC, or access control, refer to [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for:**
+- Complete permission definitions and role capabilities
+- Ownership model and enforcement patterns
+- Backend tiered permission check patterns
+- Frontend permission check examples
+- RBAC configuration and testing
+
 All backend code in `plugins/kuadrant-backend/src/router.ts` must follow these security tenets:
 
 ### 1. Never Trust Client Input
@@ -101,6 +108,8 @@ const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
 **Principle:** Authorization decisions must only use Backstage RBAC permissions, not group membership checks.
 
+**See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for complete permission definitions and enforcement patterns.**
+
 **Implementation:**
 - Check permissions using `permissions.authorize()`
 - Use specific permission objects (create, read, update, delete, etc.)
@@ -159,6 +168,8 @@ const patchSchema = z.object({
 
 **Principle:** When users manage their own resources (API keys, requests), verify ownership before allowing modifications.
 
+**See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for detailed ownership model and tiered permission check patterns.**
+
 **Implementation:**
 - Check `.all` permission first (admin/owner access)
 - If not allowed, check `.own` permission
@@ -194,6 +205,8 @@ if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
 ### 6. Follow Namespace Organisation Pattern
 
 **Principle:** Respect Kuadrant's namespace architecture where all API resources live in the same namespace.
+
+**See "Kuadrant Resource Namespace Organisation" section below for detailed architecture.**
 
 **Implementation:**
 - Never accept `namespace` from client input for resource creation
@@ -402,165 +415,28 @@ test.beforeAll(async ({ }, testInfo) => {
 
 Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `audit-log`, `core`, `navigation`, `api`, `integration`
 
-## RBAC Permission System
+## RBAC and Permissions
 
-The application uses Casbin-based RBAC with two key configuration files that work together:
+**See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for complete RBAC and permissions documentation.**
 
-### Roles
+When implementing or modifying anything related to permissions, roles, or access control, consult the comprehensive guide which covers:
+- All permission definitions (PlanPolicy, APIProduct, APIKeyRequest, API Key)
+- Role definitions (API Consumer, API Owner, API Admin)
+- Ownership model and enforcement patterns
+- Backend security patterns and tiered permission checks
+- Frontend permission checks and UI patterns
+- RBAC configuration files and testing
 
-**API Owner:**
-- can create/update/delete API Products
-- can approve/reject API key requests
-- can view Plan Policies (read-only)
+### Quick Reference
 
-**API Consumer:**
-- can view API Products
-- can request API keys
-- can manage own API keys only
-
-**Platform Engineers:**
-- not a role in this plugin - they manage PlanPolicies directly on the cluster
-- PlanPolicy create/update/delete operations are not exposed via this plugin
-- only read/list permissions for PlanPolicy exist in the plugin
-
-### Configuration Files
-
-**1. `catalog-entities/kuadrant-users.yaml`**
-- defines users and groups in the backstage catalog
-- sets user identity and group membership via `memberOf` field
-- determines which groups a user belongs to
-
-**2. `rbac-policy.csv`**
-- defines permissions for roles and groups using casbin policy format
-- maps groups → roles → specific permissions
-- controls actual access to resources and operations
-- referenced in `app-config.local.yaml` at `permission.rbac.policies-csv-file`
-
-### Permission Flow
-
-```
-user logs in → auth sets userEntityRef (e.g., user:default/guest)
-    ↓
-catalog lookup → finds user's memberOf groups from kuadrant-users.yaml
-    ↓
-rbac-policy.csv → maps groups to roles (e.g., g, group:default/api-owners, role:default/api-owner)
-    ↓
-rbac-policy.csv → grants permissions to roles (e.g., p, role:default/api-owner, kuadrant.apiproduct.create, create, allow)
-    ↓
-user gets all permissions from all their group memberships
-```
-
-### Testing Different Permission Levels
-
-the guest user (default in development) has full admin access. to test restricted permission levels, use these commands:
-
+**Testing Different Roles:**
 ```bash
 yarn user:consumer      # switch to API Consumer
 yarn user:owner         # switch to API Owner
 yarn user:default       # restore default permissions
 ```
 
-after switching roles, restart with `yarn dev`.
-
-alternatively, make the following manual changes:
-
-#### Test as API Consumer (Restricted Access)
-
-**1. edit `catalog-entities/kuadrant-users.yaml`:**
-find the guest user entry and change:
-```yaml
-memberOf: [api-consumers]
-```
-
-**2. optionally edit `rbac-policy.csv`:**
-find the guest user assignment and change:
-```csv
-g, user:default/guest, role:default/api-consumer
-```
-(this is redundant if group membership is set, but keeps direct assignments consistent)
-
-**3. restart the application:**
-```bash
-yarn dev
-```
-
-**4. expected behaviour:**
-- ✅ view api products (browse catalog)
-- ✅ request api keys for apis
-- ✅ view/delete own api keys only
-- ✅ see only "API Products" card on /kuadrant page
-- ❌ no "Plan Policies" card visible
-- ❌ no "Approval Queue" card visible
-- ❌ no "Create API Product" button
-- ❌ no delete buttons on api products
-- ❌ cannot view other users' api keys
-
-#### Test as API Owner (Can Publish APIs)
-
-**1. edit `catalog-entities/kuadrant-users.yaml`:**
-find the guest user entry and change:
-```yaml
-memberOf: [api-owners]
-```
-
-**2. optionally edit `rbac-policy.csv`:**
-find the guest user assignment and change:
-```csv
-g, user:default/guest, role:default/api-owner
-```
-
-**3. restart the application:**
-```bash
-yarn dev
-```
-
-**4. expected behaviour:**
-- ✅ all api-consumer permissions above
-- ✅ see "API Products", "Plan Policies", and "Approval Queue" cards
-- ✅ "Create API Product" button visible
-- ✅ delete buttons on api products
-- ✅ create/update/delete api products
-- ✅ approve/reject api key requests in approval queue
-- ✅ view/delete any api key
-- ✅ view plan policies (read-only)
-- ❌ cannot create/update/delete plan policies (managed on cluster)
-
-#### Restore Default (All Permissions)
-
-**1. edit `catalog-entities/kuadrant-users.yaml`:**
-find the guest user entry and change:
-```yaml
-memberOf: [api-owners, api-consumers]
-```
-
-**2. optionally edit `rbac-policy.csv`:**
-find the guest user assignment and change:
-```csv
-g, user:default/guest, role:default/api-owner
-```
-
-**3. restart the application:**
-```bash
-yarn dev
-```
-
-### Note on Configuration Files
-
-**group membership (primary mechanism):**
-- `catalog-entities/kuadrant-users.yaml` controls which groups a user belongs to
-- this is the primary way to grant permissions
-- requires full application restart to take effect
-
-**direct user-to-role assignments (optional):**
-- `rbac-policy.csv` line 65 can directly assign guest to a role
-- redundant if user is already in a group that maps to that role
-- useful for users not in any groups or for specific overrides
-- hot-reloads due to `policyFileReload: true` in app-config
-
-**admin/superUsers bypass (avoid for testing):**
-- `app-config.local.yaml` defines admin and superUsers in the `permission.rbac` section
-- these users bypass all RBAC checks entirely
-- do not add guest to these lists when testing permissions
+After switching roles, restart with `yarn dev`.
 
 ## Recent Architectural Changes
 
@@ -790,58 +666,21 @@ This allows plugins to work in:
 
 ### Kuadrant RBAC Architecture
 
-The Kuadrant plugin uses a two-layer RBAC model with clear separation of concerns:
+**See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for complete RBAC documentation including:**
+- Two-layer RBAC model (Backstage Portal vs Kuadrant/Gateway Runtime)
+- Per-APIProduct access control with resource references
+- Approval mode (automatic vs manual)
+- All permission definitions and role capabilities
 
-**Layer 1: Backstage RBAC (Portal Access Control)**
-- **Catalog visibility**: Who can see API entities in the catalog
-- **Request creation**: Who can request API keys (with per-APIProduct resource-based permissions)
-- **Approval**: Who can approve/reject access requests
-- **Management**: Who can create/delete APIProducts
+The Kuadrant plugin uses a two-layer RBAC model:
+- **Layer 1 (Backstage)**: Portal access control - who can see/request/approve APIs
+- **Layer 2 (Kuadrant/Gateway)**: Runtime access control - API key validation and rate limiting
 
-**Layer 2: Kuadrant/Gateway RBAC (Runtime Access Control)**
-- **API key validation**: Is this key valid? (AuthPolicy)
-- **Rate limiting**: What limits apply? (PlanPolicy predicate checks plan-id annotation on Secret)
-- **Authentication**: Does request have valid auth? (AuthPolicy validates bearer tokens)
-
-**No overlap** - Backstage controls who gets API keys, Kuadrant/Gateway enforces runtime limits.
-
-**Per-APIProduct Access Control:**
-
-The `kuadrant.apikeyrequest.create` permission supports resource references for fine-grained access control:
-
-```csv
-# Allow all consumers to request any API
-p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
-
-# Restrict specific APIs to specific roles
-p, role:default/partner, kuadrant.apikeyrequest.create, create, allow, apiproduct:toystore/toystore-api
-p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
-```
-
-Backend checks include the resource reference:
-```typescript
-const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
-const decision = await permissions.authorize([{
-  permission: kuadrantApiKeyRequestCreatePermission,
-  resourceRef,
-}], { credentials });
-```
-
-**Approval Mode:**
-
-APIProduct supports `approvalMode: automatic | manual` (defaults to manual):
-- **automatic**: Backstage immediately creates API key Secret when request is made
-- **manual**: API owner must approve request before key is created
-
-This is separate from per-APIProduct access control - approval mode controls workflow, RBAC controls who can even request access.
-
-**Plan Tier Names:**
-
-Plan tier names are **not hardcoded** (gold/silver/bronze) - they are arbitrary strings defined by API owners in the PlanPolicy. The APIProduct CRD syncs plan data (tier names, descriptions, limits) from the PlanPolicy for display in Backstage.
-
-**Why Not Sync PlanPolicy Predicates to Backstage?**
-
-PlanPolicy predicates (CEL expressions) are evaluated by the gateway at runtime, not by Backstage. Backstage should not duplicate Authorino's auth logic. Access control in Backstage is for portal UX (who can see/request APIs), not runtime enforcement (who can call APIs with which rate limits).
+Key security principles:
+- Ownership is immutable (set on creation, cannot be modified)
+- All endpoints use tiered permission checks (`.all` → `.own` → ownership verification)
+- Input validation with explicit whitelists
+- No authentication bypasses
 
 ### Backstage Table detailPanel with Interactive Content
 
@@ -1160,174 +999,15 @@ When APIKeyRequest is created (POST /requests):
 
 ## Frontend Permission System (2025-11-05)
 
-### Overview
+**See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for complete frontend permission documentation including:**
+- Custom `useKuadrantPermission` hook usage
+- Permission error handling patterns
+- Ownership-aware action patterns
+- Component patterns (PermissionGate, button gating, conditional columns)
+- Loading states and empty states
+- Key frontend files and examples
 
-The Kuadrant frontend uses Backstage's permission framework for fine-grained access control. All UI actions (create, delete, approve, etc.) check permissions before rendering buttons/forms.
-
-### Custom Permission Hook
-
-**`src/utils/permissions.ts`** provides `useKuadrantPermission` hook that:
-- Handles both BasicPermission and ResourcePermission types without type bypasses
-- Returns `{ allowed, loading, error }` for proper error handling
-- Eliminates `as any` type casting found in raw `usePermission` usage
-
-**Usage**:
-```typescript
-import { useKuadrantPermission } from '../../utils/permissions';
-import { kuadrantApiProductCreatePermission } from '../../permissions';
-
-const { allowed, loading, error } = useKuadrantPermission(
-  kuadrantApiProductCreatePermission
-);
-
-if (loading) return <Progress />;
-if (error) return <ErrorMessage error={error} />;
-if (!allowed) return null; // hide button
-```
-
-### Permission Error Handling
-
-All components show detailed error messages when permission checks fail:
-```typescript
-if (permissionError) {
-  return (
-    <Box p={2}>
-      <Typography color="error">
-        Unable to check permissions: {permissionError.message}
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        Permission: kuadrant.apiproduct.create
-      </Typography>
-      <Typography variant="body2" color="textSecondary">
-        Please try again or contact your administrator
-      </Typography>
-    </Box>
-  );
-}
-```
-
-This helps users and administrators diagnose permission service failures vs actual permission denial.
-
-### Ownership-Aware Actions
-
-Delete buttons for API keys use ownership checking via `canDeleteResource` helper:
-```typescript
-import { canDeleteResource } from '../../utils/permissions';
-
-// in render
-const canDelete = canDeleteResource(
-  row.spec.requestedBy.userId,  // owner
-  currentUserId,                 // current user
-  canDeleteOwnKey,               // permission to delete own
-  canDeleteAllKeys               // permission to delete all
-);
-
-if (!canDelete) return null;
-```
-
-This prevents showing delete buttons on keys users can't actually delete, avoiding confusing "permission denied" errors.
-
-### ResourcePermission Handling
-
-`kuadrantApiKeyRequestCreatePermission` is a ResourcePermission (scoped to 'apiproduct'). The custom hook handles this automatically:
-
-```typescript
-// frontend - no special handling needed
-const { allowed } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission);
-
-// backend - uses resource reference
-const decision = await permissions.authorize([{
-  permission: kuadrantApiKeyRequestCreatePermission,
-  resourceRef: `apiproduct:${namespace}/${name}`,
-}], { credentials });
-```
-
-### Component Patterns
-
-**1. Page-level access via PermissionGate**:
-```typescript
-export const KuadrantPage = () => (
-  <PermissionGate
-    permission={kuadrantApiProductListPermission}
-    errorMessage="You don't have permission to view the Kuadrant page"
-  >
-    <ResourceList />
-  </PermissionGate>
-);
-```
-
-**2. Action button gating**:
-```typescript
-{canCreateApiProduct && (
-  <Button onClick={() => setCreateDialogOpen(true)}>
-    Create API Product
-  </Button>
-)}
-```
-
-**3. Conditional table columns**:
-```typescript
-{
-  title: 'Actions',
-  render: (row) => {
-    if (!canDelete) return null;
-    return <IconButton onClick={() => handleDelete(row)} />;
-  },
-}
-```
-
-### Permission Documentation
-
-All permissions in `src/permissions.ts` include JSDoc comments explaining:
-- What the permission controls
-- When to use it
-- Whether it's BasicPermission or ResourcePermission
-- The difference between `.own` vs `.all` variants
-
-Example:
-```typescript
-/**
- * permission to delete API keys owned by the current user
- * allows users to revoke their own access
- */
-export const kuadrantApiKeyDeleteOwnPermission = createPermission({
-  name: 'kuadrant.apikey.delete.own',
-  attributes: { action: 'delete' },
-});
-```
-
-### Common Patterns
-
-**Loading states**: Include permission loading in component loading logic:
-```typescript
-const loading = dataLoading || permissionLoading;
-if (loading) return <Progress />;
-```
-
-**Multiple permissions**: Check all permission errors:
-```typescript
-const permissionError = createError || deleteError || updateError;
-if (permissionError) {
-  // show error with failed permission name
-}
-```
-
-**Empty states**: Hide entire sections when users lack permissions:
-```typescript
-{canViewApprovalQueue && (
-  <Grid item>
-    <ApprovalQueueCard />
-  </Grid>
-)}
-```
-
-### Key Files
-
-- `src/utils/permissions.ts` - Custom hook and helper functions
-- `src/permissions.ts` - Permission definitions (must match backend)
-- `src/components/PermissionGate/PermissionGate.tsx` - Page-level access control
-- `src/components/KuadrantPage/KuadrantPage.tsx` - Example of multi-permission component
-- `src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx` - Example of ownership-aware actions
+The Kuadrant frontend uses Backstage's permission framework for fine-grained access control. All UI actions check permissions before rendering buttons/forms.
 
 ## API Key Management Model
 

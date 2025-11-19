@@ -14,17 +14,20 @@ import {
   kuadrantPlanPolicyListPermission,
   kuadrantPlanPolicyReadPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiProductReadPermission,
+  kuadrantApiProductReadOwnPermission,
+  kuadrantApiProductReadAllPermission,
   kuadrantApiProductCreatePermission,
-  kuadrantApiProductDeletePermission,
+  kuadrantApiProductUpdateOwnPermission,
+  kuadrantApiProductUpdateAllPermission,
+  kuadrantApiProductDeleteOwnPermission,
+  kuadrantApiProductDeleteAllPermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
+  kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
-  kuadrantApiProductUpdatePermission,
 } from './permissions';
 
 function generateApiKey(): string {
@@ -85,17 +88,46 @@ export async function createRouter({
     try {
       const credentials = await httpAuth.credentials(req);
 
-      const decision = await permissions.authorize(
+      const listDecision = await permissions.authorize(
         [{ permission: kuadrantApiProductListPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
+      if (listDecision[0].result !== AuthorizeResult.ALLOW) {
         throw new NotAllowedError('unauthorised');
       }
 
+      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
-      res.json(data);
+
+      // check if user has read all permission
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiProductReadAllPermission }],
+        { credentials }
+      );
+
+      if (readAllDecision[0].result === AuthorizeResult.ALLOW) {
+        // admin - return all apiproducts
+        res.json(data);
+      } else {
+        // owner - check read own permission and filter
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiProductReadOwnPermission }],
+          { credentials }
+        );
+
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // filter to only owned apiproducts
+        const ownedItems = (data.items || []).filter((item: any) => {
+          const createdByUserId = item.metadata?.annotations?.['backstage.io/created-by-user-id'];
+          return createdByUserId === userId;
+        });
+
+        res.json({ ...data, items: ownedItems });
+      }
     } catch (error) {
       console.error('error fetching apiproducts:', error);
       if (error instanceof NotAllowedError) {
@@ -109,19 +141,40 @@ export async function createRouter({
   router.get('/apiproducts/:namespace/:name', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);
+      const { namespace, name } = req.params;
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiProductReadPermission }],
+      // try read all permission first (admin)
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiProductReadAllPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
+      if (readAllDecision[0].result !== AuthorizeResult.ALLOW) {
+        // fallback to read own permission
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiProductReadOwnPermission }],
+          { credentials }
+        );
 
-      const { namespace, name } = req.params;
-      const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
-      res.json(data);
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership
+        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const createdByUserId = data.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+        if (createdByUserId !== userId) {
+          throw new NotAllowedError('you can only read your own api products');
+        }
+
+        res.json(data);
+      } else {
+        // admin - read any apiproduct
+        const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        res.json(data);
+      }
     } catch (error) {
       console.error('error fetching apiproduct:', error);
       if (error instanceof NotAllowedError) {
@@ -145,7 +198,7 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userId, userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const apiProduct = req.body;
       const targetRef = apiProduct.spec?.targetRef;
 
@@ -157,11 +210,13 @@ export async function createRouter({
       const namespace = targetRef.namespace;
       apiProduct.metadata.namespace = namespace;
 
-      // set the owner to the authenticated user
-      if (!apiProduct.spec.contact) {
-        apiProduct.spec.contact = {};
+      // set ownership annotations (backstage-specific metadata)
+      if (!apiProduct.metadata.annotations) {
+        apiProduct.metadata.annotations = {};
       }
-      apiProduct.spec.contact.team = `user:default/${userId}`;
+      apiProduct.metadata.annotations['backstage.io/created-by-user-id'] = userId;
+      apiProduct.metadata.annotations['backstage.io/created-by-user-ref'] = userEntityRef;
+      apiProduct.metadata.annotations['backstage.io/created-at'] = new Date().toISOString();
 
       // temporary: populate plans from planpolicy until controller implements this
       // look up httproute and find planpolicy targeting it
@@ -234,17 +289,34 @@ export async function createRouter({
   router.delete('/apiproducts/:namespace/:name', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);
+      const { namespace, name } = req.params;
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiProductDeletePermission }],
+      // try delete all permission first (admin)
+      const deleteAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiProductDeleteAllPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
+      if (deleteAllDecision[0].result !== AuthorizeResult.ALLOW) {
+        // fallback to delete own permission
+        const deleteOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiProductDeleteOwnPermission }],
+          { credentials }
+        );
 
-      const { namespace, name } = req.params;
+        if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership before deleting
+        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const createdByUserId = existing.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+        if (createdByUserId !== userId) {
+          throw new NotAllowedError('you can only delete your own api products');
+        }
+      }
 
       await k8sClient.deleteCustomResource(
         'extensions.kuadrant.io',
@@ -332,16 +404,41 @@ export async function createRouter({
         throw new NotAllowedError('authentication required');
       }
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiProductUpdatePermission }],
+      const { namespace, name } = req.params;
+
+      // try update all permission first (admin)
+      const updateAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiProductUpdateAllPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+      if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+        // fallback to update own permission
+        const updateOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiProductUpdateOwnPermission }],
+          { credentials }
+        );
+
+        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership
+        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const createdByUserId = existing.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+        if (createdByUserId !== userId) {
+          throw new NotAllowedError('you can only update your own api products');
+        }
       }
 
-      const { namespace, name } = req.params;
+      // prevent modification of ownership annotations
+      if (req.body.metadata?.annotations) {
+        delete req.body.metadata.annotations['backstage.io/created-by-user-id'];
+        delete req.body.metadata.annotations['backstage.io/created-by-user-ref'];
+        delete req.body.metadata.annotations['backstage.io/created-at'];
+      }
 
       const updated = await k8sClient.patchCustomResource(
         'extensions.kuadrant.io',
@@ -617,13 +714,24 @@ export async function createRouter({
     try {
       const credentials = await httpAuth.credentials(req);
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestListPermission }],
+      // check if user can read all requests or only own
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestReadAllPermission }],
         { credentials }
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+      const canReadAll = readAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canReadAll) {
+        // try read own permission
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+          { credentials }
+        );
+
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
       }
 
       const status = req.query.status as string;
@@ -637,6 +745,25 @@ export async function createRouter({
       }
 
       let filteredItems = data.items || [];
+
+      // if user only has read.own permission, filter by api product ownership
+      if (!canReadAll) {
+        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+
+        // get all apiproducts owned by this user
+        const apiproducts = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+        const ownedApiProducts = (apiproducts.items || [])
+          .filter((product: any) =>
+            product.metadata.annotations?.['backstage.io/created-by-user-id'] === userId
+          )
+          .map((product: any) => product.metadata.name);
+
+        // filter requests to only those for owned api products
+        filteredItems = filteredItems.filter((req: any) =>
+          ownedApiProducts.includes(req.spec?.apiName)
+        );
+      }
+
       if (status) {
         filteredItems = filteredItems.filter((req: any) => {
           const phase = req.status?.phase || 'Pending';
@@ -708,15 +835,6 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
-        { credentials },
-      );
-
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
-
       const { namespace, name } = req.params;
       const { comment } = parsed.data;
       const reviewedBy = `user:default/${userId}`;
@@ -730,6 +848,40 @@ export async function createRouter({
       );
 
       const spec = request.spec as any;
+
+      // verify user owns/admins the apiproduct this request is for
+      const apiProduct = await k8sClient.getCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        spec.apiNamespace,
+        'apiproducts',
+        spec.apiName,
+      );
+
+      const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+      // try update all permission first (admin)
+      const updateAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        { credentials },
+      );
+
+      if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+        // fallback to update own permission
+        const updateOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          { credentials },
+        );
+
+        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership of the apiproduct
+        if (createdByUserId !== userId) {
+          throw new NotAllowedError('you can only approve requests for your own api products');
+        }
+      }
       const apiKey = generateApiKey();
       const timestamp = Date.now();
       const secretName = `${spec.requestedBy.userId}-${spec.apiName}-${timestamp}`
@@ -852,18 +1004,54 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userId } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
+      const { namespace, name } = req.params;
+      const { comment } = parsed.data;
+      const reviewedBy = `user:default/${userId}`;
+
+      // fetch request to get apiproduct info
+      const request = await k8sClient.getCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeyrequests',
+        name,
+      );
+
+      const spec = request.spec as any;
+
+      // verify user owns/admins the apiproduct this request is for
+      const apiProduct = await k8sClient.getCustomResource(
+        'extensions.kuadrant.io',
+        'v1alpha1',
+        spec.apiNamespace,
+        'apiproducts',
+        spec.apiName,
+      );
+
+      const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+      // try update all permission first (admin)
+      const updateAllDecision = await permissions.authorize(
         [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
         { credentials },
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
-      }
+      if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+        // fallback to update own permission
+        const updateOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          { credentials },
+        );
 
-      const { namespace, name } = req.params;
-      const { comment } = parsed.data;
-      const reviewedBy = `user:default/${userId}`;
+        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+
+        // verify ownership of the apiproduct
+        if (createdByUserId !== userId) {
+          throw new NotAllowedError('you can only reject requests for your own api products');
+        }
+      }
 
       const status = {
         phase: 'Rejected',
@@ -934,6 +1122,40 @@ export async function createRouter({
           );
 
           const spec = request.spec as any;
+
+          // verify user owns/admins the apiproduct this request is for
+          const apiProduct = await k8sClient.getCustomResource(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            spec.apiNamespace,
+            'apiproducts',
+            spec.apiName,
+          );
+
+          const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+          // try update all permission first (admin)
+          const updateAllDecision = await permissions.authorize(
+            [{ permission: kuadrantApiProductUpdateAllPermission }],
+            { credentials },
+          );
+
+          if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+            // fallback to update own permission
+            const updateOwnDecision = await permissions.authorize(
+              [{ permission: kuadrantApiProductUpdateOwnPermission }],
+              { credentials },
+            );
+
+            if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+              throw new NotAllowedError('unauthorised');
+            }
+
+            // verify ownership of the apiproduct
+            if (createdByUserId !== userId) {
+              throw new NotAllowedError('you can only approve requests for your own api products');
+            }
+          }
           const apiKey = generateApiKey();
           const timestamp = Date.now();
           const secretName = `${spec.requestedBy.userId}-${spec.apiName}-${timestamp}`
@@ -1083,6 +1305,51 @@ export async function createRouter({
 
       for (const reqRef of requests) {
         try {
+          // fetch request to get apiproduct info
+          const request = await k8sClient.getCustomResource(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            reqRef.namespace,
+            'apikeyrequests',
+            reqRef.name,
+          );
+
+          const spec = request.spec as any;
+
+          // verify user owns/admins the apiproduct this request is for
+          const apiProduct = await k8sClient.getCustomResource(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            spec.apiNamespace,
+            'apiproducts',
+            spec.apiName,
+          );
+
+          const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+
+          // try update all permission first (admin)
+          const updateAllDecision = await permissions.authorize(
+            [{ permission: kuadrantApiProductUpdateAllPermission }],
+            { credentials },
+          );
+
+          if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
+            // fallback to update own permission
+            const updateOwnDecision = await permissions.authorize(
+              [{ permission: kuadrantApiProductUpdateOwnPermission }],
+              { credentials },
+            );
+
+            if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+              throw new NotAllowedError('unauthorised');
+            }
+
+            // verify ownership of the apiproduct
+            if (createdByUserId !== userId) {
+              throw new NotAllowedError('you can only reject requests for your own api products');
+            }
+          }
+
           const status = {
             phase: 'Rejected',
             reviewedBy,

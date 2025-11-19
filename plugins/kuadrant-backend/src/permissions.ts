@@ -42,18 +42,33 @@ export const kuadrantApiProductCreatePermission = createPermission({
   attributes: { action: 'create' },
 });
 
-export const kuadrantApiProductReadPermission = createPermission({
-  name: 'kuadrant.apiproduct.read',
+export const kuadrantApiProductReadOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.read.own',
   attributes: { action: 'read' },
 });
 
-export const kuadrantApiProductUpdatePermission = createPermission({
-  name: 'kuadrant.apiproduct.update',
+export const kuadrantApiProductReadAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.read.all',
+  attributes: { action: 'read' },
+});
+
+export const kuadrantApiProductUpdateOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.update.own',
   attributes: { action: 'update' },
 });
 
-export const kuadrantApiProductDeletePermission = createPermission({
-  name: 'kuadrant.apiproduct.delete',
+export const kuadrantApiProductUpdateAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.update.all',
+  attributes: { action: 'update' },
+});
+
+export const kuadrantApiProductDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apiproduct.delete.own',
+  attributes: { action: 'delete' },
+});
+
+export const kuadrantApiProductDeleteAllPermission = createPermission({
+  name: 'kuadrant.apiproduct.delete.all',
   attributes: { action: 'delete' },
 });
 
@@ -87,11 +102,6 @@ export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
 export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
   name: 'kuadrant.apikeyrequest.update.all',
   attributes: { action: 'update' },
-});
-
-export const kuadrantApiKeyRequestListPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.list',
-  attributes: { action: 'read' },
 });
 
 export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
@@ -135,16 +145,18 @@ export const kuadrantPermissions = [
   kuadrantPlanPolicyDeletePermission,
   kuadrantPlanPolicyListPermission,
   kuadrantApiProductCreatePermission,
-  kuadrantApiProductReadPermission,
-  kuadrantApiProductUpdatePermission,
-  kuadrantApiProductDeletePermission,
+  kuadrantApiProductReadOwnPermission,
+  kuadrantApiProductReadAllPermission,
+  kuadrantApiProductUpdateOwnPermission,
+  kuadrantApiProductUpdateAllPermission,
+  kuadrantApiProductDeleteOwnPermission,
+  kuadrantApiProductDeleteAllPermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyRequestReadOwnPermission,
   kuadrantApiKeyRequestReadAllPermission,
   kuadrantApiKeyRequestUpdateOwnPermission,
   kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestListPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
   kuadrantApiKeyReadOwnPermission,

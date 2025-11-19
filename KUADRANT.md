@@ -194,22 +194,30 @@ make kind-create
 
 The Kuadrant plugins ship with a comprehensive permission system for access control.
 
-### Three Reference Personas
+### Three-Tier Role Hierarchy
 
 These are example role configurations - permissions are composable, so you can create custom roles mixing these permissions however you want.
 
-**Platform Engineer**
-- **Can do**: Create/update PlanPolicy resources, read all resources for monitoring
-- **Cannot do**: Approve/reject API key requests, create APIProducts
-- **Use case**: Manages infrastructure (gateways, HTTPRoutes), defines rate limit tiers
+```
+API Consumer (browse all, manage own keys)
+    ↓
+API Owner (owns specific products, approves requests for own products)
+    ↓
+API Admin (owns all products, approves any request)
+```
+
+**API Admin** (platform engineer)
+- **Can do**: View/edit ALL API Products, approve/reject any API key requests, manage RBAC policies, read PlanPolicy
+- **Cannot do**: Create/update/delete PlanPolicy (managed on cluster by platform engineers via kubectl)
+- **Use case**: Platform engineers who manage all API products and access control
 
 **API Owner**
-- **Can do**: Create/update APIProduct, approve/reject requests for own APIs, read PlanPolicy (to reference)
-- **Cannot do**: Create/update PlanPolicy, approve requests for other owners' APIs
-- **Use case**: Publishes APIs, manages access to own APIs
+- **Can do**: Create/update OWN API Products, approve/reject requests for OWN APIs, read PlanPolicy (to reference), request API access
+- **Cannot do**: View/edit other owners' APIs, create/update/delete PlanPolicy (managed on cluster)
+- **Use case**: Publishes APIs they own, manages access to their own APIs
 
 **API Consumer**
-- **Can do**: Read APIProducts, create APIKeyRequests, manage own API keys
+- **Can do**: Read ALL APIProducts (for catalog browsing), create APIKeyRequests, manage own API keys
 - **Cannot do**: Approve requests, create APIs, modify rate limits
 - **Use case**: Browses APIs, requests access, uses APIs within quotas
 
@@ -218,59 +226,69 @@ These are example role configurations - permissions are composable, so you can c
 The backend exports these permissions (defined in `plugins/kuadrant-backend/src/permissions.ts`). These appear in the RBAC plugin UI and can be composed into custom roles.
 
 **PlanPolicy (rate limit tiers):**
-- `kuadrant.planpolicy.create` - Create PlanPolicy resources
-- `kuadrant.planpolicy.read` - Read PlanPolicy resources
-- `kuadrant.planpolicy.update` - Update PlanPolicy resources
-- `kuadrant.planpolicy.delete` - Delete PlanPolicy resources
-- `kuadrant.planpolicy.list` - List PlanPolicy resources
+- `kuadrant.planpolicy.create` - create PlanPolicy resources
+- `kuadrant.planpolicy.read` - read PlanPolicy resources
+- `kuadrant.planpolicy.update` - update PlanPolicy resources
+- `kuadrant.planpolicy.delete` - delete PlanPolicy resources
+- `kuadrant.planpolicy.list` - list PlanPolicy resources
 
-**APIProduct (catalog entries):**
-- `kuadrant.apiproduct.create` - Create APIProduct resources
-- `kuadrant.apiproduct.read` - Read APIProduct resources
-- `kuadrant.apiproduct.update` - Update APIProduct resources
-- `kuadrant.apiproduct.delete` - Delete APIProduct resources
-- `kuadrant.apiproduct.list` - List APIProduct resources
+**APIProduct (catalog entries with ownership):**
+- `kuadrant.apiproduct.create` - create APIProduct resources
+- `kuadrant.apiproduct.read.own` - read own APIProduct resources
+- `kuadrant.apiproduct.read.all` - read all APIProduct resources
+- `kuadrant.apiproduct.update.own` - update own APIProduct resources
+- `kuadrant.apiproduct.update.all` - update any APIProduct resource
+- `kuadrant.apiproduct.delete.own` - delete own APIProduct resources
+- `kuadrant.apiproduct.delete.all` - delete any APIProduct resource
+- `kuadrant.apiproduct.list` - list APIProduct resources (backend filters by ownership)
 
-**APIKeyRequest (access requests):**
-- `kuadrant.apikeyrequest.create` - Create APIKeyRequest resources
-- `kuadrant.apikeyrequest.read.own` - Read own APIKeyRequest resources
-- `kuadrant.apikeyrequest.read.all` - Read all APIKeyRequest resources
-- `kuadrant.apikeyrequest.update` - Update APIKeyRequest (approve/reject)
-- `kuadrant.apikeyrequest.list` - List APIKeyRequest resources
+**APIKeyRequest (access requests with ownership):**
+- `kuadrant.apikeyrequest.create` - create APIKeyRequest resources (resource permission scoped to APIProduct)
+- `kuadrant.apikeyrequest.read.own` - read own APIKeyRequest resources
+- `kuadrant.apikeyrequest.read.all` - read all APIKeyRequest resources
+- `kuadrant.apikeyrequest.update` - update any APIKeyRequest (approve/reject)
+- `kuadrant.apikeyrequest.update.own` - update own APIKeyRequest resources
+- `kuadrant.apikeyrequest.delete.own` - delete own APIKeyRequest resources
+- `kuadrant.apikeyrequest.delete.all` - delete any APIKeyRequest resource
+- `kuadrant.apikeyrequest.list` - list APIKeyRequest resources
 
-**API Keys (managed secrets):**
-- `kuadrant.apikey.read.own` - Read own API keys
-- `kuadrant.apikey.read.all` - Read all API keys
-- `kuadrant.apikey.delete.own` - Delete own API keys
-- `kuadrant.apikey.delete.all` - Delete any API key
+**API Keys (managed secrets with ownership):**
+- `kuadrant.apikey.read.own` - read own API keys
+- `kuadrant.apikey.read.all` - read all API keys
+- `kuadrant.apikey.delete.own` - delete own API keys
+- `kuadrant.apikey.delete.all` - delete any API key
+
+**Ownership Model:**
+
+APIProducts track ownership via Kubernetes annotations:
+- `backstage.io/created-by-user-id` - user ID for permission checks
+- `backstage.io/created-by-user-ref` - user entity ref for catalog owner field
+- `backstage.io/created-at` - creation timestamp
+
+Backend enforces ownership checks for `.own` permissions:
+- API Owners can only view/edit/delete their own APIProducts
+- API Admins can view/edit/delete all APIProducts
+- APIKeyRequest approval requires ownership of the associated APIProduct
 
 ### Testing with Different Users
 
-Switch between test users to verify RBAC behaviour:
+Test users are defined in `catalog-entities/kuadrant-users.yaml`:
 
-```bash
-# switch to api consumer (can only request keys)
-yarn user:consumer
+**API Consumers:**
+- `consumer1` (consumer1@kuadrant.local)
+- `consumer2` (consumer2@kuadrant.local)
 
-# switch to api owner (can approve requests)
-yarn user:owner
+**API Owners:**
+- `owner1` (owner1@kuadrant.local) - API Owner 1
+- `owner2` (owner2@kuadrant.local) - API Owner 2
 
-# switch to default (all permissions)
-yarn user:default
+**API Admins:**
+- `admin` (admin@kuadrant.local) - Administrator
 
-# restart development server
-yarn dev
-```
+**Development:**
+- `guest` (guest@kuadrant.local) - Guest User (member of api-owners for development convenience)
 
-**Test roles** (modifies guest user in `catalog-entities/kuadrant-users.yaml`):
-- `consumer` - member of api-consumers group only
-- `owner` - member of api-owners group only
-- `default` - member of both api-owners and api-consumers groups
-
-After switching:
-1. Refresh your browser (press F5 or Ctrl+R / Cmd+R)
-2. Sign in again using the Guest button
-3. You're now authenticated as the selected user
+To test different permission levels, sign in as different users through your authentication provider (Dex, Keycloak, etc.)
 
 ### RBAC Policy
 
@@ -296,7 +314,6 @@ auth:
   providers:
     guest:
       dangerouslyAllowOutsideDevelopment: true
-      userEntityRef: user:default/api-owner
 
 permission:
   enabled: true
@@ -304,7 +321,7 @@ permission:
     policies-csv-file: ../../rbac-policy.csv
 ```
 
-The `userEntityRef` determines which user you're logged in as (changeable via yarn user commands).
+The RBAC policy file maps groups to roles, and users inherit permissions from their group memberships defined in the catalog.
 
 ### Kubernetes RBAC
 

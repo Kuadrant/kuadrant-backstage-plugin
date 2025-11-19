@@ -101,7 +101,9 @@ export class APIProductEntityProvider implements EntityProvider {
       console.log(`apiproduct provider: filtered to ${publishedProducts.length} published apiproducts (${apiProducts.length - publishedProducts.length} drafts excluded)`);
 
       // transform apiproducts to backstage api entities
-      const entities = publishedProducts.map(product => this.transformToEntity(product));
+      const entities = publishedProducts
+        .map(product => this.transformToEntity(product))
+        .filter((entity): entity is ApiEntity => entity !== null);
       console.log(`apiproduct provider: transformed ${entities.length} entities`);
 
       // submit entities to catalog
@@ -120,7 +122,7 @@ export class APIProductEntityProvider implements EntityProvider {
     }
   }
 
-  private transformToEntity(product: APIProduct): ApiEntity {
+  private transformToEntity(product: APIProduct): ApiEntity | null {
     const namespace = product.metadata.namespace || 'default';
     const name = product.metadata.name;
     const displayName = product.spec.displayName || name;
@@ -129,8 +131,13 @@ export class APIProductEntityProvider implements EntityProvider {
     // determine lifecycle from labels or default to production
     const lifecycle = product.metadata.labels?.lifecycle || 'production';
 
-    // determine owner from contact info or default to guests
-    const owner = product.spec.contact?.team || 'guests';
+    // owner must be set via backstage ownership annotation
+    // if missing, skip this apiproduct (created outside backstage or invalid)
+    const owner = product.metadata.annotations?.['backstage.io/created-by-user-ref'];
+    if (!owner) {
+      console.warn(`apiproduct ${namespace}/${name} has no backstage.io/created-by-user-ref annotation, skipping catalog sync`);
+      return null;
+    }
 
     // build tags from product tags
     const tags = product.spec.tags || [];

@@ -1,35 +1,51 @@
-# api owner: publishes apis, approves requests
-# can do: create/update apiproduct, approve/reject requests, read planpolicy (to reference), request api access, manage rbac
+# api admin: platform engineers who manage all api products
+# can do: view/edit all apiproducts, approve/reject any requests, manage rbac policies
 # cannot do: create/update/delete planpolicy (managed on cluster by platform engineers)
+p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
+p, role:default/api-admin, kuadrant.planpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.apiproduct.create, create, allow
+p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
+p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
+p, role:default/api-admin, kuadrant.apiproduct.delete.all, delete, allow
+p, role:default/api-admin, kuadrant.apiproduct.list, read, allow
+p, role:default/api-admin, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
+p, role:default/api-admin, kuadrant.apikeyrequest.read.all, read, allow
+p, role:default/api-admin, kuadrant.apikeyrequest.update.all, update, allow
+p, role:default/api-admin, kuadrant.apikeyrequest.list, read, allow
+p, role:default/api-admin, kuadrant.apikeyrequest.delete.all, delete, allow
+p, role:default/api-admin, kuadrant.apikey.read.all, read, allow
+p, role:default/api-admin, kuadrant.apikey.delete.all, delete, allow
+p, role:default/api-admin, catalog.entity.read, read, allow
+p, role:default/api-admin, catalog.entity.read, read, allow, api
+p, role:default/api-admin, policy.entity.read, read, allow
+p, role:default/api-admin, policy.entity.create, create, allow
+p, role:default/api-admin, policy.entity.update, update, allow
+p, role:default/api-admin, policy.entity.delete, delete, allow
+
+# api owner: publishes apis they own, approves requests for their apis
+# can do: create/update own apiproduct, approve/reject requests for own apis, read planpolicy (to reference), request api access, browse all apis
+# cannot do: edit other owners' apis, create/update/delete planpolicy (managed on cluster)
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
-p, role:default/api-owner, kuadrant.apiproduct.read, read, allow
-p, role:default/api-owner, kuadrant.apiproduct.update, update, allow
-p, role:default/api-owner, kuadrant.apiproduct.delete, delete, allow
+p, role:default/api-owner, kuadrant.apiproduct.read.all, read, allow
+p, role:default/api-owner, kuadrant.apiproduct.update.own, update, allow
+p, role:default/api-owner, kuadrant.apiproduct.delete.own, delete, allow
 p, role:default/api-owner, kuadrant.apiproduct.list, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
 p, role:default/api-owner, kuadrant.apikeyrequest.read.own, read, allow
-p, role:default/api-owner, kuadrant.apikeyrequest.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.update.own, update, allow
-p, role:default/api-owner, kuadrant.apikeyrequest.update.all, update, allow
-p, role:default/api-owner, kuadrant.apikeyrequest.list, read, allow
 p, role:default/api-owner, kuadrant.apikeyrequest.delete.own, delete, allow
-p, role:default/api-owner, kuadrant.apikeyrequest.delete.all, delete, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.list, read, allow
 p, role:default/api-owner, kuadrant.apikey.read.own, read, allow
-p, role:default/api-owner, kuadrant.apikey.read.all, read, allow
 p, role:default/api-owner, kuadrant.apikey.delete.own, delete, allow
-p, role:default/api-owner, kuadrant.apikey.delete.all, delete, allow
 p, role:default/api-owner, catalog.entity.read, read, allow
-p, role:default/api-owner, policy.entity.read, read, allow
-p, role:default/api-owner, policy.entity.create, create, allow
-p, role:default/api-owner, policy.entity.update, update, allow
-p, role:default/api-owner, policy.entity.delete, delete, allow
+p, role:default/api-owner, catalog.entity.read, read, allow, api
 
 # api consumer: browses apis, requests access
-# can do: read apiproducts, create requests, manage own api keys, edit own pending requests
+# can do: read all apiproducts (for catalog browsing), create requests, manage own api keys, edit own pending requests
 # cannot do: approve requests, create apis, modify rate limits
-p, role:default/api-consumer, kuadrant.apiproduct.read, read, allow
+p, role:default/api-consumer, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
 # allow requesting access to any api (per-apiproduct access control can be added below)
 p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
@@ -39,16 +55,16 @@ p, role:default/api-consumer, kuadrant.apikeyrequest.delete.own, delete, allow
 p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
+p, role:default/api-consumer, catalog.entity.read, read, allow, api
 
 # example: restrict specific apis to specific roles
 # p, role:default/partner, kuadrant.apikeyrequest.create, create, allow, apiproduct:toystore/toystore-api
 # p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
 
 # assign groups to roles
+g, group:default/api-admins, role:default/api-admin
 g, group:default/api-owners, role:default/api-owner
 g, group:default/api-consumers, role:default/api-consumer
 
-# assign users to roles (for development with guest auth)
-g, user:default/api-owner, role:default/api-owner
-g, user:default/api-consumer, role:default/api-consumer
+# assign individual users to roles (for development with guest auth)
 g, user:default/guest, role:default/api-owner

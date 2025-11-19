@@ -23,10 +23,13 @@ import { PermissionGate } from '../PermissionGate';
 import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
 import {
   kuadrantApiProductCreatePermission,
-  kuadrantApiProductDeletePermission,
-  kuadrantApiProductUpdatePermission,
+  kuadrantApiProductDeleteOwnPermission,
+  kuadrantApiProductDeleteAllPermission,
+  kuadrantApiProductUpdateOwnPermission,
+  kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductListPermission,
   kuadrantApiKeyRequestReadAllPermission,
+  kuadrantApiKeyRequestReadOwnPermission,
   kuadrantPlanPolicyListPermission,
 } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
@@ -64,20 +67,41 @@ export const ResourceList = () => {
   } = useKuadrantPermission(kuadrantApiProductCreatePermission);
 
   const {
-    allowed: canViewApprovalQueue,
-    loading: approvalQueuePermissionLoading,
-    error: approvalQueuePermissionError,
+    allowed: canViewAllRequests,
+    loading: approvalQueueAllPermissionLoading,
   } = useKuadrantPermission(kuadrantApiKeyRequestReadAllPermission);
 
   const {
-    allowed: canDeleteApiProduct,
-    loading: deletePermissionLoading,
-    error: deletePermissionError,
-  } = useKuadrantPermission(kuadrantApiProductDeletePermission);
+    allowed: canViewOwnRequests,
+    loading: approvalQueueOwnPermissionLoading,
+    error: approvalQueuePermissionError,
+  } = useKuadrantPermission(kuadrantApiKeyRequestReadOwnPermission);
+
+  const canViewApprovalQueue = canViewAllRequests || canViewOwnRequests;
+  const approvalQueuePermissionLoading = approvalQueueAllPermissionLoading || approvalQueueOwnPermissionLoading;
 
   const {
-    allowed: canUpdateApiProduct,
-  } = useKuadrantPermission(kuadrantApiProductUpdatePermission);
+    allowed: canDeleteOwnApiProduct,
+    loading: deleteOwnPermissionLoading,
+  } = useKuadrantPermission(kuadrantApiProductDeleteOwnPermission);
+
+  const {
+    allowed: canDeleteAllApiProducts,
+    loading: deleteAllPermissionLoading,
+    error: deletePermissionError,
+  } = useKuadrantPermission(kuadrantApiProductDeleteAllPermission);
+
+  const {
+    allowed: canUpdateOwnApiProduct,
+  } = useKuadrantPermission(kuadrantApiProductUpdateOwnPermission);
+
+  const {
+    allowed: canUpdateAllApiProducts,
+  } = useKuadrantPermission(kuadrantApiProductUpdateAllPermission);
+
+  const canDeleteApiProduct = canDeleteOwnApiProduct || canDeleteAllApiProducts;
+  const canUpdateApiProduct = canUpdateOwnApiProduct || canUpdateAllApiProducts;
+  const deletePermissionLoading = deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
     allowed: canListPlanPolicies,
@@ -185,10 +209,24 @@ export const ResourceList = () => {
       render: (row: any) => {
         const status = row.spec?.publishStatus || 'Draft';
         return (
-          <Chip 
-            label={status} 
-            size="small" 
+          <Chip
+            label={status}
+            size="small"
             color={status === 'Published' ? 'primary' : 'default'}
+          />
+        );
+      },
+    },
+    {
+      title: 'Approval Mode',
+      field: 'spec.approvalMode',
+      render: (row: any) => {
+        const mode = row.spec?.approvalMode || 'manual';
+        return (
+          <Chip
+            label={mode}
+            size="small"
+            color={mode === 'automatic' ? 'secondary' : 'default'}
           />
         );
       },

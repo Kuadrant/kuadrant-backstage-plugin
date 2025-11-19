@@ -110,26 +110,41 @@ yarn test                         # Run tests
 
 ### Testing Permissions
 
-The application uses RBAC with two roles: API Consumer and API Owner. Use these commands to switch roles:
+The application uses RBAC with a three-tier role hierarchy:
 
-```bash
-yarn user:consumer      # Switch to API Consumer
-yarn user:owner         # Switch to API Owner
-yarn user:default       # Restore default permissions
+```
+API Consumer → API Owner → API Admin
 ```
 
-After switching roles, restart with `yarn dev`.
+Test users are configured in `catalog-entities/kuadrant-users.yaml`:
+- `consumer1`, `consumer2` - members of `api-consumers` group
+- `owner1`, `owner2` - members of `api-owners` group
+- `admin` - member of `api-admins` group
+- `guest` - member of `api-owners` group (for development)
 
-**API Consumer (restricted access):**
-- Can view API Products
+**API Consumer (browse and request):**
+- Can view all API Products (for browsing)
 - Can request API keys
+- Can manage own API keys only
 - No "Create API Product" button
 - No "Plan Policies" or "Approval Queue" cards
 
-**API Owner (can publish APIs):**
-- Can create/delete API Products
-- Can approve/reject API key requests
+**API Owner (own products):**
+- Can create/delete own API Products
+- Can approve/reject requests for own APIs only
 - Can view Plan Policies (read-only)
+- Cannot see other owners' API Products
+
+**API Admin (all products):**
+- Can view/edit/delete all API Products
+- Can approve/reject any API key request
+- Can manage RBAC policies
+- Full visibility across all API Products
+
+**Ownership Model:**
+- API Products track ownership via annotations (`backstage.io/created-by-user-id`)
+- Backend enforces ownership checks for API Owners
+- API Admins bypass ownership checks (can manage everything)
 
 Note: PlanPolicies are managed on the cluster by platform engineers. This plugin only provides read access to view existing policies.
 
