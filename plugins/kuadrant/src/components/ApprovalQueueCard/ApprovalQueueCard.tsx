@@ -446,6 +446,7 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Actions',
+      filtering: false,
       render: (row) => {
         if (!canUpdateRequests) return null;
         return (
@@ -757,10 +758,14 @@ export const ApprovalQueueCard = () => {
                       <Table
                         options={{
                           selection: canUpdateRequests && tabData.showSelection,
-                          paging: false,
-                          search: false,
+                          paging: requests.length > 5,
+                          pageSize: 20,
+                          search: true,
+                          filtering: true,
+                          debounceInterval: 300,
                           showTextRowsSelected: false,
-                          toolbar: false,
+                          toolbar: true,
+                          emptyRowsWhenPaging: false,
                         }}
                         data={requests}
                         columns={tabData.columns}

@@ -190,6 +190,7 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'Reason',
+      field: 'status.reason',
       render: (row: APIKeyRequest) => {
         if (row.status?.reason) {
           const color = row.status.phase === 'Rejected' ? 'error' : 'textPrimary';
@@ -215,6 +216,7 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'Reviewed By',
+      field: 'status.reviewedBy',
       render: (row: APIKeyRequest) => {
         if ((row.status?.phase === 'Approved' || row.status?.phase === 'Rejected') && row.status.reviewedBy) {
           const reviewedDate = row.status.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '';
@@ -234,6 +236,8 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'API Key',
+      field: 'status.apiKey',
+      filtering: false,
       render: (row: APIKeyRequest) => {
         if (row.status?.phase === 'Approved' && row.status.apiKey) {
           const isVisible = visibleKeys.has(row.metadata.name);
@@ -269,6 +273,7 @@ export const MyApiKeysCard = () => {
     },
     {
       title: '',
+      filtering: false,
       render: (row: APIKeyRequest) => {
         return (
           <IconButton
@@ -352,10 +357,13 @@ export const MyApiKeysCard = () => {
         ) : (
           <Table
             options={{
-              paging: tabData.length > 10,
-              pageSize: 10,
-              search: false,
-              toolbar: false,
+              paging: tabData.length > 5,
+              pageSize: 20,
+              search: true,
+              filtering: true,
+              debounceInterval: 300,
+              toolbar: true,
+              emptyRowsWhenPaging: false,
             }}
             columns={tabColumns}
             data={tabData.map((item: APIKeyRequest) => ({
