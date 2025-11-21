@@ -133,9 +133,9 @@ export class APIProductEntityProvider implements EntityProvider {
 
     // owner must be set via backstage ownership annotation
     // if missing, skip this apiproduct (created outside backstage or invalid)
-    const owner = product.metadata.annotations?.['backstage.io/created-by-user-ref'];
+    const owner = product.metadata.annotations?.['backstage.io/owner'];
     if (!owner) {
-      console.warn(`apiproduct ${namespace}/${name} has no backstage.io/created-by-user-ref annotation, skipping catalog sync`);
+      console.warn(`apiproduct ${namespace}/${name} has no backstage.io/owner annotation, skipping catalog sync`);
       return null;
     }
 

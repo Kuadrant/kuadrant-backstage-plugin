@@ -424,6 +424,41 @@ export class Common {
       }
     }
   }
+
+  async dexQuickLogin(userEmail: string) {
+    let popup: Page;
+
+    await this.page.goto("/");
+    await this.page.waitForSelector('h2:has-text("Select a sign-in method")', { timeout: 10000 });
+
+    // click the OIDC "Sign In" button to trigger the popup
+    this.page.once("popup", (asyncnewPage) => {
+      popup = asyncnewPage;
+    });
+
+    const oidcSignInButton = this.page.locator('button:has-text("Sign In")').last();
+    await oidcSignInButton.click();
+
+    await expect(async () => {
+      await popup.waitForLoadState("domcontentloaded");
+      expect(popup).toBeTruthy();
+    }).toPass({
+      intervals: [5_000, 10_000],
+      timeout: 20 * 1000,
+    });
+
+    if (popup.url().startsWith(process.env.BASE_URL)) {
+      return "Already logged in";
+    } else {
+      // extract role from email (e.g., "owner1@kuadrant.local" -> "owner1")
+      const role = userEmail.split('@')[0];
+      const quickLoginButton = popup.locator(`[data-testid="quick-login-${role}"]`);
+      await quickLoginButton.click();
+      await popup.waitForEvent("close", { timeout: 10000 });
+      await this.uiHelper.waitForSideBarVisible();
+      return "Login successful";
+    }
+  }
 }
 
 export async function setupBrowser(browser: Browser, testInfo: TestInfo) {
