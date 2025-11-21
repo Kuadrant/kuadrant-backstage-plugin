@@ -678,8 +678,12 @@ func main() {
             <Table
               title="Pending Requests"
               options={{
-                paging: false,
-                search: false,
+                paging: true,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
               }}
               columns={pendingRequestColumns}
               data={pendingRequests}
@@ -691,8 +695,12 @@ func main() {
             <Table
               title="Rejected Requests"
               options={{
-                paging: false,
-                search: false,
+                paging: true,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
               }}
               columns={requestColumns}
               data={rejectedRequests}
@@ -705,8 +713,12 @@ func main() {
               key="api-keys-table"
               title="API Keys"
               options={{
-                paging: false,
-                search: false,
+                paging: true,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
               }}
               columns={approvedColumns}
               data={approvedRequests}

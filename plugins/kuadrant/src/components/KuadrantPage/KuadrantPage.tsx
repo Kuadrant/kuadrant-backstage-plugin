@@ -291,7 +291,14 @@ export const ResourceList = () => {
     }
     return (
       <Table
-        options={{ paging: false, search: false, toolbar: false }}
+        options={{
+          paging: true,
+          pageSize: 20,
+          search: true,
+          filtering: true,
+          debounceInterval: 300,
+          toolbar: true
+        }}
         columns={columns}
         data={resources}
       />

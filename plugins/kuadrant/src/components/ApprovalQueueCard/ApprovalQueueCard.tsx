@@ -757,10 +757,13 @@ export const ApprovalQueueCard = () => {
                       <Table
                         options={{
                           selection: canUpdateRequests && tabData.showSelection,
-                          paging: false,
-                          search: false,
+                          paging: true,
+                          pageSize: 20,
+                          search: true,
+                          filtering: true,
+                          debounceInterval: 300,
                           showTextRowsSelected: false,
-                          toolbar: false,
+                          toolbar: true,
                         }}
                         data={requests}
                         columns={tabData.columns}
