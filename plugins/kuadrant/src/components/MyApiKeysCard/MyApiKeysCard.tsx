@@ -352,10 +352,12 @@ export const MyApiKeysCard = () => {
         ) : (
           <Table
             options={{
-              paging: tabData.length > 10,
-              pageSize: 10,
-              search: false,
-              toolbar: false,
+              paging: true,
+              pageSize: 20,
+              search: true,
+              filtering: true,
+              debounceInterval: 300,
+              toolbar: true,
             }}
             columns={tabColumns}
             data={tabData.map((item: APIKeyRequest) => ({
