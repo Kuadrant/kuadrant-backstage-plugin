@@ -79,6 +79,8 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 
 ## Role Definitions
 
+The Kuadrant plugin defines four personas with distinct responsibilities and permissions:
+
 ### API Consumer
 
 **Purpose**: End users who consume APIs
@@ -104,13 +106,15 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 
 **Permissions**:
 - All API Consumer permissions, plus:
-- `kuadrant.planpolicy.read` - view plan policies (to reference when creating products)
+- `kuadrant.planpolicy.read` - view plan policies (for reference)
 - `kuadrant.planpolicy.list`
 - `kuadrant.apiproduct.create` - create API Products
-- `kuadrant.apiproduct.read.own` - view own API Products only
+- `kuadrant.apiproduct.read.own` - view own API Products
 - `kuadrant.apiproduct.update.own` - update own API Products
 - `kuadrant.apiproduct.delete.own` - delete own API Products
 - `kuadrant.apikeyrequest.update.own` - approve/reject requests for own APIs (see approval workflow below)
+- `kuadrant.apikey.read.own` - view API keys for own APIs
+- `kuadrant.apikey.delete.own` - delete API keys for own APIs
 
 **Cannot**:
 - View or modify other owners' API Products
@@ -121,8 +125,15 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 
 **Purpose**: Platform engineers who manage all API Products
 
+**Responsibilities**:
+- Manages all API Products across the platform
+- Approves/rejects any API key request (cross-team)
+- Troubleshoots issues on behalf of API Owners
+- Provides second-level support for API management
+
 **Permissions**:
 - All `.all` scoped permissions
+- `kuadrant.apiproduct.create` - create any API Product
 - `kuadrant.apiproduct.read.all` - view all API Products
 - `kuadrant.apiproduct.update.all` - update any API Product
 - `kuadrant.apiproduct.delete.all` - delete any API Product
@@ -135,22 +146,100 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 
 **Cannot**:
 - Create/update/delete PlanPolicies (managed on cluster)
+- Modify platform infrastructure (HTTPRoutes, Gateways)
+
+### Platform Engineer
+
+**Purpose**: Infrastructure engineers who manage Kuadrant platform
+
+**Responsibilities**:
+- Manages cluster infrastructure (Gateways, HTTPRoutes, PlanPolicies)
+- Creates PlanPolicy resources with rate limit tiers
+- Annotates HTTPRoutes with `backstage.io/expose: "true"` to make them available for publishing
+- Coordinates with API Admins and API Owners when changing rate limits
+- Does not typically manage individual API Products (delegated to API Admins/Owners)
+
+**Permissions**:
+- Full cluster admin access (Kubernetes RBAC)
+- Create/read/update/delete PlanPolicy resources
+- Create/read/update/delete HTTPRoute resources
+- Create/read/update/delete Gateway resources
+- Manage RBAC policies
+
+**Cannot**:
+- Typically does not manage day-to-day API Products (delegates to API Admin)
+
+## RBAC Permissions Matrix
+
+Comprehensive view of what each persona can and cannot do:
+
+| Persona | Can Do | Cannot Do |
+|---------|--------|-----------|
+| **Platform Engineer** | • Manage Kuadrant infrastructure (Gateways, HTTPRoutes)<br/>• Create/update/delete PlanPolicy resources<br/>• Annotate HTTPRoutes with `backstage.io/expose: "true"`<br/>• Manage RBAC policies and permissions<br/>• Configure platform-wide settings<br/>• Full cluster admin access for platform management | • Typically does not manage day-to-day API Products (delegates to API Admin/Owner)<br/>• Should coordinate with API Admins and API Owners before changing rate limits |
+| **API Admin** | • Read all APIProducts<br/>• Create/update/delete any APIProduct<br/>• Approve/reject any API key requests<br/>• Manage all API keys (read/delete)<br/>• View all APIKeyRequests<br/>• Troubleshoot on behalf of API Owners<br/>• All `.all` scoped permissions | • Cannot create/update/delete PlanPolicy<br/>• Cannot modify platform infrastructure (HTTPRoutes, Gateways) |
+| **API Owner** | • Read/list HTTPRoutes (to publish APIs)<br/>• Create/update/delete own APIProducts<br/>• Read all APIProducts<br/>• Approve/reject API key requests for own APIs<br/>• Delete API key requests for own APIs<br/>• Manage own API documentation<br/>• View/manage API keys for own APIs | • Cannot create/update PlanPolicy<br/>• Cannot modify platform infrastructure<br/>• Cannot approve requests for other owners' APIs<br/>• Cannot update/delete other owners' APIProducts |
+| **API Consumer** | • Read/list APIProduct<br/>• Create APIKeyRequest<br/>• Read/update/delete own APIKeyRequests<br/>• View own request status<br/>• Manage own API keys<br/>• Use APIs within rate limit quotas | • Cannot approve requests<br/>• Cannot view others' requests<br/>• Cannot create or publish APIs<br/>• Cannot modify rate limits |
+
+### Permission Breakdown by Resource
+
+**PlanPolicy (rate limit tiers):**
+- Platform Engineer: create, read, update, delete
+- API Admin: read, list (for reference)
+- API Owner: read, list (for reference)
+- API Consumer: none
+
+**HTTPRoute:**
+- Platform Engineer: create, read, update, delete, annotate
+- API Admin: read, list (for reference)
+- API Owner: read, list (to select for publishing)
+- API Consumer: none (indirect read through APIProduct)
+
+**APIProduct (catalog entries):**
+- Platform Engineer: typically none (delegated to API Admin/Owner)
+- API Admin: create, read, update, delete (all)
+- API Owner: create, read (all), update (own), delete (own)
+- API Consumer: read, list
+
+**APIKeyRequest (access requests):**
+- Platform Engineer: typically none (delegated to API Admin)
+- API Admin: create, read, update (approve/reject/modify any), delete (all)
+- API Owner: create, read (for own APIs), update (approve/reject for own APIs), delete (for own APIs)
+- API Consumer: create, read (own), update (own), delete (own)
+
+**API Keys (managed secrets):**
+- Platform Engineer: typically none (delegated to API Admin)
+- API Admin: read all, delete all
+- API Owner: read (for own APIs), delete (for own APIs)
+- API Consumer: read own, delete own
+
+### Role Hierarchy
+
+The four personas form a clear hierarchy:
+
+1. **Platform Engineer** - infrastructure layer (cluster, gateways, rate limits)
+2. **API Admin** - management layer (all API Products, all requests)
+3. **API Owner** - ownership layer (own API Products, own API requests)
+4. **API Consumer** - consumption layer (browse, request, use)
+
+Each layer builds on the capabilities below it, with clear boundaries of responsibility.
 
 ## Ownership Model
 
 ### Ownership Tracking
 
-APIProducts track ownership via Kubernetes annotations:
+APIProducts track ownership via the standard Backstage annotation:
 
 ```yaml
 metadata:
   annotations:
-    backstage.io/created-by-user-id: "jmadigan"
-    backstage.io/created-by-user-ref: "user:default/jmadigan"
-    backstage.io/created-at: "2025-11-14T10:30:00Z"
+    backstage.io/owner: "user:default/jmadigan"
 ```
 
-**Immutability**: Ownership annotations are set on creation and cannot be modified. This prevents ownership hijacking and maintains clear accountability.
+The owner reference uses Backstage's entity reference format: `kind:namespace/name`
+
+**Immutability**: The ownership annotation is set on creation and cannot be modified. This prevents ownership hijacking and maintains clear accountability.
+
+**Timestamp**: Kubernetes automatically sets `metadata.creationTimestamp` for audit purposes.
 
 ### Backend Enforcement Pattern
 
@@ -176,8 +265,10 @@ if (allDecision[0].result !== AuthorizeResult.ALLOW) {
 
   // 3. verify ownership
   const apiProduct = await k8sClient.getCustomResource(...);
-  const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
-  if (createdByUserId !== userId) {
+  const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+  const ownerUserId = extractUserIdFromOwner(owner); // extracts "jmadigan" from "user:default/jmadigan"
+
+  if (ownerUserId !== userId) {
     throw new NotAllowedError('you can only update your own api products');
   }
 }
@@ -194,9 +285,11 @@ List endpoints return different results based on permissions:
 if (hasReadAllPermission) {
   return allApiProducts;
 } else if (hasReadOwnPermission) {
-  return allApiProducts.filter(p =>
-    p.metadata?.annotations?.['backstage.io/created-by-user-id'] === userId
-  );
+  return allApiProducts.filter(p => {
+    const owner = p.metadata?.annotations?.['backstage.io/owner'];
+    const ownerUserId = extractUserIdFromOwner(owner);
+    return ownerUserId === userId;
+  });
 } else {
   throw new NotAllowedError('unauthorised');
 }
@@ -230,7 +323,10 @@ if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
 
   // fetch apiproduct and verify ownership
   const apiProduct = await k8sClient.getCustomResource(...);
-  if (apiProduct.metadata.annotations['backstage.io/created-by-user-id'] !== userId) {
+  const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+  const ownerUserId = extractUserIdFromOwner(owner);
+
+  if (ownerUserId !== userId) {
     throw new NotAllowedError('you can only approve requests for your own api products');
   }
 }
@@ -270,7 +366,7 @@ const decision = await permissions.authorize([{
 The APIProduct entity provider only syncs products with ownership annotations to the Backstage catalog:
 
 ```typescript
-const owner = product.metadata.annotations?.['backstage.io/created-by-user-ref'];
+const owner = product.metadata.annotations?.['backstage.io/owner'];
 if (!owner) {
   console.warn(`skipping apiproduct ${namespace}/${name} - no ownership annotation`);
   return null;
@@ -334,14 +430,12 @@ const patchSchema = z.object({
 
 ### Ownership Immutability
 
-PATCH endpoints explicitly prevent modification of ownership annotations:
+PATCH endpoints explicitly prevent modification of ownership annotation:
 
 ```typescript
 // prevent ownership hijacking
 if (req.body.metadata?.annotations) {
-  delete req.body.metadata.annotations['backstage.io/created-by-user-id'];
-  delete req.body.metadata.annotations['backstage.io/created-by-user-ref'];
-  delete req.body.metadata.annotations['backstage.io/created-at'];
+  delete req.body.metadata.annotations['backstage.io/owner'];
 }
 ```
 
