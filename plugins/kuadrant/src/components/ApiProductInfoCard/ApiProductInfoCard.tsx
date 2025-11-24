@@ -44,7 +44,8 @@ export const ApiProductInfoCard = () => {
   }, [backendUrl, fetchApi, namespace, apiProductName]);
 
   // check if user has permission to view this api product
-  const ownerUserId = apiProduct?.metadata?.annotations?.['backstage.io/created-by-user-id'];
+  const owner = apiProduct?.metadata?.annotations?.['backstage.io/owner'];
+  const ownerUserId = owner?.split('/')[1]; // extract "owner1" from "user:default/owner1"
   const canView = canReadAll || (currentUserId && ownerUserId === currentUserId);
 
   if (!namespace || !apiProductName) {

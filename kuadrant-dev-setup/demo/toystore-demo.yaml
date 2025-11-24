@@ -119,7 +119,7 @@ metadata:
   labels:
     app: toystore
   annotations:
-    secret.kuadrant.io/user-id: alice
+    secret.kuadrant.io/user-id: user:default/alice
     secret.kuadrant.io/plan-id: gold
 stringData:
   api_key: secret-alice-key
@@ -133,7 +133,7 @@ metadata:
   labels:
     app: toystore
   annotations:
-    secret.kuadrant.io/user-id: bob
+    secret.kuadrant.io/user-id: user:default/bob
     secret.kuadrant.io/plan-id: silver
 stringData:
   api_key: secret-bob-key
@@ -172,9 +172,7 @@ metadata:
   name: toystore-api
   namespace: toystore
   annotations:
-    backstage.io/created-by-user-id: guest
-    backstage.io/created-by-user-ref: user:default/guest
-    backstage.io/created-at: "2025-01-01T00:00:00Z"
+    backstage.io/owner: user:default/guest
 spec:
   displayName: Toystore API
   description: simple toy store api for demonstration

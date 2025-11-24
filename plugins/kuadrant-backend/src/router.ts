@@ -34,8 +34,17 @@ function generateApiKey(): string {
   return randomBytes(32).toString('hex');
 }
 
+/**
+ * Extract a kubernetes-safe name from entity ref
+ * e.g., "user:default/alice" -> "alice"
+ * e.g., "group:platform/api-owners" -> "api-owners"
+ */
+function extractNameFromEntityRef(entityRef: string): string {
+  const parts = entityRef.split('/');
+  return parts[parts.length - 1];
+}
+
 async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, userInfo: UserInfoService): Promise<{
-  userId: string;
   userEntityRef: string;
   groups: string[];
 }> {
@@ -47,14 +56,10 @@ async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, 
 
   // get user info from credentials
   const info = await userInfo.getUserInfo(credentials);
-
-  // extract userId from entity ref (format: "user:default/alice" -> "alice")
-  const userId = info.userEntityRef.split('/')[1];
   const groups = info.ownershipEntityRefs || [];
 
-  console.log(`user identity resolved: userId=${userId}, userEntityRef=${info.userEntityRef}, groups=${groups.join(',')}`);
+  console.log(`user identity resolved: userEntityRef=${info.userEntityRef}, groups=${groups.join(',')}`);
   return {
-    userId,
     userEntityRef: info.userEntityRef,
     groups
   };
@@ -97,7 +102,7 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
 
       // check if user has read all permission
@@ -122,8 +127,8 @@ export async function createRouter({
 
         // filter to only owned apiproducts
         const ownedItems = (data.items || []).filter((item: any) => {
-          const createdByUserId = item.metadata?.annotations?.['backstage.io/created-by-user-id'];
-          return createdByUserId === userId;
+          const owner = item.metadata?.annotations?.['backstage.io/owner'];
+          return owner === userEntityRef;
         });
 
         res.json({ ...data, items: ownedItems });
@@ -161,11 +166,12 @@ export async function createRouter({
         }
 
         // verify ownership
-        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
-        const createdByUserId = data.metadata?.annotations?.['backstage.io/created-by-user-id'];
+        const owner = data.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
-        if (createdByUserId !== userId) {
+        if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only read your own api products');
         }
 
@@ -198,7 +204,7 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      const { userId, userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const apiProduct = req.body;
       const targetRef = apiProduct.spec?.targetRef;
 
@@ -210,13 +216,12 @@ export async function createRouter({
       const namespace = targetRef.namespace;
       apiProduct.metadata.namespace = namespace;
 
-      // set ownership annotations (backstage-specific metadata)
+      // set ownership annotation (backstage-specific metadata)
+      // note: creationTimestamp is automatically set by kubernetes api server
       if (!apiProduct.metadata.annotations) {
         apiProduct.metadata.annotations = {};
       }
-      apiProduct.metadata.annotations['backstage.io/created-by-user-id'] = userId;
-      apiProduct.metadata.annotations['backstage.io/created-by-user-ref'] = userEntityRef;
-      apiProduct.metadata.annotations['backstage.io/created-at'] = new Date().toISOString();
+      apiProduct.metadata.annotations['backstage.io/owner'] = userEntityRef;
 
       // temporary: populate plans from planpolicy until controller implements this
       // look up httproute and find planpolicy targeting it
@@ -309,11 +314,12 @@ export async function createRouter({
         }
 
         // verify ownership before deleting
-        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
-        const createdByUserId = existing.metadata?.annotations?.['backstage.io/created-by-user-id'];
+        const owner = existing.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
-        if (createdByUserId !== userId) {
+        if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only delete your own api products');
         }
       }
@@ -424,20 +430,19 @@ export async function createRouter({
         }
 
         // verify ownership
-        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
-        const createdByUserId = existing.metadata?.annotations?.['backstage.io/created-by-user-id'];
+        const owner = existing.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
-        if (createdByUserId !== userId) {
+        if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only update your own api products');
         }
       }
 
-      // prevent modification of ownership annotations
+      // prevent modification of ownership annotation
       if (req.body.metadata?.annotations) {
-        delete req.body.metadata.annotations['backstage.io/created-by-user-id'];
-        delete req.body.metadata.annotations['backstage.io/created-by-user-ref'];
-        delete req.body.metadata.annotations['backstage.io/created-at'];
+        delete req.body.metadata.annotations['backstage.io/owner'];
       }
 
       const updated = await k8sClient.patchCustomResource(
@@ -559,7 +564,7 @@ export async function createRouter({
       const { apiName, apiNamespace, planTier, useCase, userEmail } = parsed.data;
 
       // extract userId from authenticated credentials, not from request body
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       // check permission with resource reference (per-apiproduct access control)
       const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
@@ -576,9 +581,10 @@ export async function createRouter({
       }
       const timestamp = new Date().toISOString();
       const randomSuffix = randomBytes(4).toString('hex');
-      const requestName = `${userId}-${apiName}-${randomSuffix}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      const userName = extractNameFromEntityRef(userEntityRef);
+      const requestName = `${userName}-${apiName}-${randomSuffix}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
-      const requestedBy: any = { userId };
+      const requestedBy: any = { userId: userEntityRef };
       if (userEmail) {
         requestedBy.email = userEmail;
       }
@@ -622,7 +628,8 @@ export async function createRouter({
           // automatically approve and create secret
           const apiKey = generateApiKey();
           const timestamp = Date.now();
-          const secretName = `${userId}-${apiName}-${timestamp}`
+          const userName = extractNameFromEntityRef(userEntityRef);
+          const secretName = `${userName}-${apiName}-${timestamp}`
             .toLowerCase()
             .replace(/[^a-z0-9-]/g, '-');
 
@@ -637,7 +644,7 @@ export async function createRouter({
               },
               annotations: {
                 'secret.kuadrant.io/plan-id': planTier,
-                'secret.kuadrant.io/user-id': userId,
+                'secret.kuadrant.io/user-id': userEntityRef,
               },
             },
             stringData: {
@@ -748,14 +755,15 @@ export async function createRouter({
 
       // if user only has read.own permission, filter by api product ownership
       if (!canReadAll) {
-        const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+        const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
         // get all apiproducts owned by this user
         const apiproducts = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
         const ownedApiProducts = (apiproducts.items || [])
-          .filter((product: any) =>
-            product.metadata.annotations?.['backstage.io/created-by-user-id'] === userId
-          )
+          .filter((product: any) => {
+            const owner = product.metadata?.annotations?.['backstage.io/owner'];
+            return owner === userEntityRef;
+          })
           .map((product: any) => product.metadata.name);
 
         // filter requests to only those for owned api products
@@ -796,7 +804,7 @@ export async function createRouter({
       }
 
       // extract userId from authenticated credentials, not from query params
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const namespace = req.query.namespace as string;
 
       let data;
@@ -807,7 +815,7 @@ export async function createRouter({
       }
 
       const filteredItems = (data.items || []).filter(
-        (req: any) => req.spec?.requestedBy?.userId === userId
+        (req: any) => req.spec?.requestedBy?.userId === userEntityRef
       );
 
       res.json({ items: filteredItems });
@@ -833,11 +841,11 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const { namespace, name } = req.params;
       const { comment } = parsed.data;
-      const reviewedBy = `user:default/${userId}`;
+      const reviewedBy = userEntityRef;
 
       const request = await k8sClient.getCustomResource(
         'extensions.kuadrant.io',
@@ -858,7 +866,8 @@ export async function createRouter({
         spec.apiName,
       );
 
-      const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+      const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
@@ -878,13 +887,14 @@ export async function createRouter({
         }
 
         // verify ownership of the apiproduct
-        if (createdByUserId !== userId) {
+        if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only approve requests for your own api products');
         }
       }
       const apiKey = generateApiKey();
       const timestamp = Date.now();
-      const secretName = `${spec.requestedBy.userId}-${spec.apiName}-${timestamp}`
+      const userName = extractNameFromEntityRef(spec.requestedBy.userId);
+      const secretName = `${userName}-${spec.apiName}-${timestamp}`
         .toLowerCase()
         .replace(/[^a-z0-9-]/g, '-');
 
@@ -1002,11 +1012,11 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const { namespace, name } = req.params;
       const { comment } = parsed.data;
-      const reviewedBy = `user:default/${userId}`;
+      const reviewedBy = userEntityRef;
 
       // fetch request to get apiproduct info
       const request = await k8sClient.getCustomResource(
@@ -1028,7 +1038,8 @@ export async function createRouter({
         spec.apiName,
       );
 
-      const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+      const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
@@ -1048,7 +1059,7 @@ export async function createRouter({
         }
 
         // verify ownership of the apiproduct
-        if (createdByUserId !== userId) {
+        if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only reject requests for your own api products');
         }
       }
@@ -1096,7 +1107,7 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
         [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
@@ -1108,7 +1119,7 @@ export async function createRouter({
       }
 
       const { requests, comment } = parsed.data;
-      const reviewedBy = `user:default/${userId}`;
+      const reviewedBy = userEntityRef;
       const results = [];
 
       for (const reqRef of requests) {
@@ -1132,7 +1143,8 @@ export async function createRouter({
             spec.apiName,
           );
 
-          const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
           // try update all permission first (admin)
           const updateAllDecision = await permissions.authorize(
@@ -1152,13 +1164,14 @@ export async function createRouter({
             }
 
             // verify ownership of the apiproduct
-            if (createdByUserId !== userId) {
+            if (owner !== userEntityRef) {
               throw new NotAllowedError('you can only approve requests for your own api products');
             }
           }
           const apiKey = generateApiKey();
           const timestamp = Date.now();
-          const secretName = `${spec.requestedBy.userId}-${spec.apiName}-${timestamp}`
+          const userName = extractNameFromEntityRef(spec.requestedBy.userId);
+          const secretName = `${userName}-${spec.apiName}-${timestamp}`
             .toLowerCase()
             .replace(/[^a-z0-9-]/g, '-');
 
@@ -1288,7 +1301,7 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
         [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
@@ -1300,7 +1313,7 @@ export async function createRouter({
       }
 
       const { requests, comment } = parsed.data;
-      const reviewedBy = `user:default/${userId}`;
+      const reviewedBy = userEntityRef;
       const results = [];
 
       for (const reqRef of requests) {
@@ -1325,7 +1338,8 @@ export async function createRouter({
             spec.apiName,
           );
 
-          const createdByUserId = apiProduct.metadata?.annotations?.['backstage.io/created-by-user-id'];
+          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+        // owner is already in entity ref format
 
           // try update all permission first (admin)
           const updateAllDecision = await permissions.authorize(
@@ -1345,7 +1359,7 @@ export async function createRouter({
             }
 
             // verify ownership of the apiproduct
-            if (createdByUserId !== userId) {
+            if (owner !== userEntityRef) {
               throw new NotAllowedError('you can only reject requests for your own api products');
             }
           }
@@ -1392,7 +1406,7 @@ export async function createRouter({
   router.delete('/requests/:namespace/:name', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
       // get request to verify ownership
@@ -1426,7 +1440,7 @@ export async function createRouter({
         }
 
         // verify ownership
-        if (requestUserId !== userId) {
+        if (requestUserId !== userEntityRef) {
           throw new NotAllowedError('you can only delete your own api key requests');
         }
       }
@@ -1492,7 +1506,7 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { userId } = await getUserIdentity(req, httpAuth, userInfo);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
       // get existing request to check ownership and status
@@ -1530,7 +1544,7 @@ export async function createRouter({
         }
 
         // verify ownership
-        if (requestUserId !== userId) {
+        if (requestUserId !== userEntityRef) {
           throw new NotAllowedError('you can only update your own api key requests');
         }
       }
