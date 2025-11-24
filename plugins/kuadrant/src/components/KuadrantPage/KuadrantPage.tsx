@@ -182,7 +182,7 @@ export const ResourceList = () => {
   const columns: TableColumn[] = [
     {
       title: 'Name',
-      field: 'name',
+      field: 'spec.displayName',
       render: (row: any) => {
         const publishStatus = row.spec?.publishStatus;
         const isPublished = publishStatus === 'Published';
@@ -198,9 +198,13 @@ export const ResourceList = () => {
 
         return (
           <span className="text-muted">
-        <strong>{displayName}</strong>
-      </span>
+            <strong>{displayName}</strong>
+          </span>
         );
+      },
+      customFilterAndSearch: (term, row: any) => {
+        const displayName = row.spec?.displayName || row.metadata.name || '';
+        return displayName.toLowerCase().includes(term.toLowerCase());
       },
     },
     {
@@ -257,6 +261,7 @@ export const ResourceList = () => {
     {
       title: 'Actions',
       field: 'actions',
+      filtering: false,
       render: (row: any) => (
         <Box display="flex" style={{ gap: 4 }}>
           {canUpdateApiProduct && (
@@ -305,7 +310,15 @@ export const ResourceList = () => {
     }
     return (
       <Table
-        options={{ paging: false, search: false, toolbar: false }}
+        options={{
+          paging: resources.length > 5,
+          pageSize: 20,
+          search: true,
+          filtering: true,
+          debounceInterval: 300,
+          toolbar: true,
+          emptyRowsWhenPaging: false,
+        }}
         columns={columns}
         data={resources}
       />

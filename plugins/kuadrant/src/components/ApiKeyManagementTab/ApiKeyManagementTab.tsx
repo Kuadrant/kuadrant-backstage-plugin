@@ -460,6 +460,7 @@ func main() {
       title: 'API Key',
       field: 'status.apiKey',
       searchable: false,
+      filtering: false,
       render: (row: APIKeyRequest) => {
         const isVisible = visibleKeys.has(row.metadata.name);
         const apiKey = row.status?.apiKey || 'N/A';
@@ -489,6 +490,7 @@ func main() {
       title: '',
       field: 'actions',
       searchable: false,
+      filtering: false,
       render: (row: APIKeyRequest) => {
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
@@ -610,6 +612,7 @@ func main() {
       title: '',
       field: 'actions',
       searchable: false,
+      filtering: false,
       render: (row: APIKeyRequest) => {
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
         const ownerId = row.spec.requestedBy.userId;
@@ -678,8 +681,13 @@ func main() {
             <Table
               title="Pending Requests"
               options={{
-                paging: false,
-                search: false,
+                paging: pendingRequests.length > 5,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
+                emptyRowsWhenPaging: false,
               }}
               columns={pendingRequestColumns}
               data={pendingRequests}
@@ -691,8 +699,13 @@ func main() {
             <Table
               title="Rejected Requests"
               options={{
-                paging: false,
-                search: false,
+                paging: rejectedRequests.length > 5,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
+                emptyRowsWhenPaging: false,
               }}
               columns={requestColumns}
               data={rejectedRequests}
@@ -705,8 +718,13 @@ func main() {
               key="api-keys-table"
               title="API Keys"
               options={{
-                paging: false,
-                search: false,
+                paging: approvedRequests.length > 5,
+                pageSize: 20,
+                search: true,
+                filtering: true,
+                debounceInterval: 300,
+                toolbar: true,
+                emptyRowsWhenPaging: false,
               }}
               columns={approvedColumns}
               data={approvedRequests}
