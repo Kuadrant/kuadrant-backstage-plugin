@@ -108,6 +108,48 @@ yarn lint:check                   # Check linting
 yarn test                         # Run tests
 ```
 
+### Testing
+
+**Unit Tests:**
+```bash
+yarn test                       # run all tests
+yarn test --filter=backend      # run tests for specific package
+```
+
+**E2E Tests:**
+
+End-to-end tests use Playwright to test the Kuadrant plugin UI and workflows.
+
+Prerequisites:
+1. Kind cluster running with Kuadrant (`cd kuadrant-dev-setup && make kind-create`)
+2. App running (`yarn dev` in separate terminal)
+
+Run tests:
+```bash
+cd e2e-tests
+yarn test                       # run kuadrant e2e tests
+yarn test:smoke                 # run smoke tests only
+```
+
+Tests available:
+- `kuadrant-plugin.spec.ts` - basic navigation and rendering tests
+- `kuadrant-rbac.spec.ts` - comprehensive RBAC permission tests covering all personas
+
+The E2E tests verify:
+- UI navigation and page rendering
+- RBAC permissions for all 4 personas (Platform Engineer, API Admin, API Owner, API Consumer)
+- Create/read/update/delete operations
+- Approval workflows
+- Ownership enforcement
+
+### Linting and Formatting
+```bash
+yarn lint:check                 # check for linting errors
+yarn lint:fix                   # fix linting errors
+yarn prettier:check             # check formatting
+yarn prettier:fix               # fix formatting
+```
+
 ### Testing Permissions
 
 The application uses RBAC with a three-tier role hierarchy:
