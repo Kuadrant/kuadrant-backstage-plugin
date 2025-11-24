@@ -183,11 +183,25 @@ export const ResourceList = () => {
     {
       title: 'Name',
       field: 'name',
-      render: (row: any) => (
-        <Link to={`/catalog/default/api/${row.metadata.name}/api-product`}>
-          <strong>{row.spec?.displayName || row.metadata.name}</strong>
-        </Link>
-      ),
+      render: (row: any) => {
+        const publishStatus = row.spec?.publishStatus;
+        const isPublished = publishStatus === 'Published';
+        const displayName = row.spec?.displayName ?? row.metadata.name;
+
+        if (isPublished) {
+          return (
+            <Link to={`/catalog/default/api/${row.metadata.name}/api-product`}>
+              <strong>{displayName}</strong>
+            </Link>
+          );
+        }
+
+        return (
+          <span className="text-muted">
+        <strong>{displayName}</strong>
+      </span>
+        );
+      },
     },
     {
       title: 'Resource Name',
@@ -254,7 +268,7 @@ export const ResourceList = () => {
               <EditIcon fontSize="small" />
             </IconButton>
           )}
-          
+
           {canDeleteApiProduct && (
             <IconButton
               size="small"
