@@ -132,6 +132,8 @@ demo-install:
 	@echo "installing toystore demo resources..."
 	@kubectl apply -f demo/toystore-demo.yaml
 	@kubectl apply -f demo/additional-demos.yaml
+	# temp solution until developer-portal-controller does this
+	@kubectl patch apiproduct toystore-api -n toystore --subresource status --type=merge --patch "$$(cat demo/toystore-status.yaml)"
 	@echo ""
 	@echo "demo resources installed!"
 	@echo ""
