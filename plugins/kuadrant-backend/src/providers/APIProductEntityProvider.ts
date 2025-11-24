@@ -149,7 +149,7 @@ export class APIProductEntityProvider implements EntityProvider {
     const tags = product.spec.tags || [];
 
     // OpenAPI spec URL
-    const definition = product.status.openapi?.raw ? `${product.status.openapi.raw}`
+    const definition = product.status?.openapi?.raw ? `${product.status.openapi.raw}`
       : `# no openapi spec configured
       openapi: 3.0.0
       info:
