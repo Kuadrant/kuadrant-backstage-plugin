@@ -88,10 +88,10 @@ export async function createRouter({
 
   const k8sClient = new KuadrantK8sClient(config);
 
-  // helper function to fetch api key from secret if secretRef exists
-  async function enrichApiKeyWithSecret(apiKeyResource: any): Promise<any> {
+  // helper to enrich apikey with secret value
+  async function enrichApiKey(apiKeyResource: any): Promise<any> {
     const secretRef = apiKeyResource.status?.secretRef;
-    if (!secretRef || !secretRef.name) {
+    if (!secretRef?.name) {
       return apiKeyResource;
     }
 
@@ -103,13 +103,9 @@ export async function createRouter({
 
       if (encodedKey) {
         const decodedKey = Buffer.from(encodedKey, 'base64').toString('utf-8');
-        // add apiKey to status for backward compatibility with frontend
         return {
           ...apiKeyResource,
-          status: {
-            ...apiKeyResource.status,
-            apiKey: decodedKey,
-          },
+          apiKey: decodedKey,
         };
       }
     } catch (error) {
@@ -678,7 +674,7 @@ export async function createRouter({
             apiHostname,
             apiBasePath: '/api/v1',
             apiDescription: `${apiName} api`,
-            planLimits,
+            limits: planLimits,
           };
 
           await k8sClient.patchCustomResourceStatus(
@@ -772,7 +768,7 @@ export async function createRouter({
       const enrichedItems = await Promise.all(
         filteredItems.map(async (item: any) => {
           if (item.status?.phase === 'Approved' && item.status?.secretRef) {
-            return await enrichApiKeyWithSecret(item);
+            return await enrichApiKey(item);
           }
           return item;
         })
@@ -821,7 +817,7 @@ export async function createRouter({
       const enrichedItems = await Promise.all(
         filteredItems.map(async (item: any) => {
           if (item.status?.phase === 'Approved' && item.status?.secretRef) {
-            return await enrichApiKeyWithSecret(item);
+            return await enrichApiKey(item);
           }
           return item;
         })
@@ -990,7 +986,7 @@ export async function createRouter({
         apiHostname,
         apiBasePath: '/api/v1',
         apiDescription: `${spec.apiProductRef.name} api`,
-        planLimits,
+        limits: planLimits,
       };
 
       await k8sClient.patchCustomResourceStatus(
@@ -1073,11 +1069,20 @@ export async function createRouter({
         }
       }
 
+      const now = new Date().toISOString();
       const status = {
         phase: 'Rejected',
         reviewedBy,
-        reviewedAt: new Date().toISOString(),
-        reason: comment || 'rejected',
+        reviewedAt: now,
+        conditions: [
+          {
+            type: 'Ready',
+            status: 'False',
+            reason: 'Rejected',
+            message: comment || 'request rejected',
+            lastTransitionTime: now,
+          },
+        ],
       };
 
       await k8sClient.patchCustomResourceStatus(
@@ -1267,7 +1272,7 @@ export async function createRouter({
             apiHostname,
             apiBasePath: '/api/v1',
             apiDescription: `${spec.apiProductRef.name} api`,
-            planLimits,
+            limits: planLimits,
           };
 
           await k8sClient.patchCustomResourceStatus(
@@ -1373,11 +1378,20 @@ export async function createRouter({
             }
           }
 
+          const now = new Date().toISOString();
           const status = {
             phase: 'Rejected',
             reviewedBy,
-            reviewedAt: new Date().toISOString(),
-            reason: comment || 'rejected',
+            reviewedAt: now,
+            conditions: [
+              {
+                type: 'Ready',
+                status: 'False',
+                reason: 'Rejected',
+                message: comment || 'request rejected',
+                lastTransitionTime: now,
+              },
+            ],
           };
 
           await k8sClient.patchCustomResourceStatus(

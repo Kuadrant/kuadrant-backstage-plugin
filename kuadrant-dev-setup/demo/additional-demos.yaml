@@ -22,7 +22,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team
@@ -52,7 +51,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team
@@ -82,7 +80,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner2-team
@@ -112,7 +109,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner2-team
@@ -142,7 +138,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: admin-team
@@ -172,7 +167,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: owner1-team

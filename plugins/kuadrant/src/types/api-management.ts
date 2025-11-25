@@ -17,27 +17,19 @@ export interface APIKeyRequestSpec {
     name: string;
   };
   planTier: PlanTier;
-  useCase?: string;
+  useCase: string;
   requestedBy: {
     userId: string;
     email: string;
   };
 }
 
-export interface APIKeyPlanLimits {
-  requestsPerDay?: number;
-  requestsPerHour?: number;
-  requestsPerMinute?: number;
-}
-
 export interface APIKeyRequestStatus {
   phase?: RequestPhase;
   reviewedBy?: string;
   reviewedAt?: string;
-  reason?: string;
   apiHostname?: string;
-  apiKey?: string; // populated by backend from secret
-  planLimits?: APIKeyPlanLimits;
+  limits?: PlanLimits;
   secretRef?: {
     name: string;
     key: string;
@@ -50,6 +42,21 @@ export interface APIKeyRequestStatus {
     lastTransitionTime?: string;
     observedGeneration?: number;
   }>;
+}
+
+// enriched response from backend (adds apiKey from secretRef lookup)
+export interface EnrichedAPIKeyRequest extends APIKeyRequest {
+  apiKey?: string;
+}
+
+// helper to extract rejection reason from conditions
+export function getRejectionReason(request: APIKeyRequest): string | undefined {
+  const conditions = request.status?.conditions;
+  if (!conditions) return undefined;
+  const rejected = conditions.find(
+    c => c.type === 'Ready' && c.status === 'False' && c.reason === 'Rejected'
+  );
+  return rejected?.message;
 }
 
 export interface APIKeyRequest {

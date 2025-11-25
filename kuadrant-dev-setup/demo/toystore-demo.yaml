@@ -188,7 +188,6 @@ spec:
     kind: HTTPRoute
     name: toystore
   documentation:
-    openAPISpecURL: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: api-owners

@@ -31,7 +31,7 @@ import {
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKeyRequest, EnrichedAPIKeyRequest, getRejectionReason } from '../../types/api-management';
 
 interface ApprovalDialogProps {
   open: boolean;
@@ -657,13 +657,13 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Reason',
-      field: 'status.reason',
-      render: (row) => {
-        if (!row.status?.reason) {
+      render: (row: EnrichedAPIKeyRequest) => {
+        const reason = getRejectionReason(row);
+        if (!reason) {
           return <Typography variant="body2">-</Typography>;
         }
         return (
-          <Tooltip title={row.status.reason} placement="top">
+          <Tooltip title={reason} placement="top">
             <Typography
               variant="body2"
               style={{
@@ -673,7 +673,7 @@ export const ApprovalQueueCard = () => {
                 whiteSpace: 'nowrap',
               }}
             >
-              {row.status.reason}
+              {reason}
             </Typography>
           </Tooltip>
         );

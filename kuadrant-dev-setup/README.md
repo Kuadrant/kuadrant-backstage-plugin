@@ -2,10 +2,25 @@
 
 development environment for kuadrant plugins in rhdh.
 
+## prerequisites
+
+**developer-portal-controller:** must be cloned alongside this repo:
+```bash
+cd ../..
+git clone git@github.com:Kuadrant/developer-portal-controller.git
+```
+
+expected directory layout:
+```
+Work/
+├── kuadrant-backstage-plugin/    # this repo
+└── developer-portal-controller/  # controller repo
+```
+
 ## quick start
 
 ```bash
-# create kind cluster with kuadrant
+# create kind cluster with kuadrant + controller
 make kind-create
 
 # start rhdh with hot reload
@@ -23,8 +38,12 @@ visit http://localhost:3000/kuadrant
 - gateway api crds v1.2.0
 - istio service mesh (base + istiod)
 
+**developer-portal-controller:**
+- deploys controller from `../developer-portal-controller`
+- installs CRDs: APIProduct, APIKey (devportal.kuadrant.io/v1alpha1)
+- controller manages plan discovery and status reconciliation
+
 **kuadrant components:**
-- custom crds: APIProduct, APIKeyRequest
 - kuadrant instance in `kuadrant-system` namespace
 
 **demo resources (toystore):**
@@ -33,7 +52,6 @@ visit http://localhost:3000/kuadrant
 - authpolicy for api key authentication
 - planpolicy for rate limiting
 - sample api products
-- example secrets
 
 **rbac:**
 - rhdh service account with cluster access
@@ -45,9 +63,6 @@ visit http://localhost:3000/kuadrant
 kuadrant-dev-setup/
 ├── Makefile                  # cluster and kuadrant setup
 ├── README.md                 # this file
-├── crds/                     # custom resource definitions
-│   ├── extensions.kuadrant.io_apiproduct.yaml
-│   └── extensions.kuadrant.io_apikeyrequest.yaml
 ├── demo/                     # demo resources
 │   └── toystore-demo.yaml    # toystore api with policies
 ├── rbac/                     # rbac configs
@@ -56,20 +71,25 @@ kuadrant-dev-setup/
     └── kind-cluster.yaml     # kind cluster configuration
 ```
 
+CRDs are managed by the developer-portal-controller:
+- `../developer-portal-controller/config/crd/bases/devportal.kuadrant.io_apiproducts.yaml`
+- `../developer-portal-controller/config/crd/bases/devportal.kuadrant.io_apikeys.yaml`
+
 ## commands
 
 ### cluster management
 ```bash
-make kind-create    # create cluster + install kuadrant + demo
+make kind-create    # create cluster + install kuadrant + controller + demo
 make kind-delete    # delete cluster
 make clean          # delete cluster + cleanup bin/
 ```
 
 ### kuadrant
 ```bash
-make kuadrant-install   # install kuadrant v1.3.0
-make demo-install       # install toystore demo
-make demo-uninstall     # remove toystore demo
+make kuadrant-install     # install kuadrant v1.3.0
+make controller-deploy    # deploy developer-portal-controller
+make demo-install         # install toystore demo
+make demo-uninstall       # remove toystore demo
 ```
 
 ### verify installation
@@ -167,7 +187,10 @@ this setup is simplified for rhdh development:
 - kind cluster creation
 - kuadrant v1.3.0 installation
 - toystore demo resources
-- custom crds
+
+**what we added:**
+- developer-portal-controller deployment
+- CRDs managed by controller (not local copies)
 
 **what we simplified:**
 - single makefile (no complex includes)

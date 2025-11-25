@@ -27,9 +27,8 @@ import {
   Tab,
   Menu,
   Tooltip,
-  CircularProgress,
 } from '@material-ui/core';
-import { useApi, configApiRef, identityApiRef, fetchApiRef, alertApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
@@ -37,7 +36,7 @@ import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKeyRequest, EnrichedAPIKeyRequest, getRejectionReason } from '../../types/api-management';
 import {
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
@@ -46,7 +45,6 @@ import {
 } from '../../permissions';
 import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
-import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 
 interface APIProduct {
   metadata: {
@@ -86,11 +84,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const config = useApi(configApiRef);
   const identityApi = useApi(identityApiRef);
   const fetchApi = useApi(fetchApiRef);
-  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
-  const [userId, setUserId] = useState<string>('');
+  const [userId, setUserId] = useState<string>('guest');
   const [userEmail, setUserEmail] = useState<string>('');
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
@@ -101,12 +98,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [requestToEdit, setRequestToEdit] = useState<APIKeyRequest | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
   const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [optimisticallyDeleted, setOptimisticallyDeleted] = useState<Set<string>>(new Set());
-  const [deleteDialogState, setDeleteDialogState] = useState<{
-    open: boolean;
-    request: APIKeyRequest | null;
-  }>({ open: false, request: null });
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -115,7 +106,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
     const profile = await identityApi.getProfileInfo();
-    setUserId(identity.userEntityRef);
+    setUserId(identity.userEntityRef.split('/')[1] || 'guest');
     setUserEmail(profile.email || '');
   }, [identityApi]);
 
@@ -130,7 +121,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     // filter by apiproduct name
     // apikey lives in same namespace as apiproduct
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiProductRef.name === apiProductName && r.metadata.namespace === namespace
+      (r: EnrichedAPIKeyRequest) => r.spec.apiProductRef.name === apiProductName && r.metadata.namespace === namespace
     );
   }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
@@ -177,9 +168,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
 
   const handleDeleteRequest = async (name: string) => {
-    // optimistic update - remove from UI immediately
-    setOptimisticallyDeleted(prev => new Set(prev).add(name));
-    setDeleting(name);
     try {
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
@@ -188,31 +176,13 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       if (!response.ok) {
         throw new Error('failed to delete request');
       }
-      alertApi.post({
-        message: 'API key request deleted successfully',
-        severity: 'success',
-        display: 'transient',
-      });
       setRefresh(r => r + 1);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'unknown error occurred';
-      // rollback optimistic update on error
-      setOptimisticallyDeleted(prev => {
-        const next = new Set(prev);
-        next.delete(name);
-        return next;
-      });
-      alertApi.post({
-        message: `Failed to delete API key request: ${errorMessage}`,
-        severity: 'error',
-        display: 'transient',
-      });
-    } finally {
-      setDeleting(null);
+      console.error('error deleting request:', err);
     }
   };
 
-  const handleEditRequest = (request: APIKeyRequest) => {
+  const handleEditRequest = (request: EnrichedAPIKeyRequest) => {
     setRequestToEdit(request);
     setEditDialogOpen(true);
   };
@@ -220,7 +190,6 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const handleEditSuccess = () => {
     setRefresh(r => r + 1);
     setEditDialogOpen(false);
-    alertApi.post({ message: 'Request updated', severity: 'success', display: 'transient' });
     setRequestToEdit(null);
   };
 
@@ -235,21 +204,16 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     handleMenuClose();
   };
 
-  const handleMenuDeleteClick = () => {
+  const handleMenuDelete = async () => {
     if (!menuRequest) return;
-    const request = menuRequest;
+    const requestName = menuRequest.metadata.name;
     handleMenuClose();
-    setDeleteDialogState({ open: true, request });
-  };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteDialogState.request) return;
-    await handleDeleteRequest(deleteDialogState.request.metadata.name);
-    setDeleteDialogState({ open: false, request: null });
-  };
+    if (!window.confirm('Are you sure you want to delete this request?')) {
+      return;
+    }
 
-  const handleDeleteCancel = () => {
-    setDeleteDialogState({ open: false, request: null });
+    await handleDeleteRequest(requestName);
   };
 
   const toggleVisibility = (keyName: string) => {
@@ -291,24 +255,13 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
         throw new Error(errorData.error || `failed to create request: ${response.status}`);
       }
 
-      alertApi.post({
-        message: 'API access request submitted successfully',
-        severity: 'success',
-        display: 'transient',
-      });
-
       setOpen(false);
       setSelectedPlan('');
       setUseCase('');
       setRefresh(r => r + 1);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'unknown error occurred';
-      alertApi.post({
-        message: `Failed to create API access request: ${errorMessage}`,
-        severity: 'error',
-        display: 'transient',
-      });
-      setCreateError(errorMessage);
+      console.error('error creating api key request:', err);
+      setCreateError(err instanceof Error ? err.message : 'unknown error occurred');
     } finally {
       setCreating(false);
     }
@@ -329,7 +282,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   ], [apiProductName]);
 
   // separate component to isolate state
-  const DetailPanelContent = ({ request, apiName: api }: { request: APIKeyRequest; apiName: string }) => {
+  const DetailPanelContent = ({ request, apiName: api }: { request: EnrichedAPIKeyRequest; apiName: string }) => {
     const [selectedLanguage, setSelectedLanguage] = useState(0);
     const hostname = request.status?.apiHostname || `${api}.apps.example.com`;
 
@@ -375,20 +328,20 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             <Tab label="Go" onClick={(e) => e.stopPropagation()} />
           </Tabs>
         </Box>
-        <Box mt={2}>
-          {selectedLanguage === 0 && (
-            <CodeSnippet
-              text={`curl -X GET https://${hostname}/api/v1/endpoint \\
-  -H "Authorization: Bearer ${request.status?.apiKey}"`}
-              language="bash"
-              showCopyCodeButton
-            />
-          )}
-          {selectedLanguage === 1 && (
-            <CodeSnippet
-              text={`const fetch = require('node-fetch');
+            <Box mt={2}>
+              {selectedLanguage === 0 && (
+                <CodeSnippet
+                  text={`curl -X GET https://${hostname}/api/v1/endpoint \\
+  -H "Authorization: Bearer ${request.apiKey}"`}
+                  language="bash"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 1 && (
+                <CodeSnippet
+                  text={`const fetch = require('node-fetch');
 
-const apiKey = '${request.status?.apiKey}';
+const apiKey = '${request.apiKey}';
 const endpoint = 'https://${hostname}/api/v1/endpoint';
 
 fetch(endpoint, {
@@ -400,15 +353,15 @@ fetch(endpoint, {
   .then(response => response.json())
   .then(data => console.log(data))
   .catch(error => console.error('Error:', error));`}
-              language="javascript"
-              showCopyCodeButton
-            />
-          )}
-          {selectedLanguage === 2 && (
-            <CodeSnippet
-              text={`import requests
+                  language="javascript"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 2 && (
+                <CodeSnippet
+                  text={`import requests
 
-api_key = '${request.status?.apiKey}'
+api_key = '${request.apiKey}'
 endpoint = 'https://${hostname}/api/v1/endpoint'
 
 headers = {
@@ -417,13 +370,13 @@ headers = {
 
 response = requests.get(endpoint, headers=headers)
 print(response.json())`}
-              language="python"
-              showCopyCodeButton
-            />
-          )}
-          {selectedLanguage === 3 && (
-            <CodeSnippet
-              text={`package main
+                  language="python"
+                  showCopyCodeButton
+                />
+              )}
+              {selectedLanguage === 3 && (
+                <CodeSnippet
+                  text={`package main
 
 import (
     "fmt"
@@ -432,7 +385,7 @@ import (
 )
 
 func main() {
-    apiKey := "${request.status?.apiKey}"
+    apiKey := "${request.apiKey}"
     endpoint := "https://${hostname}/api/v1/endpoint"
 
     client := &http.Client{}
@@ -449,10 +402,10 @@ func main() {
     body, _ := io.ReadAll(resp.Body)
     fmt.Println(string(body))
 }`}
-              language="go"
-              showCopyCodeButton
-            />
-          )}
+                  language="go"
+                  showCopyCodeButton
+                />
+              )}
         </Box>
       </Box>
     );
@@ -472,9 +425,9 @@ func main() {
 
   if (permissionError) {
     const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
-      deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
-        deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
-          updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
+                            deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
+                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
+                            updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
     return (
       <Box p={2}>
         <Typography color="error">
@@ -490,27 +443,25 @@ func main() {
     );
   }
 
-  const myRequests = ((requests || []) as APIKeyRequest[]).filter(
-    r => !optimisticallyDeleted.has(r.metadata.name)
-  );
+  const myRequests = (requests || []) as EnrichedAPIKeyRequest[];
   const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
   const rejectedRequests = myRequests.filter(r => r.status?.phase === 'Rejected');
 
-  const approvedColumns: TableColumn<APIKeyRequest>[] = [
+  const approvedColumns: TableColumn<EnrichedAPIKeyRequest>[] = [
     {
-      title: 'Tier',
+      title: 'Plan Tier',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => (
+      render: (row: EnrichedAPIKeyRequest) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
       ),
     },
     {
       title: 'Approved',
       field: 'status.reviewedAt',
-      render: (row: APIKeyRequest) => (
+      render: (row: EnrichedAPIKeyRequest) => (
         <Typography variant="body2">
           {row.status?.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '-'}
         </Typography>
@@ -518,12 +469,12 @@ func main() {
     },
     {
       title: 'API Key',
-      field: 'status.apiKey',
+      field: 'apiKey',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         const isVisible = visibleKeys.has(row.metadata.name);
-        const apiKey = row.status?.apiKey || 'N/A';
+        const apiKey = row.apiKey || 'N/A';
 
         return (
           <Box display="flex" alignItems="center">
@@ -551,11 +502,7 @@ func main() {
       field: 'actions',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
-        const isDeleting = deleting === row.metadata.name;
-        if (isDeleting) {
-          return <CircularProgress size={20} />;
-        }
+      render: (row: EnrichedAPIKeyRequest) => {
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
         if (!canDelete) return null;
@@ -572,18 +519,18 @@ func main() {
             aria-controls={menuAnchor ? 'actions-menu' : undefined}
             aria-haspopup="true"
           >
-            <MoreVertIcon />
-          </IconButton>
+              <MoreVertIcon />
+            </IconButton>
         );
       },
     },
   ];
 
-  const requestColumns: TableColumn<APIKeyRequest>[] = [
+  const requestColumns: TableColumn<EnrichedAPIKeyRequest>[] = [
     {
       title: 'Status',
       field: 'status.phase',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         const phase = row.status?.phase || 'Pending';
         const isPending = phase === 'Pending';
         return (
@@ -597,16 +544,16 @@ func main() {
       },
     },
     {
-      title: 'Tier',
+      title: 'Plan Tier',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => (
+      render: (row: EnrichedAPIKeyRequest) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
       ),
     },
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         if (!row.spec.useCase) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -630,7 +577,7 @@ func main() {
     {
       title: 'Requested',
       field: 'metadata.creationTimestamp',
-      render: (row: APIKeyRequest) => (
+      render: (row: EnrichedAPIKeyRequest) => (
         <Typography variant="body2">
           {row.metadata.creationTimestamp ? new Date(row.metadata.creationTimestamp).toLocaleDateString() : '-'}
         </Typography>
@@ -639,7 +586,7 @@ func main() {
     {
       title: 'Reviewed',
       field: 'status.reviewedAt',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         if (!row.status?.reviewedAt) return <Typography variant="body2">-</Typography>;
         return (
           <Typography variant="body2">
@@ -650,13 +597,13 @@ func main() {
     },
     {
       title: 'Reason',
-      field: 'status.reason',
-      render: (row: APIKeyRequest) => {
-        if (!row.status?.reason) {
+      render: (row: EnrichedAPIKeyRequest) => {
+        const reason = getRejectionReason(row);
+        if (!reason) {
           return <Typography variant="body2">-</Typography>;
         }
         return (
-          <Tooltip title={row.status.reason} placement="top">
+          <Tooltip title={reason} placement="top">
             <Typography
               variant="body2"
               style={{
@@ -666,7 +613,7 @@ func main() {
                 whiteSpace: 'nowrap',
               }}
             >
-              {row.status.reason}
+              {reason}
             </Typography>
           </Tooltip>
         );
@@ -677,11 +624,7 @@ func main() {
       field: 'actions',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
-        const isDeleting = deleting === row.metadata.name;
-        if (isDeleting) {
-          return <CircularProgress size={20} />;
-        }
+      render: (row: EnrichedAPIKeyRequest) => {
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
@@ -700,8 +643,8 @@ func main() {
             aria-controls={menuAnchor ? 'actions-menu' : undefined}
             aria-haspopup="true"
           >
-            <MoreVertIcon />
-          </IconButton>
+              <MoreVertIcon />
+            </IconButton>
         );
       },
     },
@@ -821,12 +764,11 @@ func main() {
               <Typography variant="body2">{createError}</Typography>
             </Box>
           )}
-          <FormControl fullWidth margin="normal" disabled={creating}>
-            <InputLabel>Select Tier</InputLabel>
+          <FormControl fullWidth margin="normal">
+            <InputLabel>Select Plan Tier</InputLabel>
             <Select
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as string)}
-              disabled={creating}
             >
               {plans.map((plan: Plan) => {
                 const limitDesc = Object.entries(plan.limits || {})
@@ -850,17 +792,14 @@ func main() {
             value={useCase}
             onChange={(e) => setUseCase(e.target.value)}
             helperText="Explain your intended use of this API for admin review"
-            disabled={creating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)} disabled={creating}>Cancel</Button>
+          <Button onClick={() => setOpen(false)}>Cancel</Button>
           <Button
             onClick={handleRequestAccess}
             color="primary"
-            variant="contained"
             disabled={!selectedPlan || creating}
-            startIcon={creating ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {creating ? 'Submitting...' : 'Submit Request'}
           </Button>
@@ -883,7 +822,7 @@ func main() {
           if (canEdit) {
             items.push(<MenuItem key="edit" onClick={handleMenuEdit}>Edit</MenuItem>);
           }
-          items.push(<MenuItem key="delete" onClick={handleMenuDeleteClick}>Delete</MenuItem>);
+          items.push(<MenuItem key="delete" onClick={handleMenuDelete}>Delete</MenuItem>);
           return items;
         })()}
       </Menu>
@@ -900,15 +839,6 @@ func main() {
           availablePlans={plans}
         />
       )}
-
-      <ConfirmDeleteDialog
-        open={deleteDialogState.open}
-        title="Delete Request"
-        description={`Are you sure you want to delete this ${deleteDialogState.request?.status?.phase === 'Approved' ? 'API key' : 'request'}?`}
-        deleting={deleting !== null}
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-      />
     </Box>
   );
 };
