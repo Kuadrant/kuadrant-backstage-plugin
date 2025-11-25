@@ -152,11 +152,13 @@ yarn prettier:fix               # fix formatting
 
 ### Testing Permissions
 
-The application uses RBAC with a three-tier role hierarchy:
+The application uses RBAC with a four-persona model:
 
 ```
-API Consumer → API Owner → API Admin
+API Consumer → API Owner → API Admin → Platform Engineer
 ```
+
+See [docs/rbac-permissions.md](docs/rbac-permissions.md) for complete details.
 
 Test users are configured in `catalog-entities/kuadrant-users.yaml`:
 - `consumer1`, `consumer2` - members of `api-consumers` group
@@ -184,7 +186,7 @@ Test users are configured in `catalog-entities/kuadrant-users.yaml`:
 - Full visibility across all API Products
 
 **Ownership Model:**
-- API Products track ownership via annotations (`backstage.io/created-by-user-id`)
+- API Products track ownership via annotations (`backstage.io/owner`)
 - Backend enforces ownership checks for API Owners
 - API Admins bypass ownership checks (can manage everything)
 
@@ -228,6 +230,7 @@ This repo is a fork of RHDH with Kuadrant-specific customisations. See [KUADRANT
 
 - [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
 - [CLAUDE.md](CLAUDE.md) - Development guidance and patterns
+- [docs/rbac-permissions.md](docs/rbac-permissions.md) - RBAC and permissions guide
 - [plugins/kuadrant/README.md](plugins/kuadrant/README.md) - Plugin installation guide
 - [kuadrant-dev-setup/README.md](kuadrant-dev-setup/README.md) - Cluster setup guide
 
