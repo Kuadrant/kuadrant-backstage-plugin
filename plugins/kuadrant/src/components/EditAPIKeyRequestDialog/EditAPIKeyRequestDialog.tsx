@@ -55,7 +55,7 @@ export const EditAPIKeyRequestDialog = ({
 
   const handleSave = async () => {
     if (!planTier) {
-      setError('Please select a plan tier');
+      setError('Please select a tier');
       return;
     }
 
@@ -114,7 +114,7 @@ export const EditAPIKeyRequestDialog = ({
         )}
 
         <FormControl fullWidth margin="normal">
-          <InputLabel>Plan Tier</InputLabel>
+          <InputLabel>Tier</InputLabel>
           <Select
             value={planTier}
             onChange={(e) => setPlanTier(e.target.value as string)}

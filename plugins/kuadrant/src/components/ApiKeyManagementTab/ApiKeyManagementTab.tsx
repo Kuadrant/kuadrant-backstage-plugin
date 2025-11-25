@@ -490,7 +490,7 @@ func main() {
 
   const approvedColumns: TableColumn<APIKeyRequest>[] = [
     {
-      title: 'Plan Tier',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row: APIKeyRequest) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
@@ -586,7 +586,7 @@ func main() {
       },
     },
     {
-      title: 'Plan Tier',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row: APIKeyRequest) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
@@ -800,7 +800,7 @@ func main() {
             </Box>
           )}
           <FormControl fullWidth margin="normal" disabled={creating}>
-            <InputLabel>Select Plan Tier</InputLabel>
+            <InputLabel>Select Tier</InputLabel>
             <Select
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as string)}

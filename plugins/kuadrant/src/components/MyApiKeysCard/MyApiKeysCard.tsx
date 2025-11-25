@@ -178,7 +178,7 @@ export const MyApiKeysCard = () => {
       ),
     },
     {
-      title: 'Plan',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row: APIKeyRequest) => {
         const color = row.spec.planTier === 'gold' ? 'primary' :
