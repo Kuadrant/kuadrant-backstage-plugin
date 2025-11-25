@@ -266,6 +266,22 @@ spec:
                   recently observed spec.
                 format: int64
                 type: integer
+              openapi:
+                description: OpenAPI specification fetched from the API and its sync
+                  status
+                properties:
+                  lastSyncTime:
+                    description: lastSyncTime is the last time the raw content was
+                      updated.
+                    format: date-time
+                    type: string
+                  raw:
+                    description: raw content
+                    type: string
+                required:
+                - lastSyncTime
+                - raw
+                type: object
             type: object
         type: object
     served: true

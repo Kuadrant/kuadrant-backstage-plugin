@@ -127,9 +127,10 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       throw new Error('failed to fetch requests');
     }
     const data = await response.json();
-    // filter by apiproduct name, not httproute name
+    // filter by apiproduct name
+    // apikey lives in same namespace as apiproduct
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiProductRef.name === apiProductName && r.spec.apiProductRef.namespace === namespace
+      (r: APIKeyRequest) => r.spec.apiProductRef.name === apiProductName && r.metadata.namespace === namespace
     );
   }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 

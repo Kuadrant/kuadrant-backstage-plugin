@@ -443,8 +443,8 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Namespace',
-      field: 'spec.apiProductRef.namespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiProductRef.namespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',
@@ -541,8 +541,8 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Namespace',
-      field: 'spec.apiProductRef.namespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiProductRef.namespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',
@@ -615,8 +615,8 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Namespace',
-      field: 'spec.apiProductRef.namespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiProductRef.namespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',

@@ -100,9 +100,10 @@ export const MyApiKeysCard = () => {
     handleMenuClose();
 
     // Fetch available plans for this API
+    // apikey lives in same namespace as apiproduct
     try {
       const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiProductRef.namespace}/${request.spec.apiProductRef.name}`
+        `${backendUrl}/api/kuadrant/apiproducts/${request.metadata.namespace}/${request.spec.apiProductRef.name}`
       );
 
       if (apiProductResponse.ok) {

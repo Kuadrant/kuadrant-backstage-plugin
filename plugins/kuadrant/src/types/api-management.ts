@@ -15,7 +15,6 @@ export interface PlanLimits {
 export interface APIKeyRequestSpec {
   apiProductRef: {
     name: string;
-    namespace: string;
   };
   planTier: PlanTier;
   useCase?: string;
@@ -25,25 +24,31 @@ export interface APIKeyRequestSpec {
   };
 }
 
+export interface APIKeyPlanLimits {
+  requestsPerDay?: number;
+  requestsPerHour?: number;
+  requestsPerMinute?: number;
+}
+
 export interface APIKeyRequestStatus {
   phase?: RequestPhase;
   reviewedBy?: string;
   reviewedAt?: string;
   reason?: string;
-  comment?: string;
-  apiKey?: string;
   apiHostname?: string;
-  apiBasePath?: string;
-  apiDescription?: string;
-  apiOasUrl?: string;
-  apiOasUiUrl?: string;
-  planLimits?: PlanLimits;
+  apiKey?: string; // populated by backend from secret
+  planLimits?: APIKeyPlanLimits;
+  secretRef?: {
+    name: string;
+    key: string;
+  };
   conditions?: Array<{
     type: string;
     status: 'True' | 'False' | 'Unknown';
     reason?: string;
     message?: string;
     lastTransitionTime?: string;
+    observedGeneration?: number;
   }>;
 }
 
