@@ -262,12 +262,15 @@ test.describe("Kuadrant API Product Ownership & RBAC", () => {
     const heading = page.locator("h1, h2").filter({ hasText: /kuadrant/i });
     await expect(heading.first()).toBeVisible({ timeout: 10000 });
 
-    // find My API Keys card
-    const myApiKeysCard = page.getByText(/my api keys/i).first();
+    // find My API Keys card container
+    const myApiKeysCard = page
+      .locator('[class*="InfoCard"]')
+      .filter({ hasText: /my api keys/i })
+      .first();
     await expect(myApiKeysCard).toBeVisible({ timeout: 5000 });
 
-    // check if there are any pending requests
-    const pendingTab = page.getByRole("tab", { name: /pending/i });
+    // check if there are any pending requests within the My API Keys card
+    const pendingTab = myApiKeysCard.getByRole("tab", { name: /pending/i });
     const tabVisible = await pendingTab
       .isVisible({ timeout: 5000 })
       .catch(() => false);
@@ -276,8 +279,10 @@ test.describe("Kuadrant API Product Ownership & RBAC", () => {
       await pendingTab.click();
       await page.waitForLoadState("networkidle");
 
-      // look for more menu button (three dots)
-      const moreButton = page.locator("button[aria-haspopup='true']").first();
+      // look for more menu button (three dots) within the card
+      const moreButton = myApiKeysCard
+        .locator("button[aria-haspopup='true']")
+        .first();
       const moreVisible = await moreButton
         .isVisible({ timeout: 3000 })
         .catch(() => false);
