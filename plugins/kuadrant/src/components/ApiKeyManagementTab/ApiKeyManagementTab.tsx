@@ -28,7 +28,7 @@ import {
   Menu,
   Tooltip,
 } from '@material-ui/core';
-import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, identityApiRef, fetchApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
@@ -74,6 +74,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const config = useApi(configApiRef);
   const identityApi = useApi(identityApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
@@ -165,9 +166,17 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       if (!response.ok) {
         throw new Error('failed to delete request');
       }
+      alertApi.post({
+        message: 'API key request deleted successfully',
+        severity: 'success',
+      });
       setRefresh(r => r + 1);
     } catch (err) {
-      console.error('error deleting request:', err);
+      const errorMessage = err instanceof Error ? err.message : 'unknown error occurred';
+      alertApi.post({
+        message: `Failed to delete API key request: ${errorMessage}`,
+        severity: 'error',
+      });
     }
   };
 
@@ -244,13 +253,22 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
         throw new Error(errorData.error || `failed to create request: ${response.status}`);
       }
 
+      alertApi.post({
+        message: 'API access request submitted successfully',
+        severity: 'success',
+      });
+
       setOpen(false);
       setSelectedPlan('');
       setUseCase('');
       setRefresh(r => r + 1);
     } catch (err) {
-      console.error('error creating api key request:', err);
-      setCreateError(err instanceof Error ? err.message : 'unknown error occurred');
+      const errorMessage = err instanceof Error ? err.message : 'unknown error occurred';
+      alertApi.post({
+        message: `Failed to create API access request: ${errorMessage}`,
+        severity: 'error',
+      });
+      setCreateError(errorMessage);
     } finally {
       setCreating(false);
     }
@@ -317,18 +335,18 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             <Tab label="Go" onClick={(e) => e.stopPropagation()} />
           </Tabs>
         </Box>
-            <Box mt={2}>
-              {selectedLanguage === 0 && (
-                <CodeSnippet
-                  text={`curl -X GET https://${hostname}/api/v1/endpoint \\
+        <Box mt={2}>
+          {selectedLanguage === 0 && (
+            <CodeSnippet
+              text={`curl -X GET https://${hostname}/api/v1/endpoint \\
   -H "Authorization: Bearer ${request.status?.apiKey}"`}
-                  language="bash"
-                  showCopyCodeButton
-                />
-              )}
-              {selectedLanguage === 1 && (
-                <CodeSnippet
-                  text={`const fetch = require('node-fetch');
+              language="bash"
+              showCopyCodeButton
+            />
+          )}
+          {selectedLanguage === 1 && (
+            <CodeSnippet
+              text={`const fetch = require('node-fetch');
 
 const apiKey = '${request.status?.apiKey}';
 const endpoint = 'https://${hostname}/api/v1/endpoint';
@@ -342,13 +360,13 @@ fetch(endpoint, {
   .then(response => response.json())
   .then(data => console.log(data))
   .catch(error => console.error('Error:', error));`}
-                  language="javascript"
-                  showCopyCodeButton
-                />
-              )}
-              {selectedLanguage === 2 && (
-                <CodeSnippet
-                  text={`import requests
+              language="javascript"
+              showCopyCodeButton
+            />
+          )}
+          {selectedLanguage === 2 && (
+            <CodeSnippet
+              text={`import requests
 
 api_key = '${request.status?.apiKey}'
 endpoint = 'https://${hostname}/api/v1/endpoint'
@@ -359,13 +377,13 @@ headers = {
 
 response = requests.get(endpoint, headers=headers)
 print(response.json())`}
-                  language="python"
-                  showCopyCodeButton
-                />
-              )}
-              {selectedLanguage === 3 && (
-                <CodeSnippet
-                  text={`package main
+              language="python"
+              showCopyCodeButton
+            />
+          )}
+          {selectedLanguage === 3 && (
+            <CodeSnippet
+              text={`package main
 
 import (
     "fmt"
@@ -391,10 +409,10 @@ func main() {
     body, _ := io.ReadAll(resp.Body)
     fmt.Println(string(body))
 }`}
-                  language="go"
-                  showCopyCodeButton
-                />
-              )}
+              language="go"
+              showCopyCodeButton
+            />
+          )}
         </Box>
       </Box>
     );
@@ -414,9 +432,9 @@ func main() {
 
   if (permissionError) {
     const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
-                            deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
-                            deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
-                            updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
+      deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
+        deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
+          updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
     return (
       <Box p={2}>
         <Typography color="error">
@@ -508,8 +526,8 @@ func main() {
             aria-controls={menuAnchor ? 'actions-menu' : undefined}
             aria-haspopup="true"
           >
-              <MoreVertIcon />
-            </IconButton>
+            <MoreVertIcon />
+          </IconButton>
         );
       },
     },
@@ -632,8 +650,8 @@ func main() {
             aria-controls={menuAnchor ? 'actions-menu' : undefined}
             aria-haspopup="true"
           >
-              <MoreVertIcon />
-            </IconButton>
+            <MoreVertIcon />
+          </IconButton>
         );
       },
     },
