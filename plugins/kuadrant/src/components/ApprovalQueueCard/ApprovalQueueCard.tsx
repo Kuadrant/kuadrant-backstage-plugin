@@ -493,7 +493,7 @@ export const ApprovalQueueCard = () => {
       title: 'Actions',
       filtering: false,
       render: (row) => {
-        const apiProductKey = `${row.spec.apiNamespace}/${row.spec.apiName}`;
+        const apiProductKey = `${row.metadata.namespace}/${row.spec.apiProductRef.name}`;
         const ownsApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
         const canUpdate = canUpdateAllRequests || (canUpdateOwnRequests && ownsApiProduct);
         if (!canUpdate) return null;
@@ -714,7 +714,7 @@ export const ApprovalQueueCard = () => {
   const groupByApiProduct = (requests: APIKeyRequest[]) => {
     const grouped = new Map<string, APIKeyRequest[]>();
     requests.forEach(request => {
-      const key = `${request.spec.apiProductRef.namespace}/${request.spec.apiProductRef.name}`;
+      const key = `${request.metadata.namespace}/${request.spec.apiProductRef.name}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
       }
@@ -788,7 +788,7 @@ export const ApprovalQueueCard = () => {
           <Box>
             {apiProductKeys.map(apiProductKey => {
               const requests = groupedData.get(apiProductKey) || [];
-              const displayName = requests[0]?.spec.apiName || apiProductKey;
+              const displayName = requests[0]?.spec.apiProductRef.name || apiProductKey;
               const ownsThisApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
               const canSelectRows = canUpdateAllRequests || (canUpdateOwnRequests && ownsThisApiProduct);
               return (
@@ -823,7 +823,7 @@ export const ApprovalQueueCard = () => {
                         onSelectionChange={(rows) => {
                           // merge selections from this api product with selections from other products
                           const otherSelections = selectedRequests.filter(
-                            r => `${r.spec.apiProductRef.namespace}/${r.spec.apiProductRef.name}` !== apiProductKey
+                            r => `${r.metadata.namespace}/${r.spec.apiProductRef.name}` !== apiProductKey
                           );
                           setSelectedRequests([...otherSelections, ...(rows as APIKeyRequest[])]);
                         }}
