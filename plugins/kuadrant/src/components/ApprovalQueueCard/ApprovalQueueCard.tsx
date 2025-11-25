@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useApi, fetchApiRef, identityApiRef, configApiRef } from '@backstage/core-plugin-api';
+import { useApi, fetchApiRef, identityApiRef, configApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { useAsync } from 'react-use';
 import {
   Table,
@@ -26,6 +26,7 @@ import {
   Accordion,
   AccordionSummary,
   AccordionDetails,
+  CircularProgress,
 } from '@material-ui/core';
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
@@ -36,11 +37,12 @@ interface ApprovalDialogProps {
   open: boolean;
   request: APIKeyRequest | null;
   action: 'approve' | 'reject';
+  processing: boolean;
   onClose: () => void;
   onConfirm: (comment: string) => void;
 }
 
-const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalDialogProps) => {
+const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm }: ApprovalDialogProps) => {
   const [comment, setComment] = useState('');
 
   // reset comment when dialog closes
@@ -52,13 +54,15 @@ const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalD
 
   const handleConfirm = () => {
     onConfirm(comment);
-    onClose();
   };
 
+  const actionLabel = action === 'approve' ? 'Approve' : 'Reject';
+  const processingLabel = action === 'approve' ? 'Approving...' : 'Rejecting...';
+
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
+    <Dialog open={open} onClose={processing ? undefined : onClose} maxWidth="sm" fullWidth>
       <DialogTitle>
-        {action === 'approve' ? 'Approve' : 'Reject'} API Key Request
+        {actionLabel} API Key Request
       </DialogTitle>
       <DialogContent>
         {request && (
@@ -83,18 +87,21 @@ const ApprovalDialog = ({ open, request, action, onClose, onConfirm }: ApprovalD
               margin="normal"
               value={comment}
               onChange={(e) => setComment(e.target.value)}
+              disabled={processing}
             />
           </>
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose} disabled={processing}>Cancel</Button>
         <Button
           onClick={handleConfirm}
           color={action === 'approve' ? 'primary' : 'secondary'}
           variant="contained"
+          disabled={processing}
+          startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
-          {action === 'approve' ? 'Approve' : 'Reject'}
+          {processing ? processingLabel : actionLabel}
         </Button>
       </DialogActions>
     </Dialog>
@@ -105,11 +112,12 @@ interface BulkActionDialogProps {
   open: boolean;
   requests: APIKeyRequest[];
   action: 'approve' | 'reject';
+  processing: boolean;
   onClose: () => void;
   onConfirm: (comment: string) => void;
 }
 
-const BulkActionDialog = ({ open, requests, action, onClose, onConfirm }: BulkActionDialogProps) => {
+const BulkActionDialog = ({ open, requests, action, processing, onClose, onConfirm }: BulkActionDialogProps) => {
   const [comment, setComment] = useState('');
 
   // reset comment when dialog closes
@@ -121,13 +129,14 @@ const BulkActionDialog = ({ open, requests, action, onClose, onConfirm }: BulkAc
 
   const handleConfirm = () => {
     onConfirm(comment);
-    onClose();
   };
 
   const isApprove = action === 'approve';
+  const actionLabel = isApprove ? 'Approve All' : 'Reject All';
+  const processingLabel = isApprove ? 'Approving...' : 'Rejecting...';
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
+    <Dialog open={open} onClose={processing ? undefined : onClose} maxWidth="md" fullWidth>
       <DialogTitle>
         {isApprove ? 'Approve' : 'Reject'} {requests.length} API Key Requests
       </DialogTitle>
@@ -152,16 +161,19 @@ const BulkActionDialog = ({ open, requests, action, onClose, onConfirm }: BulkAc
           value={comment}
           onChange={(e) => setComment(e.target.value)}
           helperText={`This comment will be applied to all ${isApprove ? 'approved' : 'rejected'} requests`}
+          disabled={processing}
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose} disabled={processing}>Cancel</Button>
         <Button
           onClick={handleConfirm}
           color={isApprove ? 'primary' : 'secondary'}
           variant="contained"
+          disabled={processing}
+          startIcon={processing ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
-          {isApprove ? 'Approve All' : 'Reject All'}
+          {processing ? processingLabel : actionLabel}
         </Button>
       </DialogActions>
     </Dialog>
@@ -172,6 +184,7 @@ export const ApprovalQueueCard = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [refresh, setRefresh] = useState(0);
   const [selectedTab, setSelectedTab] = useState(0);
@@ -180,19 +193,23 @@ export const ApprovalQueueCard = () => {
     open: boolean;
     request: APIKeyRequest | null;
     action: 'approve' | 'reject';
+    processing: boolean;
   }>({
     open: false,
     request: null,
     action: 'approve',
+    processing: false,
   });
   const [bulkDialogState, setBulkDialogState] = useState<{
     open: boolean;
     requests: APIKeyRequest[];
     action: 'approve' | 'reject';
+    processing: boolean;
   }>({
     open: false,
     requests: [],
     action: 'approve',
+    processing: false,
   });
 
   const {
@@ -262,15 +279,17 @@ export const ApprovalQueueCard = () => {
   }, [backendUrl, fetchApi, identityApi, refresh]);
 
   const handleApprove = (request: APIKeyRequest) => {
-    setDialogState({ open: true, request, action: 'approve' });
+    setDialogState({ open: true, request, action: 'approve', processing: false });
   };
 
   const handleReject = (request: APIKeyRequest) => {
-    setDialogState({ open: true, request, action: 'reject' });
+    setDialogState({ open: true, request, action: 'reject', processing: false });
   };
 
   const handleConfirm = async (comment: string) => {
     if (!dialogState.request || !value) return;
+
+    setDialogState(prev => ({ ...prev, processing: true }));
 
     const endpoint = dialogState.action === 'approve'
       ? `${backendUrl}/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/approve`
@@ -290,25 +309,31 @@ export const ApprovalQueueCard = () => {
         throw new Error(`failed to ${dialogState.action} request`);
       }
 
-      setDialogState({ open: false, request: null, action: 'approve' });
+      setDialogState({ open: false, request: null, action: 'approve', processing: false });
       setRefresh(r => r + 1);
+      const action = dialogState.action === 'approve' ? 'approved' : 'rejected';
+      alertApi.post({ message: `Request ${action}`, severity: 'success', display: 'transient' });
     } catch (err) {
       console.error(`error ${dialogState.action}ing request:`, err);
+      setDialogState(prev => ({ ...prev, processing: false }));
+      alertApi.post({ message: `Failed to ${dialogState.action} request`, severity: 'error', display: 'transient' });
     }
   };
 
   const handleBulkApprove = () => {
     if (selectedRequests.length === 0) return;
-    setBulkDialogState({ open: true, requests: selectedRequests, action: 'approve' });
+    setBulkDialogState({ open: true, requests: selectedRequests, action: 'approve', processing: false });
   };
 
   const handleBulkReject = () => {
     if (selectedRequests.length === 0) return;
-    setBulkDialogState({ open: true, requests: selectedRequests, action: 'reject' });
+    setBulkDialogState({ open: true, requests: selectedRequests, action: 'reject', processing: false });
   };
 
   const handleBulkConfirm = async (comment: string) => {
     if (!value || bulkDialogState.requests.length === 0) return;
+
+    setBulkDialogState(prev => ({ ...prev, processing: true }));
 
     const isApprove = bulkDialogState.action === 'approve';
     const endpoint = isApprove
@@ -333,11 +358,16 @@ export const ApprovalQueueCard = () => {
         throw new Error(`failed to bulk ${bulkDialogState.action} requests`);
       }
 
-      setBulkDialogState({ open: false, requests: [], action: 'approve' });
+      const count = bulkDialogState.requests.length;
+      const action = isApprove ? 'approved' : 'rejected';
+      setBulkDialogState({ open: false, requests: [], action: 'approve', processing: false });
       setSelectedRequests([]);
       setRefresh(r => r + 1);
+      alertApi.post({ message: `${count} requests ${action}`, severity: 'success', display: 'transient' });
     } catch (err) {
       console.error(`error bulk ${bulkDialogState.action}ing requests:`, err);
+      setBulkDialogState(prev => ({ ...prev, processing: false }));
+      alertApi.post({ message: `Failed to bulk ${bulkDialogState.action} requests`, severity: 'error', display: 'transient' });
     }
   };
 
@@ -789,14 +819,16 @@ export const ApprovalQueueCard = () => {
         open={dialogState.open}
         request={dialogState.request}
         action={dialogState.action}
-        onClose={() => setDialogState({ open: false, request: null, action: 'approve' })}
+        processing={dialogState.processing}
+        onClose={() => setDialogState({ open: false, request: null, action: 'approve', processing: false })}
         onConfirm={handleConfirm}
       />
       <BulkActionDialog
         open={bulkDialogState.open}
         requests={bulkDialogState.requests}
         action={bulkDialogState.action}
-        onClose={() => setBulkDialogState({ open: false, requests: [], action: 'approve' })}
+        processing={bulkDialogState.processing}
+        onClose={() => setBulkDialogState({ open: false, requests: [], action: 'approve', processing: false })}
         onConfirm={handleBulkConfirm}
       />
     </>

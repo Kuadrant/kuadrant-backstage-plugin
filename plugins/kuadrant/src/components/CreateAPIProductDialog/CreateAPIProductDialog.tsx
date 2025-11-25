@@ -11,6 +11,7 @@ import {
   Chip,
   Grid,
   MenuItem,
+  CircularProgress,
   makeStyles,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
@@ -207,6 +208,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               helperText="Kubernetes resource name (lowercase, hyphens)"
               margin="normal"
               required
+              disabled={creating}
               InputLabelProps={{
                 classes: {
                   asterisk: classes.asterisk,
@@ -223,6 +225,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               placeholder="My API"
               margin="normal"
               required
+              disabled={creating}
               InputLabelProps={{
                 classes: {
                   asterisk: classes.asterisk,
@@ -238,6 +241,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setVersion(e.target.value)}
               placeholder="v1"
               margin="normal"
+              disabled={creating}
             />
           </Grid>
           <Grid item xs={12}>
@@ -249,6 +253,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setApprovalMode(e.target.value as 'automatic' | 'manual')}
               margin="normal"
               helperText="Automatic: keys are created immediately. Manual: requires approval."
+              disabled={creating}
             >
               <MenuItem value="manual">Manual</MenuItem>
               <MenuItem value="automatic">Automatic</MenuItem>
@@ -263,6 +268,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
               margin="normal"
               helperText="Draft: hidden from catalog. Published: visible to consumers."
+              disabled={creating}
             >
               <MenuItem value="Draft">Draft</MenuItem>
               <MenuItem value="Published">Published</MenuItem>
@@ -279,6 +285,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               multiline
               rows={2}
               required
+              disabled={creating}
               InputLabelProps={{
                 classes: {
                   asterisk: classes.asterisk,
@@ -296,8 +303,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                 <Chip
                   key={tag}
                   label={tag}
-                  onDelete={() => handleDeleteTag(tag)}
+                  onDelete={creating ? undefined : () => handleDeleteTag(tag)}
                   size="small"
+                  disabled={creating}
                 />
               ))}
             </Box>
@@ -309,8 +317,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                 onChange={e => setTagInput(e.target.value)}
                 onKeyPress={e => e.key === 'Enter' && handleAddTag()}
                 placeholder="Add tag"
+                disabled={creating}
               />
-              <Button onClick={handleAddTag} variant="outlined" size="small">
+              <Button onClick={handleAddTag} variant="outlined" size="small" disabled={creating}>
                 Add
               </Button>
             </Box>
@@ -326,7 +335,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               margin="normal"
               required
               helperText="Select an HTTPRoute (backstage.io/expose: true). APIProduct will be created in the same namespace."
-              disabled={httpRoutesLoading}
+              disabled={httpRoutesLoading || creating}
               InputLabelProps={{
                 classes: {
                   asterisk: classes.asterisk,
@@ -368,6 +377,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setContactEmail(e.target.value)}
               placeholder="api-team@example.com"
               margin="normal"
+              disabled={creating}
             />
           </Grid>
           <Grid item xs={6}>
@@ -378,6 +388,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setContactTeam(e.target.value)}
               placeholder="platform-team"
               margin="normal"
+              disabled={creating}
             />
           </Grid>
           <Grid item xs={6}>
@@ -388,6 +399,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setDocsURL(e.target.value)}
               placeholder="https://api.example.com/docs"
               margin="normal"
+              disabled={creating}
             />
           </Grid>
           <Grid item xs={6}>
@@ -398,17 +410,19 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setOpenAPISpec(e.target.value)}
               placeholder="https://api.example.com/openapi.json"
               margin="normal"
+              disabled={creating}
             />
           </Grid>
         </Grid>
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose}>Cancel</Button>
+        <Button onClick={handleClose} disabled={creating}>Cancel</Button>
         <Button
           onClick={handleCreate}
           color="primary"
           variant="contained"
           disabled={creating || !name || !displayName || !description || !selectedHTTPRoute}
+          startIcon={creating ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {creating ? 'Creating...' : 'Create'}
         </Button>

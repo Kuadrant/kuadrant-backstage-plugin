@@ -27,6 +27,7 @@ import {
   Tab,
   Menu,
   Tooltip,
+  CircularProgress,
 } from '@material-ui/core';
 import { useApi, configApiRef, identityApiRef, fetchApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
@@ -45,6 +46,7 @@ import {
 } from '../../permissions';
 import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
+import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 
 interface APIProduct {
   metadata: {
@@ -89,6 +91,12 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [requestToEdit, setRequestToEdit] = useState<APIKeyRequest | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
   const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [optimisticallyDeleted, setOptimisticallyDeleted] = useState<Set<string>>(new Set());
+  const [deleteDialogState, setDeleteDialogState] = useState<{
+    open: boolean;
+    request: APIKeyRequest | null;
+  }>({ open: false, request: null });
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -158,6 +166,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
 
   const handleDeleteRequest = async (name: string) => {
+    // optimistic update - remove from UI immediately
+    setOptimisticallyDeleted(prev => new Set(prev).add(name));
+    setDeleting(name);
     try {
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
@@ -169,14 +180,24 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       alertApi.post({
         message: 'API key request deleted successfully',
         severity: 'success',
+        display: 'transient',
       });
       setRefresh(r => r + 1);
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'unknown error occurred';
+      // rollback optimistic update on error
+      setOptimisticallyDeleted(prev => {
+        const next = new Set(prev);
+        next.delete(name);
+        return next;
+      });
       alertApi.post({
         message: `Failed to delete API key request: ${errorMessage}`,
         severity: 'error',
+        display: 'transient',
       });
+    } finally {
+      setDeleting(null);
     }
   };
 
@@ -188,6 +209,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const handleEditSuccess = () => {
     setRefresh(r => r + 1);
     setEditDialogOpen(false);
+    alertApi.post({ message: 'Request updated', severity: 'success', display: 'transient' });
     setRequestToEdit(null);
   };
 
@@ -202,16 +224,21 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     handleMenuClose();
   };
 
-  const handleMenuDelete = async () => {
+  const handleMenuDeleteClick = () => {
     if (!menuRequest) return;
-    const requestName = menuRequest.metadata.name;
+    const request = menuRequest;
     handleMenuClose();
+    setDeleteDialogState({ open: true, request });
+  };
 
-    if (!window.confirm('Are you sure you want to delete this request?')) {
-      return;
-    }
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialogState.request) return;
+    await handleDeleteRequest(deleteDialogState.request.metadata.name);
+    setDeleteDialogState({ open: false, request: null });
+  };
 
-    await handleDeleteRequest(requestName);
+  const handleDeleteCancel = () => {
+    setDeleteDialogState({ open: false, request: null });
   };
 
   const toggleVisibility = (keyName: string) => {
@@ -256,6 +283,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       alertApi.post({
         message: 'API access request submitted successfully',
         severity: 'success',
+        display: 'transient',
       });
 
       setOpen(false);
@@ -267,6 +295,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
       alertApi.post({
         message: `Failed to create API access request: ${errorMessage}`,
         severity: 'error',
+        display: 'transient',
       });
       setCreateError(errorMessage);
     } finally {
@@ -450,7 +479,9 @@ func main() {
     );
   }
 
-  const myRequests = (requests || []) as APIKeyRequest[];
+  const myRequests = ((requests || []) as APIKeyRequest[]).filter(
+    r => !optimisticallyDeleted.has(r.metadata.name)
+  );
   const plans = (apiProduct?.spec?.plans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
@@ -510,6 +541,10 @@ func main() {
       searchable: false,
       filtering: false,
       render: (row: APIKeyRequest) => {
+        const isDeleting = deleting === row.metadata.name;
+        if (isDeleting) {
+          return <CircularProgress size={20} />;
+        }
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
         if (!canDelete) return null;
@@ -632,6 +667,10 @@ func main() {
       searchable: false,
       filtering: false,
       render: (row: APIKeyRequest) => {
+        const isDeleting = deleting === row.metadata.name;
+        if (isDeleting) {
+          return <CircularProgress size={20} />;
+        }
         const isPending = !row.status?.phase || row.status.phase === 'Pending';
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(ownerId, userId, canDeleteOwnKey, canDeleteAllKeys);
@@ -760,11 +799,12 @@ func main() {
               <Typography variant="body2">{createError}</Typography>
             </Box>
           )}
-          <FormControl fullWidth margin="normal">
+          <FormControl fullWidth margin="normal" disabled={creating}>
             <InputLabel>Select Plan Tier</InputLabel>
             <Select
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as string)}
+              disabled={creating}
             >
               {plans.map((plan: Plan) => {
                 const limitDesc = Object.entries(plan.limits || {})
@@ -788,14 +828,17 @@ func main() {
             value={useCase}
             onChange={(e) => setUseCase(e.target.value)}
             helperText="Explain your intended use of this API for admin review"
+            disabled={creating}
           />
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setOpen(false)}>Cancel</Button>
+          <Button onClick={() => setOpen(false)} disabled={creating}>Cancel</Button>
           <Button
             onClick={handleRequestAccess}
             color="primary"
+            variant="contained"
             disabled={!selectedPlan || creating}
+            startIcon={creating ? <CircularProgress size={16} color="inherit" /> : undefined}
           >
             {creating ? 'Submitting...' : 'Submit Request'}
           </Button>
@@ -818,7 +861,7 @@ func main() {
           if (canEdit) {
             items.push(<MenuItem key="edit" onClick={handleMenuEdit}>Edit</MenuItem>);
           }
-          items.push(<MenuItem key="delete" onClick={handleMenuDelete}>Delete</MenuItem>);
+          items.push(<MenuItem key="delete" onClick={handleMenuDeleteClick}>Delete</MenuItem>);
           return items;
         })()}
       </Menu>
@@ -835,6 +878,15 @@ func main() {
           availablePlans={plans}
         />
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteDialogState.open}
+        title="Delete Request"
+        description={`Are you sure you want to delete this ${deleteDialogState.request?.status?.phase === 'Approved' ? 'API key' : 'request'}?`}
+        deleting={deleting !== null}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </Box>
   );
 };

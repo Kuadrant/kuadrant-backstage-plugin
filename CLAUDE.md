@@ -1093,3 +1093,96 @@ Deleting a Secret left the APIKeyRequest, showing duplicate/stale data.
 - Secret fetching in `ApiKeyManagementTab.tsx`
 - "API Keys (from Secrets)" table component
 
+## Delete Confirmation Patterns
+
+All delete operations should use proper Material-UI dialogs instead of browser `window.confirm()` or `alert()`. The pattern varies based on severity.
+
+### ConfirmDeleteDialog Component
+
+Reusable component at `plugins/kuadrant/src/components/ConfirmDeleteDialog/ConfirmDeleteDialog.tsx`:
+
+```typescript
+interface ConfirmDeleteDialogProps {
+  open: boolean;
+  title: string;
+  description: string;
+  confirmText?: string;  // for high-severity, require typing this to confirm
+  severity?: 'normal' | 'high';  // high shows warning icon + text confirmation
+  deleting?: boolean;  // shows spinner on button
+  onConfirm: () => void;
+  onCancel: () => void;
+}
+```
+
+### Severity Levels
+
+**Normal severity** (API key requests, pending requests):
+- Simple confirmation dialog with description
+- Cancel and Delete buttons
+- No text confirmation required
+
+**High severity** (API Products, infrastructure resources):
+- Warning icon in title
+- Detailed description explaining consequences
+- Text confirmation required (user must type resource name)
+- Delete button disabled until text matches
+
+### Usage Examples
+
+**Normal severity** (MyApiKeysCard, ApiKeyManagementTab):
+```typescript
+<ConfirmDeleteDialog
+  open={deleteDialogState.open}
+  title="Delete API Key Request"
+  description={`Are you sure you want to delete the API key request for ${request?.spec.apiName}?`}
+  deleting={deleting !== null}
+  onConfirm={handleDeleteConfirm}
+  onCancel={handleDeleteCancel}
+/>
+```
+
+**High severity** (KuadrantPage - API Products):
+```typescript
+<ConfirmDeleteDialog
+  open={deleteDialogOpen}
+  title="Delete API Product"
+  description={`This will permanently delete "${name}" from namespace "${namespace}" and remove it from Kubernetes. Any associated API keys will stop working.`}
+  confirmText={name}
+  severity="high"
+  deleting={deleting}
+  onConfirm={handleDeleteConfirm}
+  onCancel={handleDeleteCancel}
+/>
+```
+
+### State Pattern
+
+Each component with delete functionality uses this state pattern:
+
+```typescript
+const [deleteDialogState, setDeleteDialogState] = useState<{
+  open: boolean;
+  request: SomeType | null;
+}>({ open: false, request: null });
+
+const handleDeleteClick = () => {
+  setDeleteDialogState({ open: true, request: itemToDelete });
+};
+
+const handleDeleteConfirm = async () => {
+  if (!deleteDialogState.request) return;
+  // perform delete
+  setDeleteDialogState({ open: false, request: null });
+};
+
+const handleDeleteCancel = () => {
+  setDeleteDialogState({ open: false, request: null });
+};
+```
+
+### Files Using ConfirmDeleteDialog
+
+- `MyApiKeysCard.tsx` - normal severity for API key requests
+- `ApiKeyManagementTab.tsx` - normal severity for requests/keys
+- `KuadrantPage.tsx` - high severity for API Products
+

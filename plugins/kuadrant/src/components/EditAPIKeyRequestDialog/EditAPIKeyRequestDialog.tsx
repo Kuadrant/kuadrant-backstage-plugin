@@ -12,6 +12,7 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  CircularProgress,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { APIKeyRequest } from '../../types/api-management';
@@ -152,7 +153,9 @@ export const EditAPIKeyRequestDialog = ({
         <Button
           onClick={handleSave}
           color="primary"
+          variant="contained"
           disabled={!planTier || saving}
+          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {saving ? 'Saving...' : 'Save Changes'}
         </Button>
