@@ -366,7 +366,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           {selectedLanguage === 0 && (
             <CodeSnippet
               text={`curl -X GET https://${hostname}/api/v1/endpoint \\
-  -H "Authorization: Bearer ${request.status?.apiKey}"`}
+  -H "Authorization: Bearer ${request.status?.apiKey}"`} // notsecret - template for user's own api key
               language="bash"
               showCopyCodeButton
             />
