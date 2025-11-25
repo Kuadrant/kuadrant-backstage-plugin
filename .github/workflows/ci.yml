@@ -92,6 +92,7 @@ jobs:
           kubectl apply -f rbac/rhdh-rbac.yaml
           ./scripts/kube-env-setup.sh
           make kuadrant-install
+          make crds-install
           make demo-install
           cd ..
 

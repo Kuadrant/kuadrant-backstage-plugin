@@ -1,10 +1,11 @@
-.PHONY: help kind-create kind-delete kuadrant-install controller-deploy demo-install demo-uninstall clean
+.PHONY: help kind-create kind-delete kuadrant-install controller-deploy crds-install demo-install demo-uninstall clean
 
 CLUSTER_NAME ?= local-cluster
 LOCALBIN ?= $(shell pwd)/bin
 KIND_VERSION ?= v0.20.0
 HELM_VERSION ?= v3.15.0
 CONTROLLER_REPO ?= ../../developer-portal-controller
+CONTROLLER_CRD_URL ?= https://raw.githubusercontent.com/Kuadrant/developer-portal-controller/main/config/crd/bases
 
 help:
 	@echo "kuadrant development setup for rhdh"
@@ -19,7 +20,8 @@ help:
 	@echo ""
 	@echo "kuadrant:"
 	@echo "  make kuadrant-install   - install kuadrant v1.3.0"
-	@echo "  make controller-deploy  - deploy developer-portal-controller"
+	@echo "  make controller-deploy  - deploy developer-portal-controller (requires local checkout)"
+	@echo "  make crds-install       - install devportal CRDs from github (for CI/testing)"
 	@echo "  make demo-install       - install toystore demo"
 	@echo "  make demo-uninstall     - remove toystore demo"
 	@echo ""
@@ -147,6 +149,12 @@ controller-deploy:
 	@echo "deploying developer-portal-controller from $(CONTROLLER_REPO)..."
 	@$(MAKE) -C $(CONTROLLER_REPO) local-deploy KIND_CLUSTER_NAME=$(CLUSTER_NAME)
 	@echo "developer-portal-controller deployed!"
+
+crds-install:
+	@echo "installing devportal CRDs from github..."
+	@kubectl apply -f $(CONTROLLER_CRD_URL)/devportal.kuadrant.io_apikeys.yaml
+	@kubectl apply -f $(CONTROLLER_CRD_URL)/devportal.kuadrant.io_apiproducts.yaml
+	@echo "devportal CRDs installed!"
 
 demo-install:
 	@echo "installing toystore demo resources..."
