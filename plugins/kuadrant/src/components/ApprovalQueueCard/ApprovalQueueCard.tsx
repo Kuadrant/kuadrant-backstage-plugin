@@ -69,7 +69,7 @@ const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm 
           <>
             <p><strong>User:</strong> {request.spec.requestedBy.userId}</p>
             <p><strong>API:</strong> {request.spec.apiName}</p>
-            <p><strong>Plan:</strong> {request.spec.planTier}</p>
+            <p><strong>Tier:</strong> {request.spec.planTier}</p>
             <Box mb={2}>
               <Typography variant="body2" component="span" style={{ fontWeight: 'bold' }}>
                 Use Case:
@@ -447,7 +447,7 @@ export const ApprovalQueueCard = () => {
       render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
     },
     {
-      title: 'Plan',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row) => (
         <Chip
@@ -545,7 +545,7 @@ export const ApprovalQueueCard = () => {
       render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
     },
     {
-      title: 'Plan',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row) => (
         <Chip
@@ -619,7 +619,7 @@ export const ApprovalQueueCard = () => {
       render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
     },
     {
-      title: 'Plan',
+      title: 'Tier',
       field: 'spec.planTier',
       render: (row) => (
         <Chip
