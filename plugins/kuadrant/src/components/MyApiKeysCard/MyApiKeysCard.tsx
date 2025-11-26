@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
-import { InfoCard, Table, TableColumn, Link } from '@backstage/core-components';
-import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
+import { InfoCard, Table, TableColumn, Link, Progress } from '@backstage/core-components';
+import { useApi, configApiRef, fetchApiRef, identityApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
-import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem } from '@material-ui/core';
+import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem, CircularProgress } from '@material-ui/core';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
+import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 import { APIKeyRequest } from '../../types/api-management';
 
 export const MyApiKeysCard = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
+  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [selectedTab, setSelectedTab] = useState(0);
   const [, setUserId] = useState<string>('');
@@ -25,6 +27,11 @@ export const MyApiKeysCard = () => {
     plans: [],
   });
   const [refresh, setRefresh] = useState(0);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [deleteDialogState, setDeleteDialogState] = useState<{
+    open: boolean;
+    request: APIKeyRequest | null;
+  }>({ open: false, request: null });
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -32,6 +39,8 @@ export const MyApiKeysCard = () => {
     console.log(`MyApiKeysCard: setting userId from userEntityRef: ${identity.userEntityRef} -> "${extractedUserId}"`);
     setUserId(extractedUserId);
   }, [identityApi]);
+
+  const [optimisticallyDeleted, setOptimisticallyDeleted] = useState<Set<string>>(new Set());
 
   const { value: requests, loading, error } = useAsync(async () => {
     const response = await fetchApi.fetch(
@@ -47,7 +56,7 @@ export const MyApiKeysCard = () => {
   if (loading) {
     return (
       <InfoCard title="My API Keys">
-        <Typography>Loading...</Typography>
+        <Progress />
       </InfoCard>
     );
   }
@@ -60,7 +69,9 @@ export const MyApiKeysCard = () => {
     );
   }
 
-  const allRequests = requests || [];
+  const allRequests = (requests || []).filter(
+    (r: APIKeyRequest) => !optimisticallyDeleted.has(r.metadata.name)
+  );
   const approvedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Approved');
   const pendingRequests = allRequests.filter((r: APIKeyRequest) => !r.status?.phase || r.status.phase === 'Pending');
   const rejectedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Rejected');
@@ -108,15 +119,22 @@ export const MyApiKeysCard = () => {
     }
   };
 
-  const handleDelete = async () => {
+  const handleDeleteClick = () => {
     if (!menuRequest) return;
-
     const request = menuRequest;
     handleMenuClose();
+    setDeleteDialogState({ open: true, request });
+  };
 
-    if (!window.confirm('Are you sure you want to delete this request?')) {
-      return;
-    }
+  const handleDeleteConfirm = async () => {
+    if (!deleteDialogState.request) return;
+
+    const request = deleteDialogState.request;
+    const requestName = request.metadata.name;
+
+    // optimistic update - remove from UI immediately
+    setOptimisticallyDeleted(prev => new Set(prev).add(requestName));
+    setDeleting(requestName);
 
     try {
       const response = await fetchApi.fetch(
@@ -129,10 +147,24 @@ export const MyApiKeysCard = () => {
       }
 
       setRefresh(r => r + 1);
+      alertApi.post({ message: 'Request deleted', severity: 'success', display: 'transient' });
+      setDeleteDialogState({ open: false, request: null });
     } catch (err) {
       console.error('Error deleting request:', err);
-      alert('Failed to delete request');
+      // rollback optimistic update on error
+      setOptimisticallyDeleted(prev => {
+        const next = new Set(prev);
+        next.delete(requestName);
+        return next;
+      });
+      alertApi.post({ message: 'Failed to delete request', severity: 'error', display: 'transient' });
+    } finally {
+      setDeleting(null);
     }
+  };
+
+  const handleDeleteCancel = () => {
+    setDeleteDialogState({ open: false, request: null });
   };
 
   const columns: TableColumn<APIKeyRequest>[] = [
@@ -275,6 +307,10 @@ export const MyApiKeysCard = () => {
       title: '',
       filtering: false,
       render: (row: APIKeyRequest) => {
+        const isDeleting = deleting === row.metadata.name;
+        if (isDeleting) {
+          return <CircularProgress size={20} />;
+        }
         return (
           <IconButton
             size="small"
@@ -386,7 +422,7 @@ export const MyApiKeysCard = () => {
           if (isPending(menuRequest)) {
             items.push(<MenuItem key="edit" onClick={handleEdit}>Edit</MenuItem>);
           }
-          items.push(<MenuItem key="delete" onClick={handleDelete}>Delete</MenuItem>);
+          items.push(<MenuItem key="delete" onClick={handleDeleteClick}>Delete</MenuItem>);
           return items;
         })()}
       </Menu>
@@ -403,6 +439,15 @@ export const MyApiKeysCard = () => {
           }}
         />
       )}
+
+      <ConfirmDeleteDialog
+        open={deleteDialogState.open}
+        title="Delete API Key Request"
+        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiName || 'this API'}?`}
+        deleting={deleting !== null}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+      />
     </>
   );
 };

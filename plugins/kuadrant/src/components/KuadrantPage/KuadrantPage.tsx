@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Typography, Grid, Box, Chip, Button, IconButton, Dialog, DialogTitle, DialogContent, DialogContentText, DialogActions } from '@material-ui/core';
+import { Typography, Grid, Box, Chip, Button, IconButton } from '@material-ui/core';
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
@@ -16,7 +16,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
-import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, fetchApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { MyApiKeysCard } from '../MyApiKeysCard';
 import { PermissionGate } from '../PermissionGate';
@@ -34,6 +34,7 @@ import {
 } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { EditAPIProductDialog } from '../EditAPIProductDialog';
+import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 
 type KuadrantResource = {
   metadata: {
@@ -51,6 +52,7 @@ type KuadrantList = {
 export const ResourceList = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
+  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -125,6 +127,7 @@ export const ResourceList = () => {
 
   const handleCreateSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
+    alertApi.post({ message: 'API Product created', severity: 'success', display: 'transient' });
   };
 
   const handleEditClick = (namespace: string, name: string) => {
@@ -134,6 +137,7 @@ export const ResourceList = () => {
 
   const handleEditSuccess = () => {
     setRefreshTrigger(prev => prev + 1);
+    alertApi.post({ message: 'API Product updated', severity: 'success', display: 'transient' });
   };
 
   const handleDeleteClick = (namespace: string, name: string) => {
@@ -156,8 +160,10 @@ export const ResourceList = () => {
       }
 
       setRefreshTrigger(prev => prev + 1);
+      alertApi.post({ message: 'API Product deleted', severity: 'success', display: 'transient' });
     } catch (err) {
       console.error('error deleting apiproduct:', err);
+      alertApi.post({ message: 'Failed to delete API Product', severity: 'error', display: 'transient' });
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
@@ -418,23 +424,16 @@ export const ResourceList = () => {
           namespace={apiProductToEdit?.namespace || ''}
           name={apiProductToEdit?.name || ''}
         />
-        <Dialog open={deleteDialogOpen} onClose={handleDeleteCancel}>
-          <DialogTitle>Delete API Product</DialogTitle>
-          <DialogContent>
-            <DialogContentText>
-              Are you sure you want to delete {apiProductToDelete?.name} from namespace {apiProductToDelete?.namespace}?
-              This will permanently remove the API Product from Kubernetes.
-            </DialogContentText>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleDeleteCancel} color="primary">
-              Cancel
-            </Button>
-            <Button onClick={handleDeleteConfirm} color="secondary" disabled={deleting}>
-              {deleting ? 'Deleting...' : 'Delete'}
-            </Button>
-          </DialogActions>
-        </Dialog>
+        <ConfirmDeleteDialog
+          open={deleteDialogOpen}
+          title="Delete API Product"
+          description={`This will permanently delete "${apiProductToDelete?.name}" from namespace "${apiProductToDelete?.namespace}" and remove it from Kubernetes. Any associated API keys will stop working.`}
+          confirmText={apiProductToDelete?.name}
+          severity="high"
+          deleting={deleting}
+          onConfirm={handleDeleteConfirm}
+          onCancel={handleDeleteCancel}
+        />
       </Content>
     </Page>
   );

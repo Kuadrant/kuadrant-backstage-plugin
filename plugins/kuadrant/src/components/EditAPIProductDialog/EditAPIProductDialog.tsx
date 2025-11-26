@@ -11,6 +11,7 @@ import {
   Chip,
   Grid,
   MenuItem,
+  CircularProgress,
   makeStyles,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
@@ -218,6 +219,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 placeholder="My API"
                 margin="normal"
                 required
+                disabled={saving}
                 InputLabelProps={{
                   classes: {
                     asterisk: classes.asterisk,
@@ -233,6 +235,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setVersion(e.target.value)}
                 placeholder="v1"
                 margin="normal"
+                disabled={saving}
               />
             </Grid>
             <Grid item xs={6}>
@@ -244,6 +247,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
                 margin="normal"
                 helperText="Draft: Hidden from catalog. Published: Visible in catalog."
+                disabled={saving}
               >
                 <MenuItem value="Draft">Draft (Hidden)</MenuItem>
                 <MenuItem value="Published">Published (Visible)</MenuItem>
@@ -258,6 +262,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setApprovalMode(e.target.value as 'automatic' | 'manual')}
                 margin="normal"
                 helperText="Automatic: keys created immediately. Manual: requires approval."
+                disabled={saving}
               >
                 <MenuItem value="manual">Manual</MenuItem>
                 <MenuItem value="automatic">Automatic</MenuItem>
@@ -274,6 +279,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 multiline
                 rows={2}
                 required
+                disabled={saving}
                 InputLabelProps={{
                   classes: {
                     asterisk: classes.asterisk,
@@ -291,8 +297,9 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                   <Chip
                     key={tag}
                     label={tag}
-                    onDelete={() => handleDeleteTag(tag)}
+                    onDelete={saving ? undefined : () => handleDeleteTag(tag)}
                     size="small"
+                    disabled={saving}
                   />
                 ))}
               </Box>
@@ -304,8 +311,9 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                   onChange={e => setTagInput(e.target.value)}
                   onKeyPress={e => e.key === 'Enter' && handleAddTag()}
                   placeholder="Add tag"
+                  disabled={saving}
                 />
-                <Button onClick={handleAddTag} variant="outlined" size="small">
+                <Button onClick={handleAddTag} variant="outlined" size="small" disabled={saving}>
                   Add
                 </Button>
               </Box>
@@ -342,6 +350,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setContactEmail(e.target.value)}
                 placeholder="api-team@example.com"
                 margin="normal"
+                disabled={saving}
               />
             </Grid>
             <Grid item xs={6}>
@@ -352,6 +361,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setContactTeam(e.target.value)}
                 placeholder="platform-team"
                 margin="normal"
+                disabled={saving}
               />
             </Grid>
             <Grid item xs={6}>
@@ -362,6 +372,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setDocsURL(e.target.value)}
                 placeholder="https://api.example.com/docs"
                 margin="normal"
+                disabled={saving}
               />
             </Grid>
             <Grid item xs={6}>
@@ -372,18 +383,20 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 onChange={e => setOpenAPISpec(e.target.value)}
                 placeholder="https://api.example.com/openapi.json"
                 margin="normal"
+                disabled={saving}
               />
             </Grid>
           </Grid>
         )}
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>Cancel</Button>
+        <Button onClick={onClose} disabled={saving}>Cancel</Button>
         <Button
           onClick={handleSave}
           color="primary"
           variant="contained"
           disabled={saving || loading || !displayName || !description}
+          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {saving ? 'Saving...' : 'Save'}
         </Button>
