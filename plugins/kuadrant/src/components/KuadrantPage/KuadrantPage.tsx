@@ -16,7 +16,7 @@ import {
   TableColumn,
 } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
-import { useApi, configApiRef, fetchApiRef, alertApiRef } from '@backstage/core-plugin-api';
+import { useApi, configApiRef, fetchApiRef, alertApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import { ApprovalQueueCard } from '../ApprovalQueueCard';
 import { MyApiKeysCard } from '../MyApiKeysCard';
 import { PermissionGate } from '../PermissionGate';
@@ -41,6 +41,7 @@ type KuadrantResource = {
     name: string;
     namespace: string;
     creationTimestamp: string;
+    annotations?: Record<string, string>;
   };
   spec?: any;
 };
@@ -53,7 +54,9 @@ export const ResourceList = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
+  const identityApi = useApi(identityApiRef);
   const backendUrl = config.getString('backend.baseUrl');
+  const [userEntityRef, setUserEntityRef] = useState<string>('');
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -101,8 +104,6 @@ export const ResourceList = () => {
     allowed: canUpdateAllApiProducts,
   } = useKuadrantPermission(kuadrantApiProductUpdateAllPermission);
 
-  const canDeleteApiProduct = canDeleteOwnApiProduct || canDeleteAllApiProducts;
-  const canUpdateApiProduct = canUpdateOwnApiProduct || canUpdateAllApiProducts;
   const deletePermissionLoading = deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
@@ -110,6 +111,11 @@ export const ResourceList = () => {
     loading: planPolicyPermissionLoading,
     error: planPolicyPermissionError,
   } = useKuadrantPermission(kuadrantPlanPolicyListPermission);
+
+  useAsync(async () => {
+    const identity = await identityApi.getBackstageIdentity();
+    setUserEntityRef(identity.userEntityRef);
+  }, [identityApi]);
 
   const { value: apiProducts, loading: apiProductsLoading, error: apiProductsError } = useAsync(async (): Promise<KuadrantList> => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
@@ -268,29 +274,38 @@ export const ResourceList = () => {
       title: 'Actions',
       field: 'actions',
       filtering: false,
-      render: (row: any) => (
-        <Box display="flex" style={{ gap: 4 }}>
-          {canUpdateApiProduct && (
-            <IconButton
-              size="small"
-              onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
-              title="Edit API Product"
-            >
-              <EditIcon fontSize="small" />
-            </IconButton>
-          )}
+      render: (row: any) => {
+        const owner = row.metadata?.annotations?.['backstage.io/owner'];
+        const isOwner = owner === userEntityRef;
+        const canEdit = canUpdateAllApiProducts || (canUpdateOwnApiProduct && isOwner);
+        const canDelete = canDeleteAllApiProducts || (canDeleteOwnApiProduct && isOwner);
 
-          {canDeleteApiProduct && (
-            <IconButton
-              size="small"
-              onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
-              title="Delete API Product"
-            >
-              <DeleteIcon fontSize="small" />
-            </IconButton>
-          )}
-        </Box>
-      ),
+        if (!canEdit && !canDelete) return null;
+
+        return (
+          <Box display="flex" style={{ gap: 4 }}>
+            {canEdit && (
+              <IconButton
+                size="small"
+                onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
+                title="Edit API Product"
+              >
+                <EditIcon fontSize="small" />
+              </IconButton>
+            )}
+
+            {canDelete && (
+              <IconButton
+                size="small"
+                onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+                title="Delete API Product"
+              >
+                <DeleteIcon fontSize="small" />
+              </IconButton>
+            )}
+          </Box>
+        );
+      },
     },
   ];
 

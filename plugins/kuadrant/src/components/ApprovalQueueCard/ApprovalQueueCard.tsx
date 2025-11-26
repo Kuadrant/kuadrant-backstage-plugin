@@ -224,7 +224,6 @@ export const ApprovalQueueCard = () => {
     error: updateOwnPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
 
-  const canUpdateRequests = canUpdateAllRequests || canUpdateOwnRequests;
   const updatePermissionLoading = updateAllPermissionLoading || updateOwnPermissionLoading;
   const updatePermissionError = updateAllPermissionError || updateOwnPermissionError;
 
@@ -234,26 +233,42 @@ export const ApprovalQueueCard = () => {
 
     console.log('ApprovalQueueCard: fetching all requests from', `${backendUrl}/api/kuadrant/requests`);
 
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests`
-    );
-    if (!response.ok) {
-      console.log('ApprovalQueueCard: failed to fetch requests, status:', response.status);
-      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy };
+    // fetch requests and api products in parallel
+    const [requestsResponse, apiProductsResponse] = await Promise.all([
+      fetchApi.fetch(`${backendUrl}/api/kuadrant/requests`),
+      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`),
+    ]);
+
+    if (!requestsResponse.ok) {
+      console.log('ApprovalQueueCard: failed to fetch requests, status:', requestsResponse.status);
+      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
     }
 
     // check content-type before parsing json
-    const contentType = response.headers.get('content-type');
+    const contentType = requestsResponse.headers.get('content-type');
     if (!contentType || !contentType.includes('application/json')) {
       console.log('ApprovalQueueCard: received non-json response');
-      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy };
+      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
     }
 
-    const data = await response.json();
+    const data = await requestsResponse.json();
     const allRequests = data.items || [];
 
+    // build set of api products owned by current user
+    const ownedApiProducts = new Set<string>();
+    if (apiProductsResponse.ok) {
+      const apiProductsData = await apiProductsResponse.json();
+      for (const product of apiProductsData.items || []) {
+        const owner = product.metadata?.annotations?.['backstage.io/owner'];
+        if (owner === reviewedBy) {
+          // key is namespace/name to match against request's apiNamespace/apiName
+          ownedApiProducts.add(`${product.metadata.namespace}/${product.metadata.name}`);
+        }
+      }
+    }
+
     console.log('ApprovalQueueCard: received', allRequests.length, 'total requests');
-    console.log('ApprovalQueueCard: raw requests:', allRequests);
+    console.log('ApprovalQueueCard: user owns', ownedApiProducts.size, 'api products');
 
     // group by status (field is 'phase' not 'status')
     const pending = allRequests.filter((r: APIKeyRequest) => {
@@ -275,7 +290,7 @@ export const ApprovalQueueCard = () => {
       rejected: rejected.length,
     });
 
-    return { pending, approved, rejected, reviewedBy };
+    return { pending, approved, rejected, reviewedBy, ownedApiProducts };
   }, [backendUrl, fetchApi, identityApi, refresh]);
 
   const handleApprove = (request: APIKeyRequest) => {
@@ -478,7 +493,10 @@ export const ApprovalQueueCard = () => {
       title: 'Actions',
       filtering: false,
       render: (row) => {
-        if (!canUpdateRequests) return null;
+        const apiProductKey = `${row.spec.apiNamespace}/${row.spec.apiName}`;
+        const ownsApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
+        const canUpdate = canUpdateAllRequests || (canUpdateOwnRequests && ownsApiProduct);
+        if (!canUpdate) return null;
         return (
           <Box display="flex" style={{ gap: 8 }}>
             <Button
@@ -692,21 +710,21 @@ export const ApprovalQueueCard = () => {
 
   const tabData = getTabData();
 
-  // group requests by api product
+  // group requests by api product (namespace/name)
   const groupByApiProduct = (requests: APIKeyRequest[]) => {
     const grouped = new Map<string, APIKeyRequest[]>();
     requests.forEach(request => {
-      const apiName = request.spec.apiName;
-      if (!grouped.has(apiName)) {
-        grouped.set(apiName, []);
+      const key = `${request.spec.apiNamespace}/${request.spec.apiName}`;
+      if (!grouped.has(key)) {
+        grouped.set(key, []);
       }
-      grouped.get(apiName)!.push(request);
+      grouped.get(key)!.push(request);
     });
     return grouped;
   };
 
   const groupedData = groupByApiProduct(tabData.data);
-  const apiProducts = Array.from(groupedData.keys()).sort();
+  const apiProductKeys = Array.from(groupedData.keys()).sort();
 
   return (
     <>
@@ -730,7 +748,7 @@ export const ApprovalQueueCard = () => {
           </Tabs>
         </Box>
 
-        {canUpdateRequests && selectedTab === 1 && selectedRequests.length > 0 && (
+        {selectedTab === 1 && selectedRequests.length > 0 && (
           <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
             <Typography variant="body2">
               {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
@@ -768,13 +786,16 @@ export const ApprovalQueueCard = () => {
           </Box>
         ) : (
           <Box>
-            {apiProducts.map(apiName => {
-              const requests = groupedData.get(apiName) || [];
+            {apiProductKeys.map(apiProductKey => {
+              const requests = groupedData.get(apiProductKey) || [];
+              const displayName = requests[0]?.spec.apiName || apiProductKey;
+              const ownsThisApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
+              const canSelectRows = canUpdateAllRequests || (canUpdateOwnRequests && ownsThisApiProduct);
               return (
-                <Accordion key={apiName} defaultExpanded={apiProducts.length === 1}>
+                <Accordion key={apiProductKey} defaultExpanded={apiProductKeys.length === 1}>
                   <AccordionSummary expandIcon={<ExpandMoreIcon />}>
                     <Box display="flex" alignItems="center" justifyContent="space-between" width="100%">
-                      <Typography variant="h6">{apiName}</Typography>
+                      <Typography variant="h6">{displayName}</Typography>
                       <Chip
                         label={`${requests.length} request${requests.length !== 1 ? 's' : ''}`}
                         size="small"
@@ -787,7 +808,7 @@ export const ApprovalQueueCard = () => {
                     <Box width="100%">
                       <Table
                         options={{
-                          selection: canUpdateRequests && tabData.showSelection,
+                          selection: canSelectRows && tabData.showSelection,
                           paging: requests.length > 5,
                           pageSize: 20,
                           search: true,
@@ -802,7 +823,7 @@ export const ApprovalQueueCard = () => {
                         onSelectionChange={(rows) => {
                           // merge selections from this api product with selections from other products
                           const otherSelections = selectedRequests.filter(
-                            r => r.spec.apiName !== apiName
+                            r => `${r.spec.apiNamespace}/${r.spec.apiName}` !== apiProductKey
                           );
                           setSelectedRequests([...otherSelections, ...(rows as APIKeyRequest[])]);
                         }}
