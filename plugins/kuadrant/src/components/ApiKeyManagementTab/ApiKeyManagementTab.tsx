@@ -80,7 +80,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const backendUrl = config.getString('backend.baseUrl');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
-  const [userId, setUserId] = useState<string>('guest');
+  const [userId, setUserId] = useState<string>('');
   const [userEmail, setUserEmail] = useState<string>('');
   const [open, setOpen] = useState(false);
   const [selectedPlan, setSelectedPlan] = useState('');
@@ -105,7 +105,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
     const profile = await identityApi.getProfileInfo();
-    setUserId(identity.userEntityRef.split('/')[1] || 'guest');
+    setUserId(identity.userEntityRef);
     setUserEmail(profile.email || '');
   }, [identityApi]);
 
