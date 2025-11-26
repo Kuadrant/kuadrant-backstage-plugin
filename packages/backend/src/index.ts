@@ -1,3 +1,12 @@
+// Load environment variables from .env file before anything else
+// Note: Yarn 3.x doesn't support automatic .env loading (only Yarn 4+)
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+const envPath = path.resolve(process.cwd(), '../../.env');
+console.log(`[dotenv] Looking for .env at: ${envPath}`);
+dotenv.config({ path: envPath });
+
 import { createBackend } from '@backstage/backend-defaults';
 import { WinstonLogger } from '@backstage/backend-defaults/rootLogger';
 import {
@@ -7,8 +16,6 @@ import {
 } from '@backstage/backend-dynamic-feature-service';
 import { createServiceFactory } from '@backstage/backend-plugin-api';
 import { PackageRoles } from '@backstage/cli-node';
-
-import * as path from 'path';
 
 import { configureCorporateProxyAgent } from './corporate-proxy';
 import { getDefaultServiceFactories } from './defaultServiceFactories';
@@ -106,7 +113,7 @@ if (
       service: dynamicPluginsFrontendServiceRef,
       deps: {},
       factory: () => ({
-        setResolverProvider() {},
+        setResolverProvider() { },
       }),
     }),
   );
