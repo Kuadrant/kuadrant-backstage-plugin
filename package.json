@@ -67,6 +67,7 @@
   },
   "packageManager": "yarn@3.8.7",
   "dependencies": {
-    "@backstage/plugin-auth-backend-module-oidc-provider": "^0.4.8"
+    "@backstage/plugin-auth-backend-module-oidc-provider": "^0.4.8",
+    "dotenv": "^17.2.3"
   }
 }
