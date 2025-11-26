@@ -14,15 +14,15 @@ backend:
   csp:
     connect-src:
       - "'self'"
-      - 'http:'
-      - 'https:'
+      - "http:"
+      - "https:"
   cors:
     origin: http://localhost:3000
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
   database:
     client: better-sqlite3
-    connection: ':memory:'
+    connection: ":memory:"
 
 proxy:
   skipInvalidProxies: true
@@ -59,7 +59,15 @@ auth:
         signIn:
           resolvers:
             - resolver: emailMatchingUserEntityProfileEmail
-
+kubernetes:
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: local-cluster
+          url: ${K8S_URL}
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+          skipTLSVerify: true
 permission:
   enabled: true
   rbac:
@@ -80,7 +88,18 @@ catalog:
     entityFilename: catalog-info.yaml
     pullRequestBranchName: backstage-integration
   rules:
-    - allow: [Component, System, API, APIProduct, Group, User, Resource, Location, Template]
+    - allow:
+        [
+          Component,
+          System,
+          API,
+          APIProduct,
+          Group,
+          User,
+          Resource,
+          Location,
+          Template,
+        ]
   locations:
     - type: file
       target: ../../catalog-entities/all.yaml

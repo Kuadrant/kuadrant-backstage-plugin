@@ -80,6 +80,7 @@
     "@red-hat-developer-hub/backstage-plugin-translations-backend": "0.0.2",
     "app": "workspace:*",
     "app-next": "workspace:*",
+    "dotenv": "16.4.7",
     "global-agent": "3.0.0",
     "jose": "5.10.0",
     "undici": "6.21.3",

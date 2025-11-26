@@ -21,8 +21,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
 
       - name: Enable Corepack
         run: corepack enable
@@ -61,8 +61,8 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: 'yarn'
+          node-version: "22"
+          cache: "yarn"
 
       - name: Enable Corepack
         run: corepack enable
@@ -90,6 +90,7 @@ jobs:
         run: |
           cd kuadrant-dev-setup
           kubectl apply -f rbac/rhdh-rbac.yaml
+          ./scripts/kube-env-setup.sh
           make kuadrant-install
           make demo-install
           cd ..

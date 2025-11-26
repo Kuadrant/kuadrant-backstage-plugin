@@ -86,6 +86,9 @@ kind-create: $(LOCALBIN)/kind-$(KIND_VERSION) $(LOCALBIN)/helm-$(HELM_VERSION)
 	@echo "creating rhdh service account and rbac..."
 	@kubectl apply -f rbac/rhdh-rbac.yaml
 	@echo ""
+	@echo "configure kubernetes integration with backstage using rhdh service account..."
+	@./scripts/kube-env-setup.sh
+	@echo ""
 	@echo "installing kuadrant..."
 	@$(MAKE) kuadrant-install
 	@echo ""
