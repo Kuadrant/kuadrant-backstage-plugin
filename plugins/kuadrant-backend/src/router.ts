@@ -544,7 +544,7 @@ export async function createRouter({
     }
   });
 
-  // apikeyrequest crud endpoints
+  // apikey crud endpoints
   const requestSchema = z.object({
     apiName: z.string(),
     apiNamespace: z.string(),
@@ -591,7 +591,7 @@ export async function createRouter({
 
       const request = {
         apiVersion: 'devportal.kuadrant.io/v1alpha1',
-        kind: 'APIKeyRequest',
+        kind: 'APIKey',
         metadata: {
           name: requestName,
           namespace: apiNamespace,
@@ -610,7 +610,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         apiNamespace,
-        'apikeyrequests',
+        'apikeys',
         request,
       );
 
@@ -696,7 +696,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             apiNamespace,
-            'apikeyrequests',
+            'apikeys',
             requestName,
             status,
           );
@@ -746,9 +746,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys');
       }
 
       let filteredItems = data.items || [];
@@ -809,9 +809,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
       }
 
       const filteredItems = (data.items || []).filter(
@@ -851,7 +851,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -988,7 +988,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         status,
       );
@@ -1023,7 +1023,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1075,7 +1075,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         status,
       );
@@ -1128,7 +1128,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
           );
 
@@ -1265,7 +1265,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
             status,
           );
@@ -1323,7 +1323,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
           );
 
@@ -1375,7 +1375,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
             status,
           );
@@ -1414,7 +1414,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1476,7 +1476,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
       res.status(204).send();
@@ -1514,7 +1514,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1554,7 +1554,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         parsed.data,
       );

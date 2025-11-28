@@ -29,7 +29,7 @@ The Kuadrant plugins enable developer portals for API access management using Ku
 - Sync API products from Kubernetes to Backstage catalog
 
 **Technical Implementation:**
-- Kubernetes CRDs: APIProduct, APIKeyRequest, PlanPolicy
+- Kubernetes CRDs: APIProduct, APIKey, PlanPolicy
 - Kuadrant Gateway API integration
 - AuthPolicy and RateLimitPolicy support
 - Direct Backstage integration (no dynamic plugin complexity for dev)
@@ -179,13 +179,13 @@ const patchSchema = z.object({
 **Example:**
 ```typescript
 const updateAllDecision = await permissions.authorize(
-  [{ permission: kuadrantApiKeyRequestUpdatePermission }],
+  [{ permission: kuadrantAPIKeyUpdatePermission }],
   { credentials }
 );
 
 if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
   const updateOwnDecision = await permissions.authorize(
-    [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+    [{ permission: kuadrantAPIKeyUpdateOwnPermission }],
     { credentials }
   );
 
@@ -211,18 +211,18 @@ if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
 **Implementation:**
 - Never accept `namespace` from client input for resource creation
 - Use the namespace of the referenced resource (APIProduct, HTTPRoute)
-- Create APIKeyRequests in the API's namespace (spec.apiNamespace)
+- Create APIKeys in the API's namespace (spec.apiNamespace)
 - Create Secrets in the API's namespace (not user namespace)
 
 **Example:**
 ```typescript
 // bad - client controls namespace
 const { namespace, apiName } = req.body;
-await k8sClient.createCustomResource('apikeyrequests', namespace, ...);
+await k8sClient.createCustomResource('apikeys', namespace, ...);
 
 // good - use API's namespace
 const { apiName, apiNamespace } = req.body;
-await k8sClient.createCustomResource('apikeyrequests', apiNamespace, ...);
+await k8sClient.createCustomResource('apikeys', apiNamespace, ...);
 ```
 
 **Why:** Cross-namespace creation can bypass RBAC, pollute namespaces, or break AuthPolicy references.
@@ -312,7 +312,7 @@ The kind cluster includes:
 - Kuadrant operator v1.3.0
 - Gateway API CRDs
 - Istio service mesh
-- Custom CRDs (APIProduct, APIKeyRequest)
+- Custom CRDs (APIProduct, APIKey)
 - Toystore demo (example API with policies)
 - RHDH service account with proper RBAC
 
@@ -448,7 +448,7 @@ Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `
 **See [`docs/rbac-permissions.md`](docs/rbac-permissions.md) for complete RBAC and permissions documentation.**
 
 When implementing or modifying anything related to permissions, roles, or access control, consult the comprehensive guide which covers:
-- All permission definitions (PlanPolicy, APIProduct, APIKeyRequest, API Key)
+- All permission definitions (PlanPolicy, APIProduct, APIKey, API Key)
 - Role definitions (API Consumer, API Owner, API Admin)
 - Ownership model and enforcement patterns
 - Backend security patterns and tiered permission checks
@@ -503,10 +503,10 @@ After switching roles, restart with `yarn dev`.
 4. Updated backend validation to check `targetRef` instead of `planPolicyRef`
 5. HTTPRoutes must have `backstage.io/expose: "true"` annotation to appear in selection
 
-### APIKeyRequest Scoping to APIProduct (IMPLEMENTED)
+### APIKey Scoping to APIProduct (IMPLEMENTED)
 
 **Problem:**
-- APIKeyRequest `spec.apiName` previously referenced HTTPRoute name
+- APIKey `spec.apiName` previously referenced HTTPRoute name
 - Multiple APIProducts referencing same HTTPRoute would share API key requests
 - No isolation between different products exposing the same route
 
@@ -519,7 +519,7 @@ After switching roles, restart with `yarn dev`.
 1. Updated ApiKeyManagementTab to use `entity.metadata.annotations['kuadrant.io/apiproduct']`
 2. Frontend now passes APIProduct name in `apiName` field when creating requests
 3. Backend already used `apiName` from request body, no changes needed
-4. Updated APIKeyRequest CRD descriptions to clarify `apiName` is APIProduct name
+4. Updated APIKey CRD descriptions to clarify `apiName` is APIProduct name
 
 **Benefits:**
 - Multiple APIProducts can share HTTPRoute infrastructure
@@ -684,7 +684,7 @@ kubernetes:
       plural: 'apiproducts'
     - apiVersion: 'v1'
       group: 'devportal.kuadrant.io'
-      plural: 'apikeyrequests'
+      plural: 'apikeys'
 ```
 
 This allows plugins to work in:
@@ -1004,13 +1004,13 @@ approvalMode:
 - Includes helper text explaining behaviour
 
 **Backend logic** (`router.ts:509-581`):
-When APIKeyRequest is created (POST /requests):
-1. Create APIKeyRequest resource in Kubernetes
+When APIKey is created (POST /requests):
+1. Create APIKey resource in Kubernetes
 2. Fetch associated APIProduct
 3. If `apiProduct.spec.approvalMode === 'automatic'`:
    - Immediately generate API key
    - Create Secret in API namespace
-   - Update APIKeyRequest status to 'Approved' with `reviewedBy: 'system'`
+   - Update APIKey status to 'Approved' with `reviewedBy: 'system'`
 4. If manual, request stays in 'Pending' state
 
 ### User Experience
@@ -1039,12 +1039,12 @@ The Kuadrant frontend uses Backstage's permission framework for fine-grained acc
 
 ## API Key Management Model
 
-APIKeyRequests are the source of truth for API keys, not Kubernetes Secrets.
+APIKeys are the source of truth for API keys, not Kubernetes Secrets.
 
 ### Resource Relationship
 
 ```
-APIKeyRequest (CRD)          Secret (Kubernetes)
+APIKey (CRD)          Secret (Kubernetes)
 ├── metadata.name            Created when approved
 ├── spec.planTier            annotations:
 ├── spec.apiName               - secret.kuadrant.io/plan-id
@@ -1058,7 +1058,7 @@ APIKeyRequest (CRD)          Secret (Kubernetes)
 **What users see**:
 - Pending Requests - awaiting approval
 - Rejected Requests - denied access
-- API Keys - approved requests showing the key from APIKeyRequest.status.apiKey
+- API Keys - approved requests showing the key from APIKey.status.apiKey
 
 **What users don't see**:
 - Kubernetes Secrets directly
@@ -1072,19 +1072,19 @@ When user deletes an approved API key (`router.ts:905-930`):
    - `secret.kuadrant.io/plan-id` === planTier
    - `app` label === apiName
 2. Deletes Secret from API namespace
-3. Deletes APIKeyRequest resource
+3. Deletes APIKey resource
 4. Both disappear from Kubernetes
 
 ### Why Secrets Aren't Listed
 
 **Problem**: Previously showed two sections:
-- "Approved Requests" (from APIKeyRequests)
+- "Approved Requests" (from APIKeys)
 - "API Keys (from Secrets)" (from Kubernetes Secrets)
 
-Deleting a Secret left the APIKeyRequest, showing duplicate/stale data.
+Deleting a Secret left the APIKey, showing duplicate/stale data.
 
 **Solution**:
-- UI only shows APIKeyRequests (single source of truth)
+- UI only shows APIKeys (single source of truth)
 - Secrets are implementation details managed by backend
 - Delete button on approved requests triggers both deletions
 

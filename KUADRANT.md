@@ -80,7 +80,7 @@ When rebasing, you'll likely see conflicts in these files:
 plugins/kuadrant/                      # Frontend plugin
 plugins/kuadrant-backend/              # Backend plugin
 kuadrant-dev-setup/                    # Kind cluster setup
-  ├── crds/                            # APIProduct, APIKeyRequest
+  ├── crds/                            # APIProduct, APIKey
   ├── demo/                            # Toystore demo
   ├── rbac/                            # RHDH service account
   ├── scripts/                         # Kind cluster config
@@ -217,7 +217,7 @@ API Admin (owns all products, approves any request)
 - **Use case**: Publishes APIs they own, manages access to their own APIs
 
 **API Consumer**
-- **Can do**: Read ALL APIProducts (for catalog browsing), create APIKeyRequests, manage own API keys
+- **Can do**: Read ALL APIProducts (for catalog browsing), create APIKeys, manage own API keys
 - **Cannot do**: Approve requests, create APIs, modify rate limits
 - **Use case**: Browses APIs, requests access, uses APIs within quotas
 
@@ -242,15 +242,15 @@ The backend exports these permissions (defined in `plugins/kuadrant-backend/src/
 - `kuadrant.apiproduct.delete.all` - delete any APIProduct resource
 - `kuadrant.apiproduct.list` - list APIProduct resources (backend filters by ownership)
 
-**APIKeyRequest (access requests with ownership):**
-- `kuadrant.apikeyrequest.create` - create APIKeyRequest resources (resource permission scoped to APIProduct)
-- `kuadrant.apikeyrequest.read.own` - read own APIKeyRequest resources
-- `kuadrant.apikeyrequest.read.all` - read all APIKeyRequest resources
-- `kuadrant.apikeyrequest.update` - update any APIKeyRequest (approve/reject)
-- `kuadrant.apikeyrequest.update.own` - update own APIKeyRequest resources
-- `kuadrant.apikeyrequest.delete.own` - delete own APIKeyRequest resources
-- `kuadrant.apikeyrequest.delete.all` - delete any APIKeyRequest resource
-- `kuadrant.apikeyrequest.list` - list APIKeyRequest resources
+**APIKey (access requests with ownership):**
+- `kuadrant.apikeyrequest.create` - create APIKey resources (resource permission scoped to APIProduct)
+- `kuadrant.apikeyrequest.read.own` - read own APIKey resources
+- `kuadrant.apikeyrequest.read.all` - read all APIKey resources
+- `kuadrant.apikeyrequest.update` - update any APIKey (approve/reject)
+- `kuadrant.apikeyrequest.update.own` - update own APIKey resources
+- `kuadrant.apikeyrequest.delete.own` - delete own APIKey resources
+- `kuadrant.apikeyrequest.delete.all` - delete any APIKey resource
+- `kuadrant.apikeyrequest.list` - list APIKey resources
 
 **API Keys (managed secrets with ownership):**
 - `kuadrant.apikey.read.own` - read own API keys
@@ -268,7 +268,7 @@ APIProducts track ownership via Kubernetes annotations:
 Backend enforces ownership checks for `.own` permissions:
 - API Owners can only view/edit/delete their own APIProducts
 - API Admins can view/edit/delete all APIProducts
-- APIKeyRequest approval requires ownership of the associated APIProduct
+- APIKey approval requires ownership of the associated APIProduct
 
 ### Testing with Different Users
 
@@ -328,7 +328,7 @@ The RBAC policy file maps groups to roles, and users inherit permissions from th
 For production deployments, the RHDH service account needs these permissions:
 
 - Read/write access to `apiproducts.devportal.kuadrant.io`
-- Read/write access to `apikeyrequests.devportal.kuadrant.io`
+- Read/write access to `apikeys.devportal.kuadrant.io`
 - Read/write access to `secrets` (for API key storage)
 - Read access to Kuadrant policies (optional, for policy viewing)
 

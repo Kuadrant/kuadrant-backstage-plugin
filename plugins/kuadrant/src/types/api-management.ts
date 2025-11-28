@@ -12,7 +12,7 @@ export interface PlanLimits {
   }>;
 }
 
-export interface APIKeyRequestSpec {
+export interface APIKeySpec {
   apiName: string;
   apiNamespace: string;
   planTier: PlanTier;
@@ -24,7 +24,7 @@ export interface APIKeyRequestSpec {
   requestedAt?: string;
 }
 
-export interface APIKeyRequestStatus {
+export interface APIKeyStatus {
   phase?: RequestPhase;
   reviewedBy?: string;
   reviewedAt?: string;
@@ -46,9 +46,9 @@ export interface APIKeyRequestStatus {
   }>;
 }
 
-export interface APIKeyRequest {
+export interface APIKey {
   apiVersion: 'devportal.kuadrant.io/v1alpha1';
-  kind: 'APIKeyRequest';
+  kind: 'APIKey';
   metadata: {
     name: string;
     namespace: string;
@@ -56,8 +56,8 @@ export interface APIKeyRequest {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec: APIKeyRequestSpec;
-  status?: APIKeyRequestStatus;
+  spec: APIKeySpec;
+  status?: APIKeyStatus;
 }
 
 export interface Plan {

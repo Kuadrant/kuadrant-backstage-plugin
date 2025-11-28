@@ -31,11 +31,11 @@ import {
 import CheckCircleIcon from '@material-ui/icons/CheckCircle';
 import CancelIcon from '@material-ui/icons/Cancel';
 import ExpandMoreIcon from '@material-ui/icons/ExpandMore';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKey } from '../../types/api-management';
 
 interface ApprovalDialogProps {
   open: boolean;
-  request: APIKeyRequest | null;
+  request: APIKey | null;
   action: 'approve' | 'reject';
   processing: boolean;
   onClose: () => void;
@@ -110,7 +110,7 @@ const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm 
 
 interface BulkActionDialogProps {
   open: boolean;
-  requests: APIKeyRequest[];
+  requests: APIKey[];
   action: 'approve' | 'reject';
   processing: boolean;
   onClose: () => void;
@@ -188,10 +188,10 @@ export const ApprovalQueueCard = () => {
   const backendUrl = config.getString('backend.baseUrl');
   const [refresh, setRefresh] = useState(0);
   const [selectedTab, setSelectedTab] = useState(0);
-  const [selectedRequests, setSelectedRequests] = useState<APIKeyRequest[]>([]);
+  const [selectedRequests, setSelectedRequests] = useState<APIKey[]>([]);
   const [dialogState, setDialogState] = useState<{
     open: boolean;
-    request: APIKeyRequest | null;
+    request: APIKey | null;
     action: 'approve' | 'reject';
     processing: boolean;
   }>({
@@ -202,7 +202,7 @@ export const ApprovalQueueCard = () => {
   });
   const [bulkDialogState, setBulkDialogState] = useState<{
     open: boolean;
-    requests: APIKeyRequest[];
+    requests: APIKey[];
     action: 'approve' | 'reject';
     processing: boolean;
   }>({
@@ -241,7 +241,7 @@ export const ApprovalQueueCard = () => {
 
     if (!requestsResponse.ok) {
       console.log('ApprovalQueueCard: failed to fetch requests, status:', requestsResponse.status);
-      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
+      return { pending: [] as APIKey[], approved: [] as APIKey[], rejected: [] as APIKey[], reviewedBy, ownedApiProducts: new Set<string>() };
     }
 
     // check content-type before parsing json
@@ -253,7 +253,8 @@ export const ApprovalQueueCard = () => {
         display: 'transient',
         severity: 'warning'
       });
-      return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
+      return { pending: [] as APIKey[], approved: [] as APIKey[], rejected: [] as APIKey[], reviewedBy, ownedApiProducts: new Set<string>() };
+
     }
 
     const data = await requestsResponse.json();
@@ -276,15 +277,15 @@ export const ApprovalQueueCard = () => {
     console.log('ApprovalQueueCard: user owns', ownedApiProducts.size, 'api products');
 
     // group by status (field is 'phase' not 'status')
-    const pending = allRequests.filter((r: APIKeyRequest) => {
+    const pending = allRequests.filter((r: APIKey) => {
       const phase = (r.status as any)?.phase || 'Pending';
       return phase === 'Pending';
     });
-    const approved = allRequests.filter((r: APIKeyRequest) => {
+    const approved = allRequests.filter((r: APIKey) => {
       const phase = (r.status as any)?.phase;
       return phase === 'Approved';
     });
-    const rejected = allRequests.filter((r: APIKeyRequest) => {
+    const rejected = allRequests.filter((r: APIKey) => {
       const phase = (r.status as any)?.phase;
       return phase === 'Rejected';
     });
@@ -298,11 +299,11 @@ export const ApprovalQueueCard = () => {
     return { pending, approved, rejected, reviewedBy, ownedApiProducts };
   }, [backendUrl, fetchApi, identityApi, refresh]);
 
-  const handleApprove = (request: APIKeyRequest) => {
+  const handleApprove = (request: APIKey) => {
     setDialogState({ open: true, request, action: 'approve', processing: false });
   };
 
-  const handleReject = (request: APIKeyRequest) => {
+  const handleReject = (request: APIKey) => {
     setDialogState({ open: true, request, action: 'reject', processing: false });
   };
 
@@ -430,7 +431,7 @@ export const ApprovalQueueCard = () => {
     });
   };
 
-  const pendingColumns: TableColumn<APIKeyRequest>[] = [
+  const pendingColumns: TableColumn<APIKey>[] = [
     {
       title: 'Request Name',
       field: 'metadata.name',
@@ -528,7 +529,7 @@ export const ApprovalQueueCard = () => {
     },
   ];
 
-  const approvedColumns: TableColumn<APIKeyRequest>[] = [
+  const approvedColumns: TableColumn<APIKey>[] = [
     {
       title: 'Request Name',
       field: 'metadata.name',
@@ -602,7 +603,7 @@ export const ApprovalQueueCard = () => {
     },
   ];
 
-  const rejectedColumns: TableColumn<APIKeyRequest>[] = [
+  const rejectedColumns: TableColumn<APIKey>[] = [
     {
       title: 'Request Name',
       field: 'metadata.name',
@@ -687,7 +688,7 @@ export const ApprovalQueueCard = () => {
   ];
 
   const getTabData = () => {
-    const addIds = (data: APIKeyRequest[]) =>
+    const addIds = (data: APIKey[]) =>
       data.map(item => ({ ...item, id: item.metadata.name }));
 
     switch (selectedTab) {
@@ -695,7 +696,7 @@ export const ApprovalQueueCard = () => {
         return { data: addIds(approved), columns: approvedColumns, showSelection: false };
       case 1:
         // Add tableData.checked to control checkbox state
-        const pendingWithSelection = pending.map((row: APIKeyRequest) => {
+        const pendingWithSelection = pending.map((row: APIKey) => {
           const isSelected = selectedRequests.some(
             selected => selected.metadata.name === row.metadata.name &&
               selected.metadata.namespace === row.metadata.namespace
@@ -716,8 +717,8 @@ export const ApprovalQueueCard = () => {
   const tabData = getTabData();
 
   // group requests by api product (namespace/name)
-  const groupByApiProduct = (requests: APIKeyRequest[]) => {
-    const grouped = new Map<string, APIKeyRequest[]>();
+  const groupByApiProduct = (requests: APIKey[]) => {
+    const grouped = new Map<string, APIKey[]>();
     requests.forEach(request => {
       const key = `${request.spec.apiNamespace}/${request.spec.apiName}`;
       if (!grouped.has(key)) {
@@ -830,7 +831,7 @@ export const ApprovalQueueCard = () => {
                           const otherSelections = selectedRequests.filter(
                             r => `${r.spec.apiNamespace}/${r.spec.apiName}` !== apiProductKey
                           );
-                          setSelectedRequests([...otherSelections, ...(rows as APIKeyRequest[])]);
+                          setSelectedRequests([...otherSelections, ...(rows as APIKey[])]);
                         }}
                       />
                     </Box>

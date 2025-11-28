@@ -24,7 +24,7 @@ visit http://localhost:3000/kuadrant
 - istio service mesh (base + istiod)
 
 **kuadrant components:**
-- custom crds: APIProduct, APIKeyRequest
+- custom crds: APIProduct, APIKey
 - kuadrant instance in `kuadrant-system` namespace
 
 **demo resources (toystore):**
@@ -47,7 +47,7 @@ kuadrant-dev-setup/
 ├── README.md                 # this file
 ├── crds/                     # custom resource definitions
 │   ├── devportal.kuadrant.io_apiproduct.yaml
-│   └── devportal.kuadrant.io_apikeyrequest.yaml
+│   └── devportal.kuadrant.io_apikey.yaml
 ├── demo/                     # demo resources
 │   └── toystore-demo.yaml    # toystore api with policies
 ├── rbac/                     # rbac configs

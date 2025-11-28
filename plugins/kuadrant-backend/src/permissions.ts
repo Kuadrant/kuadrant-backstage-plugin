@@ -77,7 +77,7 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikeyrequest permissions (access requests)
+// apikey request permissions (access requests)
 export const kuadrantApiKeyRequestCreatePermission = createPermission({
   name: 'kuadrant.apikeyrequest.create',
   attributes: { action: 'create' },
