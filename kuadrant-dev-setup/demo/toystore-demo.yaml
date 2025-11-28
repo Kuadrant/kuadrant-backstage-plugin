@@ -166,7 +166,7 @@ spec:
       limits:
         daily: 10
 ---
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: toystore-api
@@ -187,22 +187,7 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: toystore
-    namespace: toystore
-  plans:
-    - tier: gold
-      description: premium access with highest rate limits
-      limits:
-        daily: 100
-    - tier: silver
-      description: standard access with moderate rate limits
-      limits:
-        daily: 50
-    - tier: bronze
-      description: basic access with limited rate limits
-      limits:
-        daily: 10
   documentation:
-    openAPISpec: http://api.toystore.com/openapi.json
     docsURL: http://api.toystore.com/docs
   contact:
     team: api-owners

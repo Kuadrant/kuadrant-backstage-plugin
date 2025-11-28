@@ -7,7 +7,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 This is a customised fork of [Red Hat Developer Hub (RHDH)](https://github.com/redhat-developer/rhdh) for developing **Kuadrant Backstage plugins**. It's a monorepo containing the full RHDH application with Kuadrant-specific plugins for API access management:
 - `plugins/kuadrant` - Frontend plugin for API key management UI
 - `plugins/kuadrant-backend` - Backend plugin for Kubernetes integration
-- `kuadrant-dev-setup/` - Development environment setup (kind cluster, CRDs, demo resources)
+- `kuadrant-dev-setup/` - Development environment setup (kind cluster, demo resources)
+
+**Related repository:**
+- `../developer-portal-controller` - Kubernetes controller for APIProduct and APIKey CRDs (must be cloned alongside)
 
 ### Kuadrant Plugin Goals
 
@@ -29,7 +32,8 @@ The Kuadrant plugins enable developer portals for API access management using Ku
 - Sync API products from Kubernetes to Backstage catalog
 
 **Technical Implementation:**
-- Kubernetes CRDs: APIProduct, APIKeyRequest, PlanPolicy
+- Kubernetes CRDs: APIProduct, APIKey (devportal.kuadrant.io/v1alpha1), PlanPolicy
+- CRDs defined in `../developer-portal-controller/config/crd/bases/`
 - Kuadrant Gateway API integration
 - AuthPolicy and RateLimitPolicy support
 - Direct Backstage integration (no dynamic plugin complexity for dev)
@@ -297,9 +301,16 @@ yarn tsc                        # run typescript compilation
 ```
 
 ### Kuadrant Development Setup
+
+**Prerequisites:** Clone the developer-portal-controller alongside this repo:
+```bash
+cd ../..
+git clone git@github.com:Kuadrant/developer-portal-controller.git
+```
+
 ```bash
 cd kuadrant-dev-setup
-make kind-create                # create kind cluster with kuadrant + demo
+make kind-create                # create kind cluster with kuadrant + controller + demo
 cd ..
 yarn dev                        # start rhdh with hot reload
 
@@ -312,7 +323,7 @@ The kind cluster includes:
 - Kuadrant operator v1.3.0
 - Gateway API CRDs
 - Istio service mesh
-- Custom CRDs (APIProduct, APIKeyRequest)
+- developer-portal-controller (manages APIProduct and APIKey CRDs)
 - Toystore demo (example API with policies)
 - RHDH service account with proper RBAC
 
@@ -579,35 +590,32 @@ After switching roles, restart with `yarn dev`.
 - No accidental exposure of incomplete API products
 - Aligns with typical content publishing workflows
 
-### Plan Population from PlanPolicy (TEMPORARY WORKAROUND)
+### Plan Discovery via developer-portal-controller (IMPLEMENTED)
 
 **Context:**
-- APIProduct spec includes plans array that should be discovered from PlanPolicy
-- Full controller implementation not yet available
-- Without plans, API Keys tab shows "no plans available" error
+- developer-portal-controller automatically discovers plans from PlanPolicy
+- Plans are written to `status.discoveredPlans` by the controller
+- Controller watches for changes to APIProduct, HTTPRoute, and PlanPolicy resources
+- Controller source: `../developer-portal-controller/`
 
-**Temporary implementation:**
-- Backend populates `spec.plans` during APIProduct creation
-- Finds PlanPolicy targeting the same HTTPRoute as the APIProduct
-- Copies plans array (tier, description, limits) from PlanPolicy to APIProduct
-- Non-blocking: continues without plans if PlanPolicy lookup fails
+**Controller behaviour:**
+- Finds PlanPolicy targeting the HTTPRoute (or its Gateway parent)
+- Copies plan tiers and limits to `status.discoveredPlans`
+- Sets status conditions:
+  - `Ready`: True when HTTPRoute exists and is accepted by gateway
+  - `PlanPolicyDiscovered`: True when PlanPolicy is found
+- Automatically reconciles when PlanPolicy or HTTPRoute changes
 
-**Changes made:**
-1. Added PlanPolicy lookup in POST `/apiproducts` endpoint
-2. Searches for PlanPolicy with matching `targetRef` (HTTPRoute)
-3. Copies plans from PlanPolicy into APIProduct before creating resource
-4. Wrapped in try-catch to avoid breaking creation if PlanPolicy missing
-
-**Limitations:**
-- Only populates plans at creation time (not updated if PlanPolicy changes)
-- Does not write to status (writes to spec instead, which is acceptable until controller exists)
-- Will be replaced by proper controller that maintains discoveredPlans in status
+**Frontend integration:**
+- `ApiKeyManagementTab` reads from `apiProduct.status.discoveredPlans`
+- Displays helpful error messages from status conditions when plans unavailable
+- Shows specific reason: HTTPRoute not ready vs no PlanPolicy found
 
 **Benefits:**
-- Makes API Keys tab functional immediately
-- Allows developers to request API access with plan selection
-- Provides realistic testing environment for approval workflows
-- No changes needed when controller is implemented (controller will override spec with status)
+- Automatic plan synchronisation when PlanPolicy changes
+- Proper Kubernetes status reporting via conditions
+- No manual backend logic needed for plan population
+- Observability into why plans might be missing
 
 ## Important Notes
 
@@ -679,12 +687,12 @@ kubernetes:
         skipTLSVerify: true
       type: config
   customResources:
-    - apiVersion: 'v1'
-      group: 'extensions.kuadrant.io'
+    - apiVersion: 'v1alpha1'
+      group: 'devportal.kuadrant.io'
       plural: 'apiproducts'
-    - apiVersion: 'v1'
-      group: 'extensions.kuadrant.io'
-      plural: 'apikeyrequests'
+    - apiVersion: 'v1alpha1'
+      group: 'devportal.kuadrant.io'
+      plural: 'apikeys'
 ```
 
 This allows plugins to work in:
@@ -989,7 +997,7 @@ APIProducts support two approval modes for API key requests:
 
 ### Implementation
 
-**CRD field** (`extensions.kuadrant.io_apiproduct.yaml:39-43`):
+**CRD field** (`../developer-portal-controller/config/crd/bases/devportal.kuadrant.io_apiproducts.yaml`):
 ```yaml
 approvalMode:
   type: string

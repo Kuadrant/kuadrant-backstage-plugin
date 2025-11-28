@@ -1,37 +1,30 @@
 import React, { useState } from 'react';
-import { InfoCard, Table, TableColumn, Link, Progress } from '@backstage/core-components';
-import { useApi, configApiRef, fetchApiRef, identityApiRef, alertApiRef } from '@backstage/core-plugin-api';
+import { InfoCard, Table, TableColumn, Link } from '@backstage/core-components';
+import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
-import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem, CircularProgress } from '@material-ui/core';
+import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem } from '@material-ui/core';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
-import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
-import { APIKeyRequest } from '../../types/api-management';
+import { EnrichedAPIKeyRequest, getRejectionReason } from '../../types/api-management';
 
 export const MyApiKeysCard = () => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
-  const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString('backend.baseUrl');
   const [selectedTab, setSelectedTab] = useState(0);
   const [, setUserId] = useState<string>('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
-  const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
-  const [editDialogState, setEditDialogState] = useState<{ open: boolean; request: APIKeyRequest | null; plans: any[] }>({
+  const [menuRequest, setMenuRequest] = useState<EnrichedAPIKeyRequest | null>(null);
+  const [editDialogState, setEditDialogState] = useState<{ open: boolean; request: EnrichedAPIKeyRequest | null; plans: any[] }>({
     open: false,
     request: null,
     plans: [],
   });
   const [refresh, setRefresh] = useState(0);
-  const [deleting, setDeleting] = useState<string | null>(null);
-  const [deleteDialogState, setDeleteDialogState] = useState<{
-    open: boolean;
-    request: APIKeyRequest | null;
-  }>({ open: false, request: null });
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -39,8 +32,6 @@ export const MyApiKeysCard = () => {
     console.log(`MyApiKeysCard: setting userId from userEntityRef: ${identity.userEntityRef} -> "${extractedUserId}"`);
     setUserId(extractedUserId);
   }, [identityApi]);
-
-  const [optimisticallyDeleted, setOptimisticallyDeleted] = useState<Set<string>>(new Set());
 
   const { value: requests, loading, error } = useAsync(async () => {
     const response = await fetchApi.fetch(
@@ -56,7 +47,7 @@ export const MyApiKeysCard = () => {
   if (loading) {
     return (
       <InfoCard title="My API Keys">
-        <Progress />
+        <Typography>Loading...</Typography>
       </InfoCard>
     );
   }
@@ -69,12 +60,10 @@ export const MyApiKeysCard = () => {
     );
   }
 
-  const allRequests = (requests || []).filter(
-    (r: APIKeyRequest) => !optimisticallyDeleted.has(r.metadata.name)
-  );
-  const approvedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Approved');
-  const pendingRequests = allRequests.filter((r: APIKeyRequest) => !r.status?.phase || r.status.phase === 'Pending');
-  const rejectedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Rejected');
+  const allRequests: EnrichedAPIKeyRequest[] = requests || [];
+  const approvedRequests = allRequests.filter((r) => r.status?.phase === 'Approved');
+  const pendingRequests = allRequests.filter((r) => !r.status?.phase || r.status.phase === 'Pending');
+  const rejectedRequests = allRequests.filter((r) => r.status?.phase === 'Rejected');
 
   const toggleKeyVisibility = (keyName: string) => {
     setVisibleKeys(prev => {
@@ -100,9 +89,10 @@ export const MyApiKeysCard = () => {
     handleMenuClose();
 
     // Fetch available plans for this API
+    // apikey lives in same namespace as apiproduct
     try {
       const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiNamespace}/${request.spec.apiName}`
+        `${backendUrl}/api/kuadrant/apiproducts/${request.metadata.namespace}/${request.spec.apiProductRef.name}`
       );
 
       if (apiProductResponse.ok) {
@@ -119,22 +109,15 @@ export const MyApiKeysCard = () => {
     }
   };
 
-  const handleDeleteClick = () => {
+  const handleDelete = async () => {
     if (!menuRequest) return;
+
     const request = menuRequest;
     handleMenuClose();
-    setDeleteDialogState({ open: true, request });
-  };
 
-  const handleDeleteConfirm = async () => {
-    if (!deleteDialogState.request) return;
-
-    const request = deleteDialogState.request;
-    const requestName = request.metadata.name;
-
-    // optimistic update - remove from UI immediately
-    setOptimisticallyDeleted(prev => new Set(prev).add(requestName));
-    setDeleting(requestName);
+    if (!window.confirm('Are you sure you want to delete this request?')) {
+      return;
+    }
 
     try {
       const response = await fetchApi.fetch(
@@ -147,40 +130,26 @@ export const MyApiKeysCard = () => {
       }
 
       setRefresh(r => r + 1);
-      alertApi.post({ message: 'Request deleted', severity: 'success', display: 'transient' });
-      setDeleteDialogState({ open: false, request: null });
     } catch (err) {
       console.error('Error deleting request:', err);
-      // rollback optimistic update on error
-      setOptimisticallyDeleted(prev => {
-        const next = new Set(prev);
-        next.delete(requestName);
-        return next;
-      });
-      alertApi.post({ message: 'Failed to delete request', severity: 'error', display: 'transient' });
-    } finally {
-      setDeleting(null);
+      alert('Failed to delete request');
     }
   };
 
-  const handleDeleteCancel = () => {
-    setDeleteDialogState({ open: false, request: null });
-  };
-
-  const columns: TableColumn<APIKeyRequest>[] = [
+  const columns: TableColumn<EnrichedAPIKeyRequest>[] = [
     {
       title: 'API Product',
-      field: 'spec.apiName',
-      render: (row: APIKeyRequest) => (
-        <Link to={`/catalog/default/api/${row.spec.apiName}/api-keys`}>
-          <strong>{row.spec.apiName}</strong>
+      field: 'spec.apiProductRef.name',
+      render: (row: EnrichedAPIKeyRequest) => (
+        <Link to={`/catalog/default/api/${row.spec.apiProductRef.name}/api-keys`}>
+          <strong>{row.spec.apiProductRef.name}</strong>
         </Link>
       ),
     },
     {
-      title: 'Tier',
+      title: 'Plan',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         const color = row.spec.planTier === 'gold' ? 'primary' :
                      row.spec.planTier === 'silver' ? 'default' : 'secondary';
         return <Chip label={row.spec.planTier} color={color} size="small" />;
@@ -189,7 +158,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         if (!row.spec.useCase) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -213,7 +182,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Status',
       field: 'status.phase',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         const phase = row.status?.phase || 'Pending';
         const color = phase === 'Approved' ? 'primary' :
                      phase === 'Rejected' ? 'secondary' : 'default';
@@ -222,15 +191,14 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'Reason',
-      field: 'status.reason',
-      render: (row: APIKeyRequest) => {
-        if (row.status?.reason) {
-          const color = row.status.phase === 'Rejected' ? 'error' : 'textPrimary';
+      render: (row: EnrichedAPIKeyRequest) => {
+        const reason = getRejectionReason(row);
+        if (reason) {
           return (
-            <Tooltip title={row.status.reason} placement="top">
+            <Tooltip title={reason} placement="top">
               <Typography
                 variant="body2"
-                color={color}
+                color="error"
                 style={{
                   maxWidth: '200px',
                   overflow: 'hidden',
@@ -238,7 +206,7 @@ export const MyApiKeysCard = () => {
                   whiteSpace: 'nowrap',
                 }}
               >
-                {row.status.reason}
+                {reason}
               </Typography>
             </Tooltip>
           );
@@ -249,7 +217,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Reviewed By',
       field: 'status.reviewedBy',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         if ((row.status?.phase === 'Approved' || row.status?.phase === 'Rejected') && row.status.reviewedBy) {
           const reviewedDate = row.status.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '';
           return (
@@ -268,15 +236,15 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'API Key',
-      field: 'status.apiKey',
+      field: 'apiKey',
       filtering: false,
-      render: (row: APIKeyRequest) => {
-        if (row.status?.phase === 'Approved' && row.status.apiKey) {
+      render: (row: EnrichedAPIKeyRequest) => {
+        if (row.status?.phase === 'Approved' && row.apiKey) {
           const isVisible = visibleKeys.has(row.metadata.name);
           return (
             <Box display="flex" alignItems="center" style={{ gap: 8 }}>
               <Box fontFamily="monospace" fontSize="0.875rem">
-                {isVisible ? row.status.apiKey : '•'.repeat(20) + '...'}
+                {isVisible ? row.apiKey : '•'.repeat(20) + '...'}
               </Box>
               <Tooltip title={isVisible ? 'hide key' : 'show key'}>
                 <IconButton
@@ -295,7 +263,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Requested',
       field: 'metadata.creationTimestamp',
-      render: (row: APIKeyRequest) => {
+      render: (row: EnrichedAPIKeyRequest) => {
         if (!row.metadata.creationTimestamp) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -306,11 +274,7 @@ export const MyApiKeysCard = () => {
     {
       title: '',
       filtering: false,
-      render: (row: APIKeyRequest) => {
-        const isDeleting = deleting === row.metadata.name;
-        if (isDeleting) {
-          return <CircularProgress size={20} />;
-        }
+      render: (row: EnrichedAPIKeyRequest) => {
         return (
           <IconButton
             size="small"
@@ -362,7 +326,7 @@ export const MyApiKeysCard = () => {
 
   const tabData = getTabData();
   const tabColumns = getTabColumns();
-  const isPending = (row: APIKeyRequest) => !row.status || row.status.phase === 'Pending';
+  const isPending = (row: EnrichedAPIKeyRequest) => !row.status || row.status.phase === 'Pending';
 
   return (
     <>
@@ -402,7 +366,7 @@ export const MyApiKeysCard = () => {
               emptyRowsWhenPaging: false,
             }}
             columns={tabColumns}
-            data={tabData.map((item: APIKeyRequest) => ({
+            data={tabData.map((item: EnrichedAPIKeyRequest) => ({
               ...item,
               id: item.metadata.name,
             }))}
@@ -422,7 +386,7 @@ export const MyApiKeysCard = () => {
           if (isPending(menuRequest)) {
             items.push(<MenuItem key="edit" onClick={handleEdit}>Edit</MenuItem>);
           }
-          items.push(<MenuItem key="delete" onClick={handleDeleteClick}>Delete</MenuItem>);
+          items.push(<MenuItem key="delete" onClick={handleDelete}>Delete</MenuItem>);
           return items;
         })()}
       </Menu>
@@ -439,15 +403,6 @@ export const MyApiKeysCard = () => {
           }}
         />
       )}
-
-      <ConfirmDeleteDialog
-        open={deleteDialogState.open}
-        title="Delete API Key Request"
-        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiName || 'this API'}?`}
-        deleting={deleting !== null}
-        onConfirm={handleDeleteConfirm}
-        onCancel={handleDeleteCancel}
-      />
     </>
   );
 };
