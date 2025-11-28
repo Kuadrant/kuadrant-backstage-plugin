@@ -1,6 +1,6 @@
 ---
 # owner1's payment api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-payment-api
@@ -44,7 +44,7 @@ spec:
     slack: "#owner1-support"
 ---
 # owner1's inventory api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-inventory-api
@@ -88,7 +88,7 @@ spec:
     slack: "#owner1-support"
 ---
 # owner2's shipping api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner2-shipping-api
@@ -132,7 +132,7 @@ spec:
     slack: "#owner2-support"
 ---
 # owner2's customer api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner2-customer-api
@@ -176,7 +176,7 @@ spec:
     slack: "#owner2-support"
 ---
 # admin's analytics api
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: admin-analytics-api
@@ -220,7 +220,7 @@ spec:
     slack: "#admin-support"
 ---
 # draft api (not visible in catalog)
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: owner1-draft-api

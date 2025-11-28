@@ -46,8 +46,8 @@ kuadrant-dev-setup/
 ├── Makefile                  # cluster and kuadrant setup
 ├── README.md                 # this file
 ├── crds/                     # custom resource definitions
-│   ├── extensions.kuadrant.io_apiproduct.yaml
-│   └── extensions.kuadrant.io_apikeyrequest.yaml
+│   ├── devportal.kuadrant.io_apiproduct.yaml
+│   └── devportal.kuadrant.io_apikeyrequest.yaml
 ├── demo/                     # demo resources
 │   └── toystore-demo.yaml    # toystore api with policies
 ├── rbac/                     # rbac configs

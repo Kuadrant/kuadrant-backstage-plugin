@@ -327,8 +327,8 @@ The RBAC policy file maps groups to roles, and users inherit permissions from th
 
 For production deployments, the RHDH service account needs these permissions:
 
-- Read/write access to `apiproducts.extensions.kuadrant.io`
-- Read/write access to `apikeyrequests.extensions.kuadrant.io`
+- Read/write access to `apiproducts.devportal.kuadrant.io`
+- Read/write access to `apikeyrequests.devportal.kuadrant.io`
 - Read/write access to `secrets` (for API key storage)
 - Read access to Kuadrant policies (optional, for policy viewing)
 
