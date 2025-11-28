@@ -103,7 +103,7 @@ export async function createRouter({
       }
 
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-      const data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+      const data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
 
       // check if user has read all permission
       const readAllDecision = await permissions.authorize(
@@ -167,7 +167,7 @@ export async function createRouter({
 
         // verify ownership
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-        const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const data = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = data.metadata?.annotations?.['backstage.io/owner'];
         // owner is already in entity ref format
 
@@ -178,7 +178,7 @@ export async function createRouter({
         res.json(data);
       } else {
         // admin - read any apiproduct
-        const data = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const data = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         res.json(data);
       }
     } catch (error) {
@@ -262,7 +262,7 @@ export async function createRouter({
       }
 
       const created = await k8sClient.createCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apiproducts',
@@ -315,7 +315,7 @@ export async function createRouter({
 
         // verify ownership before deleting
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-        const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const existing = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = existing.metadata?.annotations?.['backstage.io/owner'];
         // owner is already in entity ref format
 
@@ -325,7 +325,7 @@ export async function createRouter({
       }
 
       await k8sClient.deleteCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apiproducts',
@@ -431,7 +431,7 @@ export async function createRouter({
 
         // verify ownership
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-        const existing = await k8sClient.getCustomResource('extensions.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        const existing = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = existing.metadata?.annotations?.['backstage.io/owner'];
         // owner is already in entity ref format
 
@@ -446,7 +446,7 @@ export async function createRouter({
       }
 
       const updated = await k8sClient.patchCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apiproducts',
@@ -590,7 +590,7 @@ export async function createRouter({
       }
 
       const request = {
-        apiVersion: 'extensions.kuadrant.io/v1alpha1',
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
         kind: 'APIKeyRequest',
         metadata: {
           name: requestName,
@@ -607,7 +607,7 @@ export async function createRouter({
       };
 
       const created = await k8sClient.createCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         apiNamespace,
         'apikeyrequests',
@@ -617,7 +617,7 @@ export async function createRouter({
       // check if apiproduct has automatic approval mode
       try {
         const apiProduct = await k8sClient.getCustomResource(
-          'extensions.kuadrant.io',
+          'devportal.kuadrant.io',
           'v1alpha1',
           apiNamespace,
           'apiproducts',
@@ -693,7 +693,7 @@ export async function createRouter({
           };
 
           await k8sClient.patchCustomResourceStatus(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             apiNamespace,
             'apikeyrequests',
@@ -746,9 +746,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
       } else {
-        data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
       }
 
       let filteredItems = data.items || [];
@@ -758,7 +758,7 @@ export async function createRouter({
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
         // get all apiproducts owned by this user
-        const apiproducts = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+        const apiproducts = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
         const ownedApiProducts = (apiproducts.items || [])
           .filter((product: any) => {
             const owner = product.metadata?.annotations?.['backstage.io/owner'];
@@ -809,9 +809,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
       } else {
-        data = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
       }
 
       const filteredItems = (data.items || []).filter(
@@ -848,7 +848,7 @@ export async function createRouter({
       const reviewedBy = userEntityRef;
 
       const request = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -859,7 +859,7 @@ export async function createRouter({
 
       // verify user owns/admins the apiproduct this request is for
       const apiProduct = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         spec.apiNamespace,
         'apiproducts',
@@ -923,7 +923,7 @@ export async function createRouter({
       // try to get plan limits from apiproduct or planpolicy
       let planLimits: any = null;
       try {
-        const products = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+        const products = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
         const product = (products.items || []).find((p: any) =>
           p.metadata.name.includes(spec.apiName) || p.spec?.displayName?.toLowerCase().includes(spec.apiName.toLowerCase())
         );
@@ -985,7 +985,7 @@ export async function createRouter({
       };
 
       await k8sClient.patchCustomResourceStatus(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1020,7 +1020,7 @@ export async function createRouter({
 
       // fetch request to get apiproduct info
       const request = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1031,7 +1031,7 @@ export async function createRouter({
 
       // verify user owns/admins the apiproduct this request is for
       const apiProduct = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         spec.apiNamespace,
         'apiproducts',
@@ -1072,7 +1072,7 @@ export async function createRouter({
       };
 
       await k8sClient.patchCustomResourceStatus(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1125,7 +1125,7 @@ export async function createRouter({
       for (const reqRef of requests) {
         try {
           const request = await k8sClient.getCustomResource(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
             'apikeyrequests',
@@ -1136,7 +1136,7 @@ export async function createRouter({
 
           // verify user owns/admins the apiproduct this request is for
           const apiProduct = await k8sClient.getCustomResource(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             spec.apiNamespace,
             'apiproducts',
@@ -1200,7 +1200,7 @@ export async function createRouter({
           // try to get plan limits from apiproduct or planpolicy
           let planLimits: any = null;
           try {
-            const products = await k8sClient.listCustomResources('extensions.kuadrant.io', 'v1alpha1', 'apiproducts');
+            const products = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
             const product = (products.items || []).find((p: any) =>
               p.metadata.name.includes(spec.apiName) || p.spec?.displayName?.toLowerCase().includes(spec.apiName.toLowerCase())
             );
@@ -1217,7 +1217,7 @@ export async function createRouter({
           if (!planLimits) {
             try {
               const policy = await k8sClient.getCustomResource(
-                'extensions.kuadrant.io',
+                'devportal.kuadrant.io',
                 'v1alpha1',
                 spec.apiNamespace,
                 'planpolicies',
@@ -1262,7 +1262,7 @@ export async function createRouter({
           };
 
           await k8sClient.patchCustomResourceStatus(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
             'apikeyrequests',
@@ -1320,7 +1320,7 @@ export async function createRouter({
         try {
           // fetch request to get apiproduct info
           const request = await k8sClient.getCustomResource(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
             'apikeyrequests',
@@ -1331,7 +1331,7 @@ export async function createRouter({
 
           // verify user owns/admins the apiproduct this request is for
           const apiProduct = await k8sClient.getCustomResource(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             spec.apiNamespace,
             'apiproducts',
@@ -1372,7 +1372,7 @@ export async function createRouter({
           };
 
           await k8sClient.patchCustomResourceStatus(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
             'apikeyrequests',
@@ -1411,7 +1411,7 @@ export async function createRouter({
 
       // get request to verify ownership
       const request = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1473,7 +1473,7 @@ export async function createRouter({
       }
 
       await k8sClient.deleteCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1511,7 +1511,7 @@ export async function createRouter({
 
       // get existing request to check ownership and status
       const existing = await k8sClient.getCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',
@@ -1551,7 +1551,7 @@ export async function createRouter({
 
       // apply validated patch
       const updated = await k8sClient.patchCustomResource(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
         'apikeyrequests',

@@ -680,10 +680,10 @@ kubernetes:
       type: config
   customResources:
     - apiVersion: 'v1'
-      group: 'extensions.kuadrant.io'
+      group: 'devportal.kuadrant.io'
       plural: 'apiproducts'
     - apiVersion: 'v1'
-      group: 'extensions.kuadrant.io'
+      group: 'devportal.kuadrant.io'
       plural: 'apikeyrequests'
 ```
 
@@ -989,7 +989,7 @@ APIProducts support two approval modes for API key requests:
 
 ### Implementation
 
-**CRD field** (`extensions.kuadrant.io_apiproduct.yaml:39-43`):
+**CRD field** (`devportal.kuadrant.io_apiproduct.yaml:39-43`):
 ```yaml
 approvalMode:
   type: string

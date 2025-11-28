@@ -47,7 +47,7 @@ export interface APIKeyRequestStatus {
 }
 
 export interface APIKeyRequest {
-  apiVersion: 'extensions.kuadrant.io/v1alpha1';
+  apiVersion: 'devportal.kuadrant.io/v1alpha1';
   kind: 'APIKeyRequest';
   metadata: {
     name: string;
@@ -104,7 +104,7 @@ export interface APIProductStatus {
 }
 
 export interface APIProduct {
-  apiVersion: 'extensions.kuadrant.io/v1alpha1';
+  apiVersion: 'devportal.kuadrant.io/v1alpha1';
   kind: 'APIProduct';
   metadata: {
     name: string;

@@ -21,12 +21,12 @@ rules:
     resources:
       - planpolicies
     verbs: ["get", "list", "watch"]
-  - apiGroups: ["extensions.kuadrant.io"]
+  - apiGroups: ["devportal.kuadrant.io"]
     resources:
       - apiproducts
       - apikeyrequests
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
-  - apiGroups: ["extensions.kuadrant.io"]
+  - apiGroups: ["devportal.kuadrant.io"]
     resources:
       - apikeyrequests/status
     verbs: ["get", "patch", "update"]
