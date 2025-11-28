@@ -166,7 +166,7 @@ spec:
       limits:
         daily: 10
 ---
-apiVersion: extensions.kuadrant.io/v1alpha1
+apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
   name: toystore-api

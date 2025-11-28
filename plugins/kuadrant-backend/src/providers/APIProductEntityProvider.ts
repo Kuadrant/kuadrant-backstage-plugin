@@ -91,7 +91,7 @@ export class APIProductEntityProvider implements EntityProvider {
       console.log('apiproduct provider: fetching apiproducts from kubernetes');
       // fetch all apiproducts from kubernetes
       const response = await this.k8sClient.listCustomResources(
-        'extensions.kuadrant.io',
+        'devportal.kuadrant.io',
         'v1alpha1',
         'apiproducts'
       );

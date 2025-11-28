@@ -113,7 +113,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       const namespace = selectedRouteNamespace;
 
       const apiProduct = {
-        apiVersion: 'extensions.kuadrant.io/v1alpha1',
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
         kind: 'APIProduct',
         metadata: {
           name,
