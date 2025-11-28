@@ -21,13 +21,13 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
-  kuadrantApiKeyRequestCreatePermission,
-  kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
-  kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestDeleteOwnPermission,
-  kuadrantApiKeyRequestDeleteAllPermission,
+  kuadrantAPIKeyCreatePermission,
+  kuadrantAPIKeyReadOwnPermission,
+  kuadrantAPIKeyReadAllPermission,
+  kuadrantAPIKeyUpdateOwnPermission,
+  kuadrantAPIKeyUpdateAllPermission,
+  kuadrantAPIKeyDeleteOwnPermission,
+  kuadrantAPIKeyDeleteAllPermission,
 } from './permissions';
 
 function generateApiKey(): string {
@@ -544,7 +544,7 @@ export async function createRouter({
     }
   });
 
-  // apikeyrequest crud endpoints
+  // apikey crud endpoints
   const requestSchema = z.object({
     apiName: z.string(),
     apiNamespace: z.string(),
@@ -570,7 +570,7 @@ export async function createRouter({
       const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
       const decision = await permissions.authorize(
         [{
-          permission: kuadrantApiKeyRequestCreatePermission,
+          permission: kuadrantAPIKeyCreatePermission,
           resourceRef,
         }],
         { credentials }
@@ -591,7 +591,7 @@ export async function createRouter({
 
       const request = {
         apiVersion: 'devportal.kuadrant.io/v1alpha1',
-        kind: 'APIKeyRequest',
+        kind: 'APIKey',
         metadata: {
           name: requestName,
           namespace: apiNamespace,
@@ -610,7 +610,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         apiNamespace,
-        'apikeyrequests',
+        'apikeys',
         request,
       );
 
@@ -696,7 +696,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             apiNamespace,
-            'apikeyrequests',
+            'apikeys',
             requestName,
             status,
           );
@@ -723,7 +723,7 @@ export async function createRouter({
 
       // check if user can read all requests or only own
       const readAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestReadAllPermission }],
+        [{ permission: kuadrantAPIKeyReadAllPermission }],
         { credentials }
       );
 
@@ -732,7 +732,7 @@ export async function createRouter({
       if (!canReadAll) {
         // try read own permission
         const readOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+          [{ permission: kuadrantAPIKeyReadOwnPermission }],
           { credentials }
         );
 
@@ -746,9 +746,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys');
       }
 
       let filteredItems = data.items || [];
@@ -795,7 +795,7 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+        [{ permission: kuadrantAPIKeyReadOwnPermission }],
         { credentials }
       );
 
@@ -809,9 +809,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
       }
 
       const filteredItems = (data.items || []).filter(
@@ -851,7 +851,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -871,14 +871,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantAPIKeyUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          [{ permission: kuadrantAPIKeyUpdateOwnPermission }],
           { credentials },
         );
 
@@ -988,7 +988,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         status,
       );
@@ -1023,7 +1023,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1043,14 +1043,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantAPIKeyUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          [{ permission: kuadrantAPIKeyUpdateOwnPermission }],
           { credentials },
         );
 
@@ -1075,7 +1075,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         status,
       );
@@ -1110,7 +1110,7 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantAPIKeyUpdateAllPermission }],
         { credentials },
       );
 
@@ -1128,7 +1128,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
           );
 
@@ -1265,7 +1265,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
             status,
           );
@@ -1304,7 +1304,7 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantAPIKeyUpdateAllPermission }],
         { credentials },
       );
 
@@ -1323,7 +1323,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
           );
 
@@ -1375,7 +1375,7 @@ export async function createRouter({
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeyrequests',
+            'apikeys',
             reqRef.name,
             status,
           );
@@ -1414,7 +1414,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1422,7 +1422,7 @@ export async function createRouter({
 
       // check if user can delete all requests or just their own
       const deleteAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestDeleteAllPermission }],
+        [{ permission: kuadrantAPIKeyDeleteAllPermission }],
         { credentials }
       );
 
@@ -1431,7 +1431,7 @@ export async function createRouter({
       if (!canDeleteAll) {
         // check if user can delete their own requests
         const deleteOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestDeleteOwnPermission }],
+          [{ permission: kuadrantAPIKeyDeleteOwnPermission }],
           { credentials }
         );
 
@@ -1476,7 +1476,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
       res.status(204).send();
@@ -1514,7 +1514,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
       );
 
@@ -1554,7 +1554,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeyrequests',
+        'apikeys',
         name,
         parsed.data,
       );

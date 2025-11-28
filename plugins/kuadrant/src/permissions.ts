@@ -122,7 +122,7 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikeyrequest permissions
+// apikey permissions
 
 /**
  * permission to create API key requests
@@ -130,11 +130,11 @@ export const kuadrantApiProductListPermission = createPermission({
  * this is a ResourcePermission scoped to 'apiproduct', allowing
  * fine-grained control over which API products users can request access to.
  *
- * use in frontend: useKuadrantPermission(kuadrantApiKeyRequestCreatePermission)
+ * use in frontend: useKuadrantPermission(kuadrantAPIKeyCreatePermission)
  * use in backend with resource: { permission, resourceRef: 'apiproduct:namespace/name' }
  */
-export const kuadrantApiKeyRequestCreatePermission = createPermission({
-  name: 'kuadrant.apikeyrequest.create',
+export const kuadrantAPIKeyCreatePermission = createPermission({
+  name: 'kuadrant.apikey.create',
   attributes: { action: 'create' },
   resourceType: 'apiproduct',
 });
@@ -143,8 +143,8 @@ export const kuadrantApiKeyRequestCreatePermission = createPermission({
  * permission to read API key requests created by the current user
  * use this for allowing users to see their own request history
  */
-export const kuadrantApiKeyRequestReadOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.own',
+export const kuadrantAPIKeyReadOwnPermission = createPermission({
+  name: 'kuadrant.apikey.read.own',
   attributes: { action: 'read' },
 });
 
@@ -152,8 +152,8 @@ export const kuadrantApiKeyRequestReadOwnPermission = createPermission({
  * permission to read all API key requests regardless of who created them
  * use this for platform engineers/admins who need to view the approval queue
  */
-export const kuadrantApiKeyRequestReadAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.all',
+export const kuadrantAPIKeyReadAllPermission = createPermission({
+  name: 'kuadrant.apikey.read.all',
   attributes: { action: 'read' },
 });
 
@@ -161,8 +161,8 @@ export const kuadrantApiKeyRequestReadAllPermission = createPermission({
  * permission to update API key requests owned by the current user
  * allows users to edit their own pending requests (change plan tier, use case)
  */
-export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.own',
+export const kuadrantAPIKeyUpdateOwnPermission = createPermission({
+  name: 'kuadrant.apikey.update.own',
   attributes: { action: 'update' },
 });
 
@@ -170,8 +170,8 @@ export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
  * permission to update any API key request regardless of ownership
  * typically granted to API owners and platform engineers for approving/rejecting requests
  */
-export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.all',
+export const kuadrantAPIKeyUpdateAllPermission = createPermission({
+  name: 'kuadrant.apikey.update.all',
   attributes: { action: 'update' },
 });
 
@@ -179,8 +179,8 @@ export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
  * permission to delete API key requests created by the current user
  * allows users to cancel their own pending requests
  */
-export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.own',
+export const kuadrantAPIKeyDeleteOwnPermission = createPermission({
+  name: 'kuadrant.apikey.delete.own',
   attributes: { action: 'delete' },
 });
 
@@ -188,13 +188,13 @@ export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
  * permission to delete any API key request regardless of ownership
  * for platform engineers/admins
  */
-export const kuadrantApiKeyRequestDeleteAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.all',
+export const kuadrantAPIKeyDeleteAllPermission = createPermission({
+  name: 'kuadrant.apikey.delete.all',
   attributes: { action: 'delete' },
 });
 
-export const kuadrantApiKeyRequestListPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.list',
+export const kuadrantAPIKeyListPermission = createPermission({
+  name: 'kuadrant.apikey.list',
   attributes: { action: 'read' },
 });
 
@@ -250,14 +250,14 @@ export const kuadrantPermissions = [
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiKeyRequestCreatePermission,
-  kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
-  kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestDeleteOwnPermission,
-  kuadrantApiKeyRequestDeleteAllPermission,
-  kuadrantApiKeyRequestListPermission,
+  kuadrantAPIKeyCreatePermission,
+  kuadrantAPIKeyReadOwnPermission,
+  kuadrantAPIKeyReadAllPermission,
+  kuadrantAPIKeyUpdateOwnPermission,
+  kuadrantAPIKeyUpdateAllPermission,
+  kuadrantAPIKeyDeleteOwnPermission,
+  kuadrantAPIKeyDeleteAllPermission,
+  kuadrantAPIKeyListPermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
   kuadrantApiKeyDeleteOwnPermission,

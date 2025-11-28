@@ -12,7 +12,7 @@ The Kuadrant plugin uses Backstage's RBAC system for access control across API P
 
 Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 
-- **resource**: `planpolicy`, `apiproduct`, `apikeyrequest`, `apikey`
+- **resource**: `planpolicy`, `apiproduct`, `apikey`, `apikey`
 - **action**: `create`, `read`, `update`, `delete`, `list`
 - **scope**: `own` (user's resources) or `all` (any resource) - omitted for non-scoped permissions
 
@@ -28,7 +28,7 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 - `kuadrant.apiproduct.read.all` - read any API Product
 
 **Resource Permissions**: Include resource references for fine-grained control
-- `kuadrant.apikeyrequest.create` with resource ref `apiproduct:namespace/name`
+- `kuadrant.apikey.create` with resource ref `apiproduct:namespace/name`
 
 ## Complete Permission List
 
@@ -55,18 +55,18 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 | `kuadrant.apiproduct.delete.all` | Delete any API Product | All |
 | `kuadrant.apiproduct.list` | List API Products (filtered by read permissions) | - |
 
-### APIKeyRequest Permissions
+### ApiKey Permissions
 
 | Permission | Description | Scope |
 |------------|-------------|-------|
-| `kuadrant.apikeyrequest.create` | Request API access | Resource (APIProduct) |
-| `kuadrant.apikeyrequest.read.own` | Read requests you created | Own |
-| `kuadrant.apikeyrequest.read.all` | Read any request | All |
-| `kuadrant.apikeyrequest.update.own` | Edit your own pending requests | Own |
-| `kuadrant.apikeyrequest.update.all` | Approve/reject any request | All |
-| `kuadrant.apikeyrequest.delete.own` | Delete your own requests | Own |
-| `kuadrant.apikeyrequest.delete.all` | Delete any request | All |
-| `kuadrant.apikeyrequest.list` | List requests (filtered by read permissions) | - |
+| `kuadrant.apikey.create` | Request API access | Resource (APIProduct) |
+| `kuadrant.apikey.read.own` | Read requests you created | Own |
+| `kuadrant.apikey.read.all` | Read any request | All |
+| `kuadrant.apikey.update.own` | Edit your own pending requests | Own |
+| `kuadrant.apikey.update.all` | Approve/reject any request | All |
+| `kuadrant.apikey.delete.own` | Delete your own requests | Own |
+| `kuadrant.apikey.delete.all` | Delete any request | All |
+| `kuadrant.apikey.list` | List requests (filtered by read permissions) | - |
 
 ### API Key Permissions
 
@@ -88,10 +88,10 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 **Permissions**:
 - `kuadrant.apiproduct.read.all` - browse API catalog
 - `kuadrant.apiproduct.list`
-- `kuadrant.apikeyrequest.create` - request API access
-- `kuadrant.apikeyrequest.read.own` - view own requests
-- `kuadrant.apikeyrequest.update.own` - edit own pending requests
-- `kuadrant.apikeyrequest.delete.own` - cancel own requests
+- `kuadrant.apikey.create` - request API access
+- `kuadrant.apikey.read.own` - view own requests
+- `kuadrant.apikey.update.own` - edit own pending requests
+- `kuadrant.apikey.delete.own` - cancel own requests
 - `kuadrant.apikey.read.own` - view own API keys
 - `kuadrant.apikey.delete.own` - revoke own API keys
 
@@ -112,7 +112,7 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 - `kuadrant.apiproduct.read.own` - view own API Products
 - `kuadrant.apiproduct.update.own` - update own API Products
 - `kuadrant.apiproduct.delete.own` - delete own API Products
-- `kuadrant.apikeyrequest.update.own` - approve/reject requests for own APIs (see approval workflow below)
+- `kuadrant.apikey.update.own` - approve/reject requests for own APIs (see approval workflow below)
 - `kuadrant.apikey.read.own` - view API keys for own APIs
 - `kuadrant.apikey.delete.own` - delete API keys for own APIs
 
@@ -137,9 +137,9 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 - `kuadrant.apiproduct.read.all` - view all API Products
 - `kuadrant.apiproduct.update.all` - update any API Product
 - `kuadrant.apiproduct.delete.all` - delete any API Product
-- `kuadrant.apikeyrequest.read.all` - view all requests
-- `kuadrant.apikeyrequest.update.all` - approve/reject any request
-- `kuadrant.apikeyrequest.delete.all` - delete any request
+- `kuadrant.apikey.read.all` - view all requests
+- `kuadrant.apikey.update.all` - approve/reject any request
+- `kuadrant.apikey.delete.all` - delete any request
 - `kuadrant.apikey.read.all` - view any API key
 - `kuadrant.apikey.delete.all` - delete any API key
 - RBAC policy management permissions
@@ -173,12 +173,12 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 
 Comprehensive view of what each persona can and cannot do:
 
-| Persona | Can Do | Cannot Do |
-|---------|--------|-----------|
+| Persona | Can Do                                                                                                                                                                                                                                                                                                         | Cannot Do |
+|---------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|-----------|
 | **Platform Engineer** | • Manage Kuadrant infrastructure (Gateways, HTTPRoutes)<br/>• Create/update/delete PlanPolicy resources<br/>• Annotate HTTPRoutes with `backstage.io/expose: "true"`<br/>• Manage RBAC policies and permissions<br/>• Configure platform-wide settings<br/>• Full cluster admin access for platform management | • Typically does not manage day-to-day API Products (delegates to API Admin/Owner)<br/>• Should coordinate with API Admins and API Owners before changing rate limits |
-| **API Admin** | • Read all APIProducts<br/>• Create/update/delete any APIProduct<br/>• Approve/reject any API key requests<br/>• Manage all API keys (read/delete)<br/>• View all APIKeyRequests<br/>• Troubleshoot on behalf of API Owners<br/>• All `.all` scoped permissions | • Cannot create/update/delete PlanPolicy<br/>• Cannot modify platform infrastructure (HTTPRoutes, Gateways) |
-| **API Owner** | • Read/list HTTPRoutes (to publish APIs)<br/>• Create/update/delete own APIProducts<br/>• Read all APIProducts<br/>• Approve/reject API key requests for own APIs<br/>• Delete API key requests for own APIs<br/>• Manage own API documentation<br/>• View/manage API keys for own APIs | • Cannot create/update PlanPolicy<br/>• Cannot modify platform infrastructure<br/>• Cannot approve requests for other owners' APIs<br/>• Cannot update/delete other owners' APIProducts |
-| **API Consumer** | • Read/list APIProduct<br/>• Create APIKeyRequest<br/>• Read/update/delete own APIKeyRequests<br/>• View own request status<br/>• Manage own API keys<br/>• Use APIs within rate limit quotas | • Cannot approve requests<br/>• Cannot view others' requests<br/>• Cannot create or publish APIs<br/>• Cannot modify rate limits |
+| **API Admin** | • Read all APIProducts<br/>• Create/update/delete any APIProduct<br/>• Approve/reject any API key requests<br/>• Manage all API keys (read/delete)<br/>• View all Apikeys<br/>• Troubleshoot on behalf of API Owners<br/>• All `.all` scoped permissions                                                       | • Cannot create/update/delete PlanPolicy<br/>• Cannot modify platform infrastructure (HTTPRoutes, Gateways) |
+| **API Owner** | • Read/list HTTPRoutes (to publish APIs)<br/>• Create/update/delete own APIProducts<br/>• Read all APIProducts<br/>• Approve/reject API key requests for own APIs<br/>• Delete API key requests for own APIs<br/>• Manage own API documentation<br/>• View/manage API keys for own APIs                        | • Cannot create/update PlanPolicy<br/>• Cannot modify platform infrastructure<br/>• Cannot approve requests for other owners' APIs<br/>• Cannot update/delete other owners' APIProducts |
+| **API Consumer** | • Read/list APIProduct<br/>• Create ApiKey<br/>• Read/update/delete own APIKeys<br/>• View own request status<br/>• Manage own API keys<br/>• Use APIs within rate limit quotas                                                                                                                         | • Cannot approve requests<br/>• Cannot view others' requests<br/>• Cannot create or publish APIs<br/>• Cannot modify rate limits |
 
 ### Permission Breakdown by Resource
 
@@ -200,7 +200,7 @@ Comprehensive view of what each persona can and cannot do:
 - API Owner: create, read (all), update (own), delete (own)
 - API Consumer: read, list
 
-**APIKeyRequest (access requests):**
+**APIKey (access requests):**
 - Platform Engineer: typically none (delegated to API Admin)
 - API Admin: create, read, update (approve/reject/modify any), delete (all)
 - API Owner: create, read (for own APIs), update (approve/reject for own APIs), delete (for own APIs)
@@ -297,23 +297,23 @@ if (hasReadAllPermission) {
 
 ## Approval Workflow
 
-### APIKeyRequest Permissions
+### APIKey Permissions
 
 API Owners can approve/reject requests for their own APIs using the `.update.own` permission. The backend verifies:
 
-1. User has `kuadrant.apikeyrequest.update.own` or `kuadrant.apikeyrequest.update.all`
+1. User has `kuadrant.apikey.update.own` or `kuadrant.apikey.update.all`
 2. If using `.update.own`, user must own the associated APIProduct
 
 ```typescript
 // approval endpoint logic
 const updateAllDecision = await permissions.authorize(
-  [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+  [{ permission: kuadrantAPIKeyUpdateAllPermission }],
   { credentials }
 );
 
 if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
   const updateOwnDecision = await permissions.authorize(
-    [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+    [{ permission: kuadrantAPIKeyUpdateOwnPermission }],
     { credentials }
   );
 
@@ -340,15 +340,15 @@ if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
 
 ## Per-APIProduct Access Control
 
-The `kuadrant.apikeyrequest.create` permission supports resource references for fine-grained control:
+The `kuadrant.apikey.create` permission supports resource references for fine-grained control:
 
 ```csv
 # allow all consumers to request any API
-p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow, apiproduct:*/*
+p, role:default/api-consumer, kuadrant.apikey.create, create, allow, apiproduct:*/*
 
 # restrict specific APIs to specific roles
-p, role:default/partner, kuadrant.apikeyrequest.create, create, allow, apiproduct:toystore/toystore-api
-p, role:default/internal, kuadrant.apikeyrequest.create, create, allow, apiproduct:internal/*
+p, role:default/partner, kuadrant.apikey.create, create, allow, apiproduct:toystore/toystore-api
+p, role:default/internal, kuadrant.apikey.create, create, allow, apiproduct:internal/*
 ```
 
 Backend checks include the resource reference:
@@ -356,7 +356,7 @@ Backend checks include the resource reference:
 ```typescript
 const resourceRef = `apiproduct:${apiNamespace}/${apiName}`;
 const decision = await permissions.authorize([{
-  permission: kuadrantApiKeyRequestCreatePermission,
+  permission: kuadrantApikeyCreatePermission,
   resourceRef,
 }], { credentials });
 ```

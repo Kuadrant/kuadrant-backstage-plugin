@@ -62,7 +62,7 @@ Visit:
 
 **Custom CRDs:**
 - `APIProduct` - Defines API products with tiers
-- `APIKeyRequest` - Tracks API access requests
+- `APIKey` - Tracks API access requests
 
 **Kuadrant components:**
 - Kuadrant operator v1.3.0
@@ -88,7 +88,7 @@ Uses local `~/.kube/config` for development:
 ```bash
 kubectl config current-context    # Verify cluster
 kubectl get apiproducts -A        # Check resources
-kubectl get apikeyrequests -A
+kubectl get apikeys -A
 ```
 
 ### Cluster Management
@@ -200,7 +200,7 @@ plugins/
 └── kuadrant-backend/             # Backend plugin
 
 kuadrant-dev-setup/               # Development environment
-├── crds/                         # APIProduct, APIKeyRequest CRDs
+├── crds/                         # APIProduct, APIKey CRDs
 ├── demo/                         # Toystore demo resources
 ├── rbac/                         # RHDH service account permissions
 ├── kuadrant-instance.yaml        # Kuadrant CR

@@ -1,1 +1,1 @@
-export { EditAPIKeyRequestDialog } from './EditAPIKeyRequestDialog';
+export { EditAPIKeyDialog } from './EditAPIKeyDialog';

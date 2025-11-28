@@ -210,9 +210,9 @@ kind: ClusterRole
 metadata:
   name: rhdh-kuadrant
 rules:
-  # APIProduct and APIKeyRequest CRDs
+  # APIProduct and APIKey CRDs
   - apiGroups: ["devportal.kuadrant.io"]
-    resources: ["apiproducts", "apikeyrequests"]
+    resources: ["apiproducts", "apikeys"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # PlanPolicy CRDs
   - apiGroups: ["kuadrant.io"]
@@ -350,13 +350,13 @@ spec:
 
 The plugin creates and manages Kubernetes custom resources:
 
-### APIKeyRequest
+### APIKey
 
 Created when users request API access:
 
 ```yaml
 apiVersion: devportal.kuadrant.io/v1alpha1
-kind: APIKeyRequest
+kind: APIKey
 metadata:
   name: guest-toystore-abc123
   namespace: toystore

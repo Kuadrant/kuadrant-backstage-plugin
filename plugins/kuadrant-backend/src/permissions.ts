@@ -3,7 +3,7 @@ import { createPermission } from '@backstage/plugin-permission-common';
 /**
  * Permission definitions for the Kuadrant plugin
  *
- * These permissions control access to PlanPolicy, APIProduct, APIKeyRequest,
+ * These permissions control access to PlanPolicy, APIProduct, APIKey,
  * and API key management within the Kuadrant Backstage plugin.
  *
  * Permissions are composable - use them to build custom roles beyond the
@@ -77,40 +77,40 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikeyrequest permissions (access requests)
-export const kuadrantApiKeyRequestCreatePermission = createPermission({
-  name: 'kuadrant.apikeyrequest.create',
+// apikey permissions (access requests)
+export const kuadrantAPIKeyCreatePermission = createPermission({
+  name: 'kuadrant.apikey.create',
   attributes: { action: 'create' },
   resourceType: 'apiproduct',
 });
 
-export const kuadrantApiKeyRequestReadOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.own',
+export const kuadrantAPIKeyReadOwnPermission = createPermission({
+  name: 'kuadrant.apikey.read.own',
   attributes: { action: 'read' },
 });
 
 export const kuadrantApiKeyRequestReadAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.all',
+  name: 'kuadrant.apikey.read.all',
   attributes: { action: 'read' },
 });
 
 export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.own',
+  name: 'kuadrant.apikey.update.own',
   attributes: { action: 'update' },
 });
 
 export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.all',
+  name: 'kuadrant.apikey.update.all',
   attributes: { action: 'update' },
 });
 
 export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.own',
+  name: 'kuadrant.apikey.delete.own',
   attributes: { action: 'delete' },
 });
 
 export const kuadrantApiKeyRequestDeleteAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.all',
+  name: 'kuadrant.apikey.delete.all',
   attributes: { action: 'delete' },
 });
 

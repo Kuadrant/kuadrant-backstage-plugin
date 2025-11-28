@@ -375,7 +375,7 @@ export const ResourceList = () => {
             <Typography variant="body2" color="textSecondary">
               permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
                          deletePermissionError ? 'kuadrant.apiproduct.delete' :
-                         approvalQueuePermissionError ? 'kuadrant.apikeyrequest.read.all' :
+                         approvalQueuePermissionError ? 'kuadrant.apikey.read.all' :
                          planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
             </Typography>
             <Typography variant="body2" color="textSecondary">
