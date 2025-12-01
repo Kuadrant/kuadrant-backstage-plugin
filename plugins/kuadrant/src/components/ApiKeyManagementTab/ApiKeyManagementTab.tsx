@@ -119,7 +119,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     const data = await response.json();
     // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
-      (r: APIKey) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
+      (r: APIKey) => r.spec.apiProductRef.name === apiProductName && r.metadata.namespace === namespace // APIProducts and APIKeys (and its Secret) will be in the same NS
     );
   }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
@@ -265,13 +265,11 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiName: apiProductName,
-          apiNamespace: namespace,
-          userId,
-          userEmail,
+          apiProductName,
+          namespace,
           planTier: selectedPlan,
           useCase: useCase.trim() || '',
-          namespace,
+          userEmail,
         }),
       });
 
@@ -621,7 +619,7 @@ func main() {
       field: 'spec.requestedAt',
       render: (row: APIKey) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? new Date(row.spec.requestedAt).toLocaleDateString() : '-'}
+          {row.status && row.status.requestedAt ? new Date(row.status.requestedAt).toLocaleDateString() : '-'}
         </Typography>
       ),
     },

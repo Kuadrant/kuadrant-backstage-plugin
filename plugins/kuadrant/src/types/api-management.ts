@@ -13,30 +13,33 @@ export interface PlanLimits {
 }
 
 export interface APIKeySpec {
-  apiName: string;
-  apiNamespace: string;
+  apiProductRef: {
+    name: string;
+  };
   planTier: PlanTier;
   useCase?: string;
   requestedBy: {
     userId: string;
     email: string;
   };
-  requestedAt?: string;
 }
 
 export interface APIKeyStatus {
   phase?: RequestPhase;
+  requestedAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
-  reason?: string;
-  comment?: string;
-  apiKey?: string;
+  reason?: string; // rejection reason or approval comment (also in conditions)
+  apiKey?: string; // the actual API key value (for approved requests)
   apiHostname?: string;
   apiBasePath?: string;
   apiDescription?: string;
-  apiOasUrl?: string;
-  apiOasUiUrl?: string;
   planLimits?: PlanLimits;
+  secretRef?: {
+    name: string;
+    key: string;
+  };
+  canReadSecret?: boolean;
   conditions?: Array<{
     type: string;
     status: 'True' | 'False' | 'Unknown';

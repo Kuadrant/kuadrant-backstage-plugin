@@ -68,7 +68,7 @@ const ApprovalDialog = ({ open, request, action, processing, onClose, onConfirm 
         {request && (
           <>
             <p><strong>User:</strong> {request.spec.requestedBy.userId}</p>
-            <p><strong>API:</strong> {request.spec.apiName}</p>
+            <p><strong>API:</strong> {request.spec.apiProductRef?.name || 'unknown'}</p>
             <p><strong>Tier:</strong> {request.spec.planTier}</p>
             <Box mb={2}>
               <Typography variant="body2" component="span" style={{ fontWeight: 'bold' }}>
@@ -148,7 +148,7 @@ const BulkActionDialog = ({ open, requests, action, processing, onClose, onConfi
           {requests.map(request => (
             <Box key={`${request.metadata.namespace}/${request.metadata.name}`} mb={1} p={1} bgcolor="background.default">
               <Typography variant="body2">
-                <strong>{request.spec.requestedBy.userId}</strong> - {request.spec.apiName} ({request.spec.planTier})
+                <strong>{request.spec.requestedBy.userId}</strong> - {request.spec.apiProductRef?.name || 'unknown'} ({request.spec.planTier})
               </Typography>
             </Box>
           ))}
@@ -444,13 +444,13 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'API',
-      field: 'spec.apiName',
-      render: (row) => <Typography variant="body2"><strong>{row.spec.apiName}</strong></Typography>,
+      field: 'spec.apiProductRef.name',
+      render: (row) => <Typography variant="body2"><strong>{row.spec.apiProductRef?.name || 'unknown'}</strong></Typography>,
     },
     {
       title: 'Namespace',
-      field: 'spec.apiNamespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',
@@ -488,10 +488,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'spec.requestedAt',
+      field: 'status.requestedAt',
       render: (row) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? formatDate(row.spec.requestedAt) : '-'}
+          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
         </Typography>
       ),
     },
@@ -499,7 +499,7 @@ export const ApprovalQueueCard = () => {
       title: 'Actions',
       filtering: false,
       render: (row) => {
-        const apiProductKey = `${row.spec.apiNamespace}/${row.spec.apiName}`;
+        const apiProductKey = `${row.metadata.namespace}/${row.spec.apiProductRef?.name || 'unknown'}`;
         const ownsApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
         const canUpdate = canUpdateAllRequests || (canUpdateOwnRequests && ownsApiProduct);
         if (!canUpdate) return null;
@@ -542,13 +542,13 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'API',
-      field: 'spec.apiName',
-      render: (row) => <Typography variant="body2"><strong>{row.spec.apiName}</strong></Typography>,
+      field: 'spec.apiProductRef.name',
+      render: (row) => <Typography variant="body2"><strong>{row.spec.apiProductRef?.name || 'unknown'}</strong></Typography>,
     },
     {
       title: 'Namespace',
-      field: 'spec.apiNamespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',
@@ -562,10 +562,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'spec.requestedAt',
+      field: 'status.requestedAt',
       render: (row) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? formatDate(row.spec.requestedAt) : '-'}
+          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
         </Typography>
       ),
     },
@@ -616,13 +616,13 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'API',
-      field: 'spec.apiName',
-      render: (row) => <Typography variant="body2"><strong>{row.spec.apiName}</strong></Typography>,
+      field: 'spec.apiProductRef.name',
+      render: (row) => <Typography variant="body2"><strong>{row.spec.apiProductRef?.name || 'unknown'}</strong></Typography>,
     },
     {
       title: 'Namespace',
-      field: 'spec.apiNamespace',
-      render: (row) => <Typography variant="body2">{row.spec.apiNamespace}</Typography>,
+      field: 'metadata.namespace',
+      render: (row) => <Typography variant="body2">{row.metadata.namespace}</Typography>,
     },
     {
       title: 'Tier',
@@ -636,10 +636,10 @@ export const ApprovalQueueCard = () => {
     },
     {
       title: 'Requested',
-      field: 'spec.requestedAt',
+      field: 'status.requestedAt',
       render: (row) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? formatDate(row.spec.requestedAt) : '-'}
+          {row.status && row.status.requestedAt ? formatDate(row.status.requestedAt) : '-'}
         </Typography>
       ),
     },
@@ -720,7 +720,7 @@ export const ApprovalQueueCard = () => {
   const groupByApiProduct = (requests: APIKey[]) => {
     const grouped = new Map<string, APIKey[]>();
     requests.forEach(request => {
-      const key = `${request.spec.apiNamespace}/${request.spec.apiName}`;
+      const key = `${request.metadata.namespace}/${request.spec.apiProductRef?.name || 'unknown'}`;
       if (!grouped.has(key)) {
         grouped.set(key, []);
       }
@@ -794,7 +794,7 @@ export const ApprovalQueueCard = () => {
           <Box>
             {apiProductKeys.map(apiProductKey => {
               const requests = groupedData.get(apiProductKey) || [];
-              const displayName = requests[0]?.spec.apiName || apiProductKey;
+              const displayName = requests[0]?.spec.apiProductRef?.name || apiProductKey;
               const ownsThisApiProduct = value?.ownedApiProducts?.has(apiProductKey) ?? false;
               const canSelectRows = canUpdateAllRequests || (canUpdateOwnRequests && ownsThisApiProduct);
               return (
@@ -829,7 +829,7 @@ export const ApprovalQueueCard = () => {
                         onSelectionChange={(rows) => {
                           // merge selections from this api product with selections from other products
                           const otherSelections = selectedRequests.filter(
-                            r => `${r.spec.apiNamespace}/${r.spec.apiName}` !== apiProductKey
+                            r => `${r.metadata.namespace}/${r.spec.apiProductRef?.name || 'unknown'}` !== apiProductKey
                           );
                           setSelectedRequests([...otherSelections, ...(rows as APIKey[])]);
                         }}

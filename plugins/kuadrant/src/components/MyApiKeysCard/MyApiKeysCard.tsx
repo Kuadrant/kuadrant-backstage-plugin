@@ -101,8 +101,10 @@ export const MyApiKeysCard = () => {
 
     // Fetch available plans for this API
     try {
+      const apiProductName = request.spec.apiProductRef?.name;
+      const apiProductNamespace = request.metadata.namespace;
       const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiNamespace}/${request.spec.apiName}`
+        `${backendUrl}/api/kuadrant/apiproducts/${apiProductNamespace}/${apiProductName}`
       );
 
       if (apiProductResponse.ok) {
@@ -170,12 +172,15 @@ export const MyApiKeysCard = () => {
   const columns: TableColumn<APIKey>[] = [
     {
       title: 'API Product',
-      field: 'spec.apiName',
-      render: (row: APIKey) => (
-        <Link to={`/catalog/default/api/${row.spec.apiName}/api-keys`}>
-          <strong>{row.spec.apiName}</strong>
-        </Link>
-      ),
+      field: 'spec.apiProductRef.name',
+      render: (row: APIKey) => {
+        const apiProductName = row.spec.apiProductRef?.name || 'unknown';
+        return (
+          <Link to={`/catalog/default/api/${apiProductName}/api-keys`}>
+            <strong>{apiProductName}</strong>
+          </Link>
+        );
+      },
     },
     {
       title: 'Tier',
@@ -443,7 +448,7 @@ export const MyApiKeysCard = () => {
       <ConfirmDeleteDialog
         open={deleteDialogState.open}
         title="Delete API Key Request"
-        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiName || 'this API'}?`}
+        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiProductRef?.name || 'this API'}?`}
         deleting={deleting !== null}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
