@@ -246,8 +246,13 @@ export const ApprovalQueueCard = () => {
 
     // check content-type before parsing json
     const contentType = requestsResponse.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.log('ApprovalQueueCard: received non-json response');
+    if (!contentType?.includes('application/json')) {
+      console.error('ApprovalQueueCard: received non-json response');
+      alertApi.post({
+        message: 'Unexpected content-type from the server response. Please contact support.',
+        display: 'transient',
+        severity: 'warning'
+      });
       return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
     }
 
@@ -693,7 +698,7 @@ export const ApprovalQueueCard = () => {
         const pendingWithSelection = pending.map((row: APIKeyRequest) => {
           const isSelected = selectedRequests.some(
             selected => selected.metadata.name === row.metadata.name &&
-                       selected.metadata.namespace === row.metadata.namespace
+              selected.metadata.namespace === row.metadata.namespace
           );
           return {
             ...row,
