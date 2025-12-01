@@ -249,7 +249,8 @@ export const ApprovalQueueCard = () => {
     if (!contentType?.includes('application/json')) {
       console.error('ApprovalQueueCard: received non-json response');
       alertApi.post({
-        message: 'Unexpected server response. Please contact support.',
+        message: 'Unexpected content-type from the server response. Please contact support.',
+        display: 'transient',
         severity: 'warning'
       });
       return { pending: [] as APIKeyRequest[], approved: [] as APIKeyRequest[], rejected: [] as APIKeyRequest[], reviewedBy, ownedApiProducts: new Set<string>() };
