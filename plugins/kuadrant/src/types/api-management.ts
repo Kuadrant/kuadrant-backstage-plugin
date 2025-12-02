@@ -12,31 +12,34 @@ export interface PlanLimits {
   }>;
 }
 
-export interface APIKeyRequestSpec {
-  apiName: string;
-  apiNamespace: string;
+export interface APIKeySpec {
+  apiProductRef: {
+    name: string;
+  };
   planTier: PlanTier;
   useCase?: string;
   requestedBy: {
     userId: string;
     email: string;
   };
-  requestedAt?: string;
 }
 
-export interface APIKeyRequestStatus {
+export interface APIKeyStatus {
   phase?: RequestPhase;
+  requestedAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
-  reason?: string;
-  comment?: string;
-  apiKey?: string;
+  reason?: string; // rejection reason or approval comment (also in conditions)
+  apiKey?: string; // the actual API key value (for approved requests)
   apiHostname?: string;
   apiBasePath?: string;
   apiDescription?: string;
-  apiOasUrl?: string;
-  apiOasUiUrl?: string;
   planLimits?: PlanLimits;
+  secretRef?: {
+    name: string;
+    key: string;
+  };
+  canReadSecret?: boolean;
   conditions?: Array<{
     type: string;
     status: 'True' | 'False' | 'Unknown';
@@ -46,9 +49,9 @@ export interface APIKeyRequestStatus {
   }>;
 }
 
-export interface APIKeyRequest {
-  apiVersion: 'extensions.kuadrant.io/v1alpha1';
-  kind: 'APIKeyRequest';
+export interface APIKey {
+  apiVersion: 'devportal.kuadrant.io/v1alpha1';
+  kind: 'APIKey';
   metadata: {
     name: string;
     namespace: string;
@@ -56,8 +59,8 @@ export interface APIKeyRequest {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
   };
-  spec: APIKeyRequestSpec;
-  status?: APIKeyRequestStatus;
+  spec: APIKeySpec;
+  status?: APIKeyStatus;
 }
 
 export interface Plan {
@@ -104,7 +107,7 @@ export interface APIProductStatus {
 }
 
 export interface APIProduct {
-  apiVersion: 'extensions.kuadrant.io/v1alpha1';
+  apiVersion: 'devportal.kuadrant.io/v1alpha1';
   kind: 'APIProduct';
   metadata: {
     name: string;

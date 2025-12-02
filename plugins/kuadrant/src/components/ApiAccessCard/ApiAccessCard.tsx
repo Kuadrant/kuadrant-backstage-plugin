@@ -13,13 +13,15 @@ import {
 import { useApi, configApiRef, identityApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 
-interface APIKeyRequest {
+interface APIKey {
   metadata: {
     name: string;
     namespace: string;
   };
   spec: {
-    apiName: string;
+    apiProductRef: {
+      name: string;
+    };
     planTier: string;
   };
   status?: {
@@ -62,8 +64,8 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     const data = await response.json();
     // filter to only this apiproduct's approved requests
     const allRequests = data.items || [];
-    return allRequests.filter((r: APIKeyRequest) =>
-      r.spec.apiName === apiProductName && r.status?.phase === 'Approved'
+    return allRequests.filter((r: APIKey) =>
+      r.spec.apiProductRef?.name === apiProductName && r.status?.phase === 'Approved'
     );
   }, [namespace, apiProductName, backendUrl, fetchApi]);
 
@@ -75,7 +77,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     return <ResponseErrorPanel error={keysError} />;
   }
 
-  const keys = (requests as APIKeyRequest[]) || [];
+  const keys = (requests as APIKey[]) || [];
 
   return (
     <>
@@ -86,7 +88,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
               <Typography variant="body1" gutterBottom>
                 You have {keys.length} active API key{keys.length !== 1 ? 's' : ''} for this API
               </Typography>
-              {keys.map((request: APIKeyRequest) => {
+              {keys.map((request: APIKey) => {
                 const planTier = request.spec.planTier;
 
                 return (

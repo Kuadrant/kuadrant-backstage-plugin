@@ -37,7 +37,7 @@ import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKey } from '../../types/api-management';
 import {
   kuadrantApiKeyRequestCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
@@ -88,14 +88,14 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [requestToEdit, setRequestToEdit] = useState<APIKeyRequest | null>(null);
+  const [requestToEdit, setRequestToEdit] = useState<APIKey | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
-  const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
+  const [menuRequest, setMenuRequest] = useState<APIKey | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [optimisticallyDeleted, setOptimisticallyDeleted] = useState<Set<string>>(new Set());
   const [deleteDialogState, setDeleteDialogState] = useState<{
     open: boolean;
-    request: APIKeyRequest | null;
+    request: APIKey | null;
   }>({ open: false, request: null });
 
   // get apiproduct name from entity annotation (set by entity provider)
@@ -119,7 +119,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     const data = await response.json();
     // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
-      (r: APIKeyRequest) => r.spec.apiName === apiProductName && r.spec.apiNamespace === namespace
+      (r: APIKey) => r.spec.apiProductRef.name === apiProductName && r.metadata.namespace === namespace // APIProducts and APIKeys (and its Secret) will be in the same NS
     );
   }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
 
@@ -201,7 +201,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     }
   };
 
-  const handleEditRequest = (request: APIKeyRequest) => {
+  const handleEditRequest = (request: APIKey) => {
     setRequestToEdit(request);
     setEditDialogOpen(true);
   };
@@ -265,13 +265,11 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          apiName: apiProductName,
-          apiNamespace: namespace,
-          userId,
-          userEmail,
+          apiProductName,
+          namespace,
           planTier: selectedPlan,
           useCase: useCase.trim() || '',
-          namespace,
+          userEmail,
         }),
       });
 
@@ -307,7 +305,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     {
       render: (data: any) => {
         // backstage Table wraps the data in { rowData: actualData }
-        const request = data.rowData as APIKeyRequest;
+        const request = data.rowData as APIKey;
         if (!request?.metadata?.name) {
           return <Box />;
         }
@@ -318,7 +316,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   ], [apiProductName]);
 
   // separate component to isolate state
-  const DetailPanelContent = ({ request, apiName: api }: { request: APIKeyRequest; apiName: string }) => {
+  const DetailPanelContent = ({ request, apiName: api }: { request: APIKey; apiName: string }) => {
     const [selectedLanguage, setSelectedLanguage] = useState(0);
     const hostname = request.status?.apiHostname || `${api}.apps.example.com`;
 
@@ -479,7 +477,7 @@ func main() {
     );
   }
 
-  const myRequests = ((requests || []) as APIKeyRequest[]).filter(
+  const myRequests = ((requests || []) as APIKey[]).filter(
     r => !optimisticallyDeleted.has(r.metadata.name)
   );
   const plans = (apiProduct?.spec?.plans || []) as Plan[];
@@ -488,18 +486,18 @@ func main() {
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
   const rejectedRequests = myRequests.filter(r => r.status?.phase === 'Rejected');
 
-  const approvedColumns: TableColumn<APIKeyRequest>[] = [
+  const approvedColumns: TableColumn<APIKey>[] = [
     {
       title: 'Tier',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => (
+      render: (row: APIKey) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
       ),
     },
     {
       title: 'Approved',
       field: 'status.reviewedAt',
-      render: (row: APIKeyRequest) => (
+      render: (row: APIKey) => (
         <Typography variant="body2">
           {row.status?.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '-'}
         </Typography>
@@ -510,7 +508,7 @@ func main() {
       field: 'status.apiKey',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const isVisible = visibleKeys.has(row.metadata.name);
         const apiKey = row.status?.apiKey || 'N/A';
 
@@ -540,7 +538,7 @@ func main() {
       field: 'actions',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const isDeleting = deleting === row.metadata.name;
         if (isDeleting) {
           return <CircularProgress size={20} />;
@@ -568,11 +566,11 @@ func main() {
     },
   ];
 
-  const requestColumns: TableColumn<APIKeyRequest>[] = [
+  const requestColumns: TableColumn<APIKey>[] = [
     {
       title: 'Status',
       field: 'status.phase',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const phase = row.status?.phase || 'Pending';
         const isPending = phase === 'Pending';
         return (
@@ -588,14 +586,14 @@ func main() {
     {
       title: 'Tier',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => (
+      render: (row: APIKey) => (
         <Chip label={row.spec.planTier} color="primary" size="small" />
       ),
     },
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (!row.spec.useCase) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -619,16 +617,16 @@ func main() {
     {
       title: 'Requested',
       field: 'spec.requestedAt',
-      render: (row: APIKeyRequest) => (
+      render: (row: APIKey) => (
         <Typography variant="body2">
-          {row.spec.requestedAt ? new Date(row.spec.requestedAt).toLocaleDateString() : '-'}
+          {row.status && row.status.requestedAt ? new Date(row.status.requestedAt).toLocaleDateString() : '-'}
         </Typography>
       ),
     },
     {
       title: 'Reviewed',
       field: 'status.reviewedAt',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (!row.status?.reviewedAt) return <Typography variant="body2">-</Typography>;
         return (
           <Typography variant="body2">
@@ -640,7 +638,7 @@ func main() {
     {
       title: 'Reason',
       field: 'status.reason',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (!row.status?.reason) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -666,7 +664,7 @@ func main() {
       field: 'actions',
       searchable: false,
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const isDeleting = deleting === row.metadata.name;
         if (isDeleting) {
           return <CircularProgress size={20} />;

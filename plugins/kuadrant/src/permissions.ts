@@ -122,7 +122,7 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikeyrequest permissions
+// apikey request permissions
 
 /**
  * permission to create API key requests
@@ -130,7 +130,7 @@ export const kuadrantApiProductListPermission = createPermission({
  * this is a ResourcePermission scoped to 'apiproduct', allowing
  * fine-grained control over which API products users can request access to.
  *
- * use in frontend: useKuadrantPermission(kuadrantApiKeyRequestCreatePermission)
+ * use in frontend: useKuadrantPermission(kuadrantAPIKeyCreatePermission)
  * use in backend with resource: { permission, resourceRef: 'apiproduct:namespace/name' }
  */
 export const kuadrantApiKeyRequestCreatePermission = createPermission({

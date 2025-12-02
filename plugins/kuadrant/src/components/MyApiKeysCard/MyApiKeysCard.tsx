@@ -8,7 +8,7 @@ import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKey } from '../../types/api-management';
 
 export const MyApiKeysCard = () => {
   const config = useApi(configApiRef);
@@ -20,8 +20,8 @@ export const MyApiKeysCard = () => {
   const [, setUserId] = useState<string>('');
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [menuAnchor, setMenuAnchor] = useState<{ top: number; left: number } | null>(null);
-  const [menuRequest, setMenuRequest] = useState<APIKeyRequest | null>(null);
-  const [editDialogState, setEditDialogState] = useState<{ open: boolean; request: APIKeyRequest | null; plans: any[] }>({
+  const [menuRequest, setMenuRequest] = useState<APIKey | null>(null);
+  const [editDialogState, setEditDialogState] = useState<{ open: boolean; request: APIKey | null; plans: any[] }>({
     open: false,
     request: null,
     plans: [],
@@ -30,7 +30,7 @@ export const MyApiKeysCard = () => {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteDialogState, setDeleteDialogState] = useState<{
     open: boolean;
-    request: APIKeyRequest | null;
+    request: APIKey | null;
   }>({ open: false, request: null });
 
   useAsync(async () => {
@@ -70,11 +70,11 @@ export const MyApiKeysCard = () => {
   }
 
   const allRequests = (requests || []).filter(
-    (r: APIKeyRequest) => !optimisticallyDeleted.has(r.metadata.name)
+    (r: APIKey) => !optimisticallyDeleted.has(r.metadata.name)
   );
-  const approvedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Approved');
-  const pendingRequests = allRequests.filter((r: APIKeyRequest) => !r.status?.phase || r.status.phase === 'Pending');
-  const rejectedRequests = allRequests.filter((r: APIKeyRequest) => r.status?.phase === 'Rejected');
+  const approvedRequests = allRequests.filter((r: APIKey) => r.status?.phase === 'Approved');
+  const pendingRequests = allRequests.filter((r: APIKey) => !r.status?.phase || r.status.phase === 'Pending');
+  const rejectedRequests = allRequests.filter((r: APIKey) => r.status?.phase === 'Rejected');
 
   const toggleKeyVisibility = (keyName: string) => {
     setVisibleKeys(prev => {
@@ -101,8 +101,10 @@ export const MyApiKeysCard = () => {
 
     // Fetch available plans for this API
     try {
+      const apiProductName = request.spec.apiProductRef?.name;
+      const apiProductNamespace = request.metadata.namespace;
       const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${request.spec.apiNamespace}/${request.spec.apiName}`
+        `${backendUrl}/api/kuadrant/apiproducts/${apiProductNamespace}/${apiProductName}`
       );
 
       if (apiProductResponse.ok) {
@@ -167,20 +169,23 @@ export const MyApiKeysCard = () => {
     setDeleteDialogState({ open: false, request: null });
   };
 
-  const columns: TableColumn<APIKeyRequest>[] = [
+  const columns: TableColumn<APIKey>[] = [
     {
       title: 'API Product',
-      field: 'spec.apiName',
-      render: (row: APIKeyRequest) => (
-        <Link to={`/catalog/default/api/${row.spec.apiName}/api-keys`}>
-          <strong>{row.spec.apiName}</strong>
-        </Link>
-      ),
+      field: 'spec.apiProductRef.name',
+      render: (row: APIKey) => {
+        const apiProductName = row.spec.apiProductRef?.name || 'unknown';
+        return (
+          <Link to={`/catalog/default/api/${apiProductName}/api-keys`}>
+            <strong>{apiProductName}</strong>
+          </Link>
+        );
+      },
     },
     {
       title: 'Tier',
       field: 'spec.planTier',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const color = row.spec.planTier === 'gold' ? 'primary' :
                      row.spec.planTier === 'silver' ? 'default' : 'secondary';
         return <Chip label={row.spec.planTier} color={color} size="small" />;
@@ -189,7 +194,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Use Case',
       field: 'spec.useCase',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (!row.spec.useCase) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -213,7 +218,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Status',
       field: 'status.phase',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const phase = row.status?.phase || 'Pending';
         const color = phase === 'Approved' ? 'primary' :
                      phase === 'Rejected' ? 'secondary' : 'default';
@@ -223,7 +228,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Reason',
       field: 'status.reason',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (row.status?.reason) {
           const color = row.status.phase === 'Rejected' ? 'error' : 'textPrimary';
           return (
@@ -249,7 +254,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Reviewed By',
       field: 'status.reviewedBy',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if ((row.status?.phase === 'Approved' || row.status?.phase === 'Rejected') && row.status.reviewedBy) {
           const reviewedDate = row.status.reviewedAt ? new Date(row.status.reviewedAt).toLocaleDateString() : '';
           return (
@@ -270,7 +275,7 @@ export const MyApiKeysCard = () => {
       title: 'API Key',
       field: 'status.apiKey',
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (row.status?.phase === 'Approved' && row.status.apiKey) {
           const isVisible = visibleKeys.has(row.metadata.name);
           return (
@@ -295,7 +300,7 @@ export const MyApiKeysCard = () => {
     {
       title: 'Requested',
       field: 'metadata.creationTimestamp',
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         if (!row.metadata.creationTimestamp) {
           return <Typography variant="body2">-</Typography>;
         }
@@ -306,7 +311,7 @@ export const MyApiKeysCard = () => {
     {
       title: '',
       filtering: false,
-      render: (row: APIKeyRequest) => {
+      render: (row: APIKey) => {
         const isDeleting = deleting === row.metadata.name;
         if (isDeleting) {
           return <CircularProgress size={20} />;
@@ -362,7 +367,7 @@ export const MyApiKeysCard = () => {
 
   const tabData = getTabData();
   const tabColumns = getTabColumns();
-  const isPending = (row: APIKeyRequest) => !row.status || row.status.phase === 'Pending';
+  const isPending = (row: APIKey) => !row.status || row.status.phase === 'Pending';
 
   return (
     <>
@@ -402,7 +407,7 @@ export const MyApiKeysCard = () => {
               emptyRowsWhenPaging: false,
             }}
             columns={tabColumns}
-            data={tabData.map((item: APIKeyRequest) => ({
+            data={tabData.map((item: APIKey) => ({
               ...item,
               id: item.metadata.name,
             }))}
@@ -443,7 +448,7 @@ export const MyApiKeysCard = () => {
       <ConfirmDeleteDialog
         open={deleteDialogState.open}
         title="Delete API Key Request"
-        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiName || 'this API'}?`}
+        description={`Are you sure you want to delete the API key request for ${deleteDialogState.request?.spec.apiProductRef?.name || 'this API'}?`}
         deleting={deleting !== null}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}

@@ -15,13 +15,13 @@ import {
   CircularProgress,
 } from '@material-ui/core';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
-import { APIKeyRequest } from '../../types/api-management';
+import { APIKey } from '../../types/api-management';
 
-interface EditAPIKeyRequestDialogProps {
+interface EditAPIKeyDialogProps {
   open: boolean;
   onClose: () => void;
   onSuccess: () => void;
-  request: APIKeyRequest;
+  request: APIKey;
   availablePlans: Array<{
     tier: string;
     description?: string;
@@ -35,7 +35,7 @@ export const EditAPIKeyRequestDialog = ({
   onSuccess,
   request,
   availablePlans,
-}: EditAPIKeyRequestDialogProps) => {
+}: EditAPIKeyDialogProps) => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const backendUrl = config.getString('backend.baseUrl');
