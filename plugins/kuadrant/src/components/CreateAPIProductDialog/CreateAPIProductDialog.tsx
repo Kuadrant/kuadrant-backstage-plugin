@@ -53,7 +53,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
 
-  const { value: httpRoutes, loading: httpRoutesLoading } = useAsync(async () => {
+  const {
+    value: httpRoutes,
+    loading: httpRoutesLoading,
+    error: httpRoutesError
+  } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
     const data = await response.json();
     // filter to only show httproutes annotated for backstage exposure
@@ -63,7 +67,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   }, [backendUrl, fetchApi, open]);
 
   // load planpolicies with full details to show associated plans
-  const { value: planPolicies } = useAsync(async () => {
+  const {
+    value: planPolicies,
+    error: planPoliciesError
+  } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
     return await response.json();
   }, [backendUrl, fetchApi, open]);
@@ -196,7 +203,29 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             {error}
           </Alert>
         )}
+        {httpRoutesError && (
+          <Alert severity="error" style={{ marginBottom: 16 }}>
+            <strong>Failed to load HTTPRoutes:</strong> {httpRoutesError.message}
+            <Box mt={1}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => window.location.reload()}
+              >
+                Retry
+              </Button>
+            </Box>
+          </Alert>
+        )}
 
+        {planPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load PlanPolicies:</strong> {planPoliciesError.message}
+            <Typography variant="body2" style={{ marginTop: 8 }}>
+              You can still create the API Product, but plan information may be incomplete.
+            </Typography>
+          </Alert>
+        )}
         <Grid container spacing={2}>
           <Grid item xs={6}>
             <TextField
@@ -334,8 +363,13 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               onChange={e => setSelectedHTTPRoute(e.target.value)}
               margin="normal"
               required
-              helperText="Select an HTTPRoute (backstage.io/expose: true). APIProduct will be created in the same namespace."
-              disabled={httpRoutesLoading || creating}
+              helperText={
+                httpRoutesError
+                  ? "Unable to load HTTPRoutes. Please retry."
+                  : "Select an HTTPRoute (backstage.io/expose: true). APIProduct will be created in the same namespace."
+              }
+              error={!!httpRoutesError}
+              disabled={httpRoutesLoading || creating || !!httpRoutesError}
               InputLabelProps={{
                 classes: {
                   asterisk: classes.asterisk,
@@ -345,10 +379,13 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               {httpRoutesLoading && (
                 <MenuItem value="">Loading...</MenuItem>
               )}
-              {!httpRoutesLoading && httpRoutes && httpRoutes.length === 0 && (
+              {httpRoutesError && (
+                <MenuItem value="">Error loading routes</MenuItem>
+              )}
+              {!httpRoutesLoading && !httpRoutesError && httpRoutes && httpRoutes.length === 0 && (
                 <MenuItem value="">No HTTPRoutes available</MenuItem>
               )}
-              {!httpRoutesLoading && httpRoutes && httpRoutes.map((route: any) => (
+              {!httpRoutesLoading && !httpRoutesError && httpRoutes && httpRoutes.map((route: any) => (
                 <MenuItem
                   key={`${route.metadata.namespace}/${route.metadata.name}`}
                   value={`${route.metadata.namespace}/${route.metadata.name}`}
