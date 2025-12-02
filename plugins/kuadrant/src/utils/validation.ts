@@ -1,5 +1,5 @@
-// kabernets name validation
-export const validateKabernetsName = (value: string): string | null => {
+// Kubernetes name validation
+export const validateKubernetesName = (value: string): string | null => {
   if (!value || !value.trim()) {
     return 'Name is required';
   }

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -18,7 +18,7 @@ import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
-import { validateKabernetsName, validateEmail, validateURL } from '../../utils/validation';
+import { validateKubernetesName, validateEmail, validateURL } from '../../utils/validation';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -99,10 +99,19 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     ? getPlanPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
     : null;
 
-  // valid handlers
+  useEffect(() => {
+    if (open) {
+      setNameError(null);
+      setContactEmailError(null);
+      setDocsURLError(null);
+      setOpenAPISpecError(null);
+    }
+  }, [open]);
+
+  // validate handlers
   const handleNameChange = (value: string) => {
     setName(value);
-    setNameError(validateKabernetsName(value));
+    setNameError(validateKubernetesName(value));
   };
 
   const handleContactEmailChange = (value: string) => {

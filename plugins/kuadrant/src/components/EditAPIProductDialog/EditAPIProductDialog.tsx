@@ -123,6 +123,15 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   }, [planPolicies, targetRef, namespace]);
 
   // val handlers
+
+  useEffect(() => {
+    if (open) {
+      setContactEmailError(null);
+      setDocsURLError(null);
+      setOpenAPISpecError(null);
+    }
+  }, [open]);
+
   const handleContactEmailChange = (value: string) => {
     setContactEmail(value);
     setContactEmailError(validateEmail(value));
