@@ -64,6 +64,7 @@ export const ResourceList = () => {
   const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
   const [apiProductToEdit, setApiProductToEdit] = useState<{ namespace: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteStats, setDeleteStats] = useState<{requests: number; secrets: number} | null>(null);
 
   const {
     allowed: canCreateApiProduct,
@@ -146,8 +147,24 @@ export const ResourceList = () => {
     alertApi.post({ message: 'API Product updated', severity: 'success', display: 'transient' });
   };
 
-  const handleDeleteClick = (namespace: string, name: string) => {
+  const handleDeleteClick = async (namespace: string, name: string) => {
     setApiProductToDelete({ namespace, name });
+    setDeleteStats(null);
+
+    try {
+      const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/requests?namespace=${namespace}`);
+      if (response.ok) {
+        const data = await response.json();
+        const related = (data.items || []).filter(
+          (r: any) => r.spec.apiName === name && r.spec.apiNamespace === namespace
+        );
+        const approved = related.filter((r: any) => r.status?.phase === 'Approved').length;
+        setDeleteStats({ requests: related.length, secrets: approved });
+      }
+    } catch (err) {
+      console.warn('Failed to fetch delete stats:', err);
+    }
+
     setDeleteDialogOpen(true);
   };
 
@@ -442,7 +459,17 @@ export const ResourceList = () => {
         <ConfirmDeleteDialog
           open={deleteDialogOpen}
           title="Delete API Product"
-          description={`This will permanently delete "${apiProductToDelete?.name}" from namespace "${apiProductToDelete?.namespace}" and remove it from Kubernetes. Any associated API keys will stop working.`}
+          description={
+            deleteStats
+              ? `Deleting "${apiProductToDelete?.name}" will also remove:
+
+• ${deleteStats.requests} API Key Request(s)
+• ${deleteStats.secrets} API Key Secret(s)
+
+This action cannot be undone.`
+              : `Deleting "${apiProductToDelete?.name}" will also remove all associated API Key Requests and Secrets.
+This action cannot be undone.`
+          }
           confirmText={apiProductToDelete?.name}
           severity="high"
           deleting={deleting}

@@ -71,7 +71,9 @@ export const ConfirmDeleteDialog = ({
         {severity !== 'high' && title}
       </DialogTitle>
       <DialogContent>
-        <DialogContentText>{description}</DialogContentText>
+        <DialogContentText style={{ whiteSpace: 'pre-line' }}>
+          {description}
+        </DialogContentText>
         {requiresTextConfirmation && (
           <Box mt={2}>
             <Typography variant="body2" color="textSecondary" gutterBottom>

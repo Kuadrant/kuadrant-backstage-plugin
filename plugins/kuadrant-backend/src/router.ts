@@ -323,7 +323,79 @@ export async function createRouter({
           throw new NotAllowedError('you can only delete your own api products');
         }
       }
+      console.log(`cascading delete: finding apikeyrequests for ${namespace}/${name}`);
 
+      let allRequests;
+      try {
+        allRequests = await k8sClient.listCustomResources(
+          'extensions.kuadrant.io',
+          'v1alpha1',
+          'apikeyrequests',
+          namespace
+        );
+      } catch (error) {
+        console.warn('failed to list apikeyrequests during cascade delete:', error);
+        allRequests = { items: [] };
+      }
+
+      // filter requests that belong to this APIProduct
+      const relatedRequests = (allRequests.items || []).filter((req: any) =>
+        req.spec?.apiName === name && req.spec?.apiNamespace === namespace
+      );
+
+      console.log(`found ${relatedRequests.length} apikeyrequests to delete`);
+
+      // delete each APIKeyRequest and its associated Secret
+      const deletionResults = await Promise.allSettled(
+        relatedRequests.map(async (request: any) => {
+          const requestName = request.metadata.name;
+          const requestUserId = request.spec?.requestedBy?.userId;
+          const planTier = request.spec?.planTier;
+
+          console.log(`deleting apikeyrequest: ${namespace}/${requestName}`);
+
+          // iff request is approved, delete the associated secret first
+          if (request.status?.phase === 'Approved') {
+            try {
+              console.log(`finding secret for approved request: ${namespace}/${requestName}`);
+              const secrets = await k8sClient.listSecrets(namespace);
+              const matchingSecret = secrets.items?.find((s: any) => {
+                const annotations = s.metadata?.annotations || {};
+                return (
+                  annotations['secret.kuadrant.io/user-id'] === requestUserId &&
+                  annotations['secret.kuadrant.io/plan-id'] === planTier &&
+                  s.metadata?.labels?.app === name
+                );
+              });
+
+              if (matchingSecret) {
+                console.log(`deleting secret: ${namespace}/${matchingSecret.metadata.name}`);
+                await k8sClient.deleteSecret(namespace, matchingSecret.metadata.name);
+              }
+            } catch (error) {
+              console.warn(`failed to delete secret for request ${requestName}:`, error);
+              // continue with request deletion even if secret deletion fails
+            }
+          }
+
+          // delete the ApiKeyRequest
+          await k8sClient.deleteCustomResource(
+            'extensions.kuadrant.io',
+            'v1alpha1',
+            namespace,
+            'apikeyrequests',
+            requestName
+          );
+        })
+      );
+
+      // log any failures (but don't block APIProduct deletion)
+      const failures = deletionResults.filter(r => r.status === 'rejected');
+      if (failures.length > 0) {
+        console.warn(`${failures.length} apikeyrequests/secret failed to delete:`,
+          failures.map((f: any) => f.reason)
+        );
+      }
       await k8sClient.deleteCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
