@@ -620,9 +620,7 @@ export const ApprovalQueueCard = () => {
 
     switch (selectedTab) {
       case 0:
-        return { data: addIds(approved), columns: approvedColumns, showSelection: false };
-      case 1:
-        // Add tableData.checked to control checkbox state
+        // pending tab - add tableData.checked to control checkbox state
         const pendingWithSelection = pending.map((row: APIKey) => {
           const isSelected = selectedRequests.some(
             selected => selected.metadata.name === row.metadata.name &&
@@ -634,10 +632,12 @@ export const ApprovalQueueCard = () => {
           };
         });
         return { data: pendingWithSelection, columns: pendingColumns, showSelection: true };
+      case 1:
+        return { data: addIds(approved), columns: approvedColumns, showSelection: false };
       case 2:
         return { data: addIds(rejected), columns: rejectedColumns, showSelection: false };
       default:
-        return { data: addIds(approved), columns: approvedColumns, showSelection: false };
+        return { data: addIds(pending), columns: pendingColumns, showSelection: true };
     }
   };
 
@@ -675,13 +675,13 @@ export const ApprovalQueueCard = () => {
             indicatorColor="primary"
             textColor="primary"
           >
-            <Tab label={`Approved (${approved.length})`} />
             <Tab label={`Pending (${pending.length})`} />
+            <Tab label={`Approved (${approved.length})`} />
             <Tab label={`Rejected (${rejected.length})`} />
           </Tabs>
         </Box>
 
-        {selectedTab === 1 && selectedRequests.length > 0 && (
+        {selectedTab === 0 && selectedRequests.length > 0 && (
           <Box mb={2} display="flex" alignItems="center" justifyContent="space-between" p={2} bgcolor="background.default">
             <Typography variant="body2">
               {selectedRequests.length} request{selectedRequests.length !== 1 ? 's' : ''} selected
@@ -712,8 +712,8 @@ export const ApprovalQueueCard = () => {
         {tabData.data.length === 0 ? (
           <Box p={3} textAlign="center">
             <Typography variant="body1" color="textSecondary">
-              {selectedTab === 0 && 'No approved requests.'}
-              {selectedTab === 1 && 'No pending requests.'}
+              {selectedTab === 0 && 'No pending requests.'}
+              {selectedTab === 1 && 'No approved requests.'}
               {selectedTab === 2 && 'No rejected requests.'}
             </Typography>
           </Box>
