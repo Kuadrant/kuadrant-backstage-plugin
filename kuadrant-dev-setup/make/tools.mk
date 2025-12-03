@@ -55,3 +55,34 @@ $(LOCALBIN)/kind-$(KIND_VERSION): $(LOCALBIN)
 		fi; \
 		chmod +x $@; \
 	fi
+
+KUSTOMIZE_VERSION ?= v5.6.0
+KUSTOMIZE := $(LOCALBIN)/kustomize-$(KUSTOMIZE_VERSION)
+
+$(KUSTOMIZE): | $(LOCALBIN)  ## Installs kustomize in $PROJECT_DIR/bin
+# For AMD64 / x86_64
+ifeq ($(shell uname -p),x86_64)
+	@{ \
+	set -e ;\
+	curl -Lo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_linux_amd64.tar.gz ;\
+	tar -zxvf kustomize.tar.gz ;\
+	mv ./kustomize $@ ;\
+	chmod +x $@ ;\
+	rm -rf kustomize.tar.gz ;\
+	}
+endif
+# For ARM64
+ifeq ($(shell uname -p),aarch64)
+	@{ \
+	set -e ;\
+	curl -Lo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_linux_arm64.tar.gz ;\
+	tar -zxvf kustomize.tar.gz ;\
+	mv ./kustomize $@ ;\
+	chmod +x $@ ;\
+	rm -rf kustomize.tar.gz ;\
+	}
+endif
+
+.PHONY: kustomize
+kustomize: $(KUSTOMIZE) ## Download kustomize locally if necessary.
+	@$(KUSTOMIZE) version
