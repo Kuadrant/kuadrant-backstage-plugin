@@ -55,7 +55,7 @@ kind-delete: $(KIND)
 	@echo "deleting kind cluster: $(CLUSTER_NAME)"
 	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
-kuadrant-install: $(HELM)
+kuadrant-install: $(HELM) $(KUSTOMIZE)
 	@echo "installing gateway api crds..."
 	@kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
 	@echo ""
