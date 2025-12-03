@@ -19,6 +19,7 @@ import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
+import { validateEmail, validateURL } from '../../utils/validation';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -54,6 +55,10 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   const [openAPISpec, setOpenAPISpec] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
+  // valid error states
+  const [contactEmailError, setContactEmailError] = useState<string | null>(null);
+  const [docsURLError, setDocsURLError] = useState<string | null>(null);
+  const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
 
   // Load APIProduct data when dialog opens
   useEffect(() => {
@@ -81,6 +86,9 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
           setOpenAPISpec(data.spec.documentation?.openAPISpec || '');
+          setContactEmailError(null);
+          setDocsURLError(null);
+          setOpenAPISpecError(null);
           setLoading(false);
         })
         .catch(err => {
@@ -113,6 +121,31 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
       );
     });
   }, [planPolicies, targetRef, namespace]);
+
+  // val handlers
+
+  useEffect(() => {
+    if (open) {
+      setContactEmailError(null);
+      setDocsURLError(null);
+      setOpenAPISpecError(null);
+    }
+  }, [open]);
+
+  const handleContactEmailChange = (value: string) => {
+    setContactEmail(value);
+    setContactEmailError(validateEmail(value));
+  };
+
+  const handleDocsURLChange = (value: string) => {
+    setDocsURL(value);
+    setDocsURLError(validateURL(value));
+  };
+
+  const handleOpenAPISpecChange = (value: string) => {
+    setOpenAPISpec(value);
+    setOpenAPISpecError(validateURL(value));
+  };
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -357,8 +390,10 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 fullWidth
                 label="Contact Email"
                 value={contactEmail}
-                onChange={e => setContactEmail(e.target.value)}
+                onChange={e => handleContactEmailChange(e.target.value)}
                 placeholder="api-team@example.com"
+                helperText={contactEmailError || "Contact email for API support"}
+                error={!!contactEmailError}
                 margin="normal"
                 disabled={saving}
               />
@@ -379,8 +414,10 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 fullWidth
                 label="Docs URL"
                 value={docsURL}
-                onChange={e => setDocsURL(e.target.value)}
+                onChange={e => handleDocsURLChange(e.target.value)}
                 placeholder="https://api.example.com/docs"
+                helperText={docsURLError || "Link to API documentation"}
+                error={!!docsURLError}
                 margin="normal"
                 disabled={saving}
               />
@@ -390,8 +427,10 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                 fullWidth
                 label="OpenAPI Spec URL"
                 value={openAPISpec}
-                onChange={e => setOpenAPISpec(e.target.value)}
+                onChange={e => handleOpenAPISpecChange(e.target.value)}
                 placeholder="https://api.example.com/openapi.json"
+                helperText={openAPISpecError || "Link to OpenAPI specification"}
+                error={!!openAPISpecError}
                 margin="normal"
                 disabled={saving}
               />
@@ -405,7 +444,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           onClick={handleSave}
           color="primary"
           variant="contained"
-          disabled={saving || loading || !displayName || !description}
+          disabled={saving || loading || !displayName || !description || !!contactEmailError || !!docsURLError || !!openAPISpecError}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {saving ? 'Saving...' : 'Save'}

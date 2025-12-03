@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, {useEffect, useState} from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -18,6 +18,7 @@ import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
+import { validateKubernetesName, validateEmail, validateURL } from '../../utils/validation';
 
 const useStyles = makeStyles({
   asterisk: {
@@ -53,7 +54,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
   const [httpRoutesRetry, setHttpRoutesRetry] = useState(0);
-
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [contactEmailError, setContactEmailError] = useState<string | null>(null);
+  const [docsURLError, setDocsURLError] = useState<string | null>(null);
+  const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
   const {
     value: httpRoutes,
     loading: httpRoutesLoading,
@@ -94,6 +98,36 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const selectedPolicy = selectedRouteInfo
     ? getPlanPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
     : null;
+
+  useEffect(() => {
+    if (open) {
+      setNameError(null);
+      setContactEmailError(null);
+      setDocsURLError(null);
+      setOpenAPISpecError(null);
+    }
+  }, [open]);
+
+  // validate handlers
+  const handleNameChange = (value: string) => {
+    setName(value);
+    setNameError(validateKubernetesName(value));
+  };
+
+  const handleContactEmailChange = (value: string) => {
+    setContactEmail(value);
+    setContactEmailError(validateEmail(value));
+  };
+
+  const handleDocsURLChange = (value: string) => {
+    setDocsURL(value);
+    setDocsURLError(validateURL(value));
+  };
+
+  const handleOpenAPISpecChange = (value: string) => {
+    setOpenAPISpec(value);
+    setOpenAPISpecError(validateURL(value));
+  };
 
   const handleAddTag = () => {
     if (tagInput.trim() && !tags.includes(tagInput.trim())) {
@@ -192,8 +226,14 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setDocsURL('');
     setOpenAPISpec('');
     setError('');
+    setNameError(null);
+    setContactEmailError(null);
+    setDocsURLError(null);
+    setOpenAPISpecError(null);
     onClose();
   };
+
+  const hasValidationErrors = !!nameError || !!contactEmailError || !!docsURLError || !!openAPISpecError;
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="md" fullWidth>
@@ -233,9 +273,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               fullWidth
               label="Name"
               value={name}
-              onChange={e => setName(e.target.value)}
+              onChange={e => handleNameChange(e.target.value)}
               placeholder="my-api"
-              helperText="Kubernetes resource name (lowercase, hyphens)"
+              helperText={nameError || "Kubernetes resource name (lowercase, hyphens)"}
+              error={!!nameError}
               margin="normal"
               required
               disabled={creating}
@@ -412,8 +453,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               fullWidth
               label="Contact Email"
               value={contactEmail}
-              onChange={e => setContactEmail(e.target.value)}
+              onChange={e => handleContactEmailChange(e.target.value)}
               placeholder="api-team@example.com"
+              helperText={contactEmailError || "Contact email for API support"}
+              error={!!contactEmailError}
               margin="normal"
               disabled={creating}
             />
@@ -434,8 +477,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               fullWidth
               label="Docs URL"
               value={docsURL}
-              onChange={e => setDocsURL(e.target.value)}
+              onChange={e => handleDocsURLChange(e.target.value)}
               placeholder="https://api.example.com/docs"
+              helperText={docsURLError || "Link to API documentation"}
+              error={!!docsURLError}
               margin="normal"
               disabled={creating}
             />
@@ -445,8 +490,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               fullWidth
               label="OpenAPI Spec URL"
               value={openAPISpec}
-              onChange={e => setOpenAPISpec(e.target.value)}
+              onChange={e => handleOpenAPISpecChange(e.target.value)}
               placeholder="https://api.example.com/openapi.json"
+              helperText={openAPISpecError || "Link to OpenAPI specification"}
+              error={!!openAPISpecError}
               margin="normal"
               disabled={creating}
             />
@@ -459,7 +506,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           onClick={handleCreate}
           color="primary"
           variant="contained"
-          disabled={creating || !name || !displayName || !description || !selectedHTTPRoute}
+          disabled={creating || !name || !displayName || !description || !selectedHTTPRoute || hasValidationErrors}
           startIcon={creating ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {creating ? 'Creating...' : 'Create'}
