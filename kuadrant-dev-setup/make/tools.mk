@@ -72,7 +72,8 @@ ifeq ($(shell uname -p),x86_64)
 	}
 endif
 # For ARM64
-ifeq ($(shell uname -p),aarch64)
+ifeq ($(shell uname -s),Darwin)
+ifeq ($(shell uname -m),arm64)
 	@{ \
 	set -e ;\
 	curl -Lo kustomize.tar.gz https://github.com/kubernetes-sigs/kustomize/releases/download/kustomize/$(KUSTOMIZE_VERSION)/kustomize_$(KUSTOMIZE_VERSION)_linux_arm64.tar.gz ;\
@@ -81,6 +82,7 @@ ifeq ($(shell uname -p),aarch64)
 	chmod +x $@ ;\
 	rm -rf kustomize.tar.gz ;\
 	}
+endif
 endif
 
 .PHONY: kustomize
