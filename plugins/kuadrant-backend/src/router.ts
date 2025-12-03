@@ -451,6 +451,9 @@ export async function createRouter({
         parsed.data,
       );
 
+      // trigger immediate catalog sync
+      await provider.refresh();
+
       return res.json(updated);
     } catch (error) {
       console.error('error updating apiproduct:', error);

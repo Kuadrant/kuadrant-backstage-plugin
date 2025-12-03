@@ -106,7 +106,8 @@ export const ApiProductInfoCard = () => {
     );
   }
 
-  const { spec } = apiProduct;
+  const { spec, status } = apiProduct;
+  const plans = status?.discoveredPlans || [];
 
   return (
     <Grid container spacing={3}>
@@ -151,19 +152,18 @@ export const ApiProductInfoCard = () => {
         </InfoCard>
       </Grid>
 
-      {spec.plans && spec.plans.length > 0 && (
+      {plans.length > 0 && (
         <Grid item xs={12}>
           <InfoCard title="Available Plans">
             <Table size="small">
               <TableHead>
                 <TableRow>
                   <TableCell>Tier</TableCell>
-                  <TableCell>Description</TableCell>
                   <TableCell>Rate Limits</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
-                {spec.plans.map((plan: any) => (
+                {plans.map((plan: any) => (
                   <TableRow key={plan.tier}>
                     <TableCell>
                       <Chip
@@ -171,7 +171,6 @@ export const ApiProductInfoCard = () => {
                         size="small"
                       />
                     </TableCell>
-                    <TableCell>{plan.description || '-'}</TableCell>
                     <TableCell>
                       {plan.limits && Object.entries(plan.limits).map(([key, value]) => (
                         <Typography key={key} variant="body2">
