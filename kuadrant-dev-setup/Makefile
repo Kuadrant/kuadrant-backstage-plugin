@@ -70,7 +70,7 @@ kuadrant-install: $(HELM)
 	@echo "installing kuadrant operator dependencies for version: $(KUADRANT_VERSION)"
 	@$(KUSTOMIZE) build github.com/kuadrant/kuadrant-operator/config/dependencies?ref=$(KUADRANT_VERSION) | kubectl apply --server-side -f -
 	@echo ""
-	@echo "waiting for kuadrant depenencies..."
+	@echo "waiting for kuadrant dependencies..."
 	@kubectl -n kuadrant-system wait --timeout=120s --for=condition=Available deployments --all
 	@echo ""
 	@echo "installing kuadrant operator version: $(KUADRANT_VERSION)"
