@@ -52,6 +52,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [openAPISpec, setOpenAPISpec] = useState('');
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
+  const [httpRoutesRetry, setHttpRoutesRetry] = useState(0);
 
   const {
     value: httpRoutes,
@@ -64,7 +65,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     return (data.items || []).filter((route: any) =>
       route.metadata.annotations?.['backstage.io/expose'] === 'true'
     );
-  }, [backendUrl, fetchApi, open]);
+  }, [backendUrl, fetchApi, open, httpRoutesRetry]);
 
   // load planpolicies with full details to show associated plans
   const {
@@ -210,7 +211,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               <Button
                 size="small"
                 variant="outlined"
-                onClick={() => window.location.reload()}
+                onClick={() => setHttpRoutesRetry(prev => prev + 1)}
               >
                 Retry
               </Button>
