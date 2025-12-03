@@ -2,8 +2,7 @@
 
 CLUSTER_NAME ?= local-cluster
 LOCALBIN ?= $(shell pwd)/bin
-KIND_VERSION ?= v0.20.0
-HELM_VERSION ?= v3.15.0
+KUADRANT_VERSION ?= main
 
 help:
 	@echo "kuadrant development setup for rhdh"
@@ -17,8 +16,7 @@ help:
 	@echo "  make kind-delete    - delete kind cluster"
 	@echo ""
 	@echo "kuadrant:"
-	@echo "  make kuadrant-install   - install kuadrant v1.3.0"
-	@echo "  make controller-deploy  - build and deploy devportal controller"
+	@echo "  make kuadrant-install   - install kuadrant"
 	@echo "  make demo-install       - install toystore demo"
 	@echo "  make demo-uninstall     - remove toystore demo"
 	@echo ""
@@ -68,43 +66,25 @@ kuadrant-install: $(HELM)
 	@$(HELM) upgrade --install istio-base istio/base -n istio-system --wait
 	@$(HELM) upgrade --install istiod istio/istiod -n istio-system --wait
 	@echo ""
-	@echo "installing kuadrant operator v1.3.0..."
 	@kubectl create namespace kuadrant-system --dry-run=client -o yaml | kubectl apply -f -
-	@$(HELM) repo add kuadrant https://kuadrant.io/helm-charts/ 2>/dev/null || true
-	@$(HELM) repo update kuadrant
-	@$(HELM) upgrade --install kuadrant-operator kuadrant/kuadrant-operator \
-		--version 1.3.0 \
-		-n kuadrant-system \
-		--wait
+	@echo "installing kuadrant operator dependencies for version: $(KUADRANT_VERSION)"
+	@$(KUSTOMIZE) build github.com/kuadrant/kuadrant-operator/config/dependencies?ref=$(KUADRANT_VERSION) | kubectl apply --server-side -f -
+	@echo ""
+	@echo "waiting for kuadrant depenencies..."
+	@kubectl -n kuadrant-system wait --timeout=120s --for=condition=Available deployments --all
+	@echo ""
+	@echo "installing kuadrant operator version: $(KUADRANT_VERSION)"
+	@$(KUSTOMIZE) build github.com/kuadrant/kuadrant-operator/config/deploy?ref=$(KUADRANT_VERSION) | kubectl apply --server-side -f -
 	@echo ""
 	@echo "creating kuadrant instance..."
 	@kubectl apply -f kuadrant-instance.yaml
+	@echo "waiting for kuadrant instance..."
+	@kubectl wait --timeout=120s kuadrant kuadrant -n kuadrant-system --for=condition=Ready
 	@echo ""
-	@echo "deploying devportal controller..."
-	@$(MAKE) controller-deploy
+	@echo "waiting for developer portal controller..."
+	@kubectl -n kuadrant-system wait --timeout=120s --for=condition=Available deployments developer-portal-controller
 	@echo ""
-	@echo "kuadrant v1.3.0 installed!"
-
-# deploy devportal-controller from local sibling directory
-CONTROLLER_DIR ?= $(shell pwd)/../../developer-portal-controller
-
-controller-deploy: $(LOCALBIN)/kind-$(KIND_VERSION)
-	@echo "deploying devportal controller from $(CONTROLLER_DIR)..."
-	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
-		echo "error: controller directory not found at $(CONTROLLER_DIR)"; \
-		echo "clone: git clone https://github.com/Kuadrant/developer-portal-controller.git $(CONTROLLER_DIR)"; \
-		exit 1; \
-	fi
-	@echo "building controller image..."
-	@$(MAKE) -C $(CONTROLLER_DIR) docker-build
-	@echo "loading controller image into kind cluster..."
-	@$(LOCALBIN)/kind-$(KIND_VERSION) load docker-image controller:latest --name $(CLUSTER_NAME)
-	@echo "installing CRDs and deploying controller..."
-	@$(MAKE) -C $(CONTROLLER_DIR) install deploy
-	@echo "patching imagePullPolicy for local image..."
-	@kubectl patch deployment -n developer-portal-controller-system developer-portal-controller-controller-manager \
-		-p '{"spec":{"template":{"spec":{"containers":[{"name":"manager","imagePullPolicy":"IfNotPresent"}]}}}}'
-	@echo "devportal controller deployed!"
+	@echo "kuadrant version: $(KUADRANT_VERSION) installed!"
 
 demo-install:
 	@echo "installing toystore demo resources..."
