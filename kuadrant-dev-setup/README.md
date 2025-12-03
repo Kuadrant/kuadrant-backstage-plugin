@@ -19,7 +19,7 @@ visit http://localhost:3000/kuadrant
 
 **kubernetes cluster (kind):**
 - kind cluster named `local-cluster`
-- kuadrant operator v1.3.0
+- kuadrant operator (from `main`)
 - gateway api crds v1.2.0
 - istio service mesh (base + istiod)
 
@@ -67,7 +67,7 @@ make clean          # delete cluster + cleanup bin/
 
 ### kuadrant
 ```bash
-make kuadrant-install   # install kuadrant v1.3.0
+make kuadrant-install [KUADRANT_VERSION=v1.3.0] # install kuadrant. Version defaults to main branch
 make demo-install       # install toystore demo
 make demo-uninstall     # remove toystore demo
 ```
@@ -165,7 +165,7 @@ this setup is simplified for rhdh development:
 
 **what we kept:**
 - kind cluster creation
-- kuadrant v1.3.0 installation
+- kuadrant installation
 - toystore demo resources
 - custom crds
 
