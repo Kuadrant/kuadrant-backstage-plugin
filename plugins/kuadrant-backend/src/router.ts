@@ -28,7 +28,11 @@ import {
   kuadrantApiKeyRequestUpdateAllPermission,
   kuadrantApiKeyRequestDeleteOwnPermission,
   kuadrantApiKeyRequestDeleteAllPermission,
+  kuadrantApiKeyReadOwnPermission,
+  kuadrantApiKeyReadAllPermission,
 } from './permissions';
+
+const secretKey = 'api_key';
 
 /**
  * Extract a kubernetes-safe name from entity ref
@@ -1300,7 +1304,120 @@ export async function createRouter({
     }
   });
 
-  // expose permissions for backstage permission framework
+  // get api key secret (show once)
+  router.get('/apikeys/:namespace/:name/secret', async (req, res): Promise<void> => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { namespace, name } = req.params;
+
+      // check if user can read all api keys or only own
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyReadAllPermission }],
+        { credentials }
+      );
+
+      const canReadAll = readAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canReadAll) {
+        // try read own permission
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyReadOwnPermission }],
+          { credentials }
+        );
+
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+      }
+
+      // get the apikey resource
+      const apiKey = await k8sClient.getCustomResource(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeys',
+        name,
+      );
+
+      // verify ownership if not admin
+      if (!canReadAll) {
+        const requestUserId = apiKey.spec?.requestedBy?.userId;
+        if (requestUserId !== userEntityRef) {
+          throw new NotAllowedError('you can only read your own api key secrets');
+        }
+      }
+
+      // check if secret can be read
+      if (apiKey.status?.canReadSecret !== true) {
+        res.status(403).json({
+          error: 'secret has already been read and cannot be retrieved again',
+        });
+        return;
+      }
+
+      // check if secretRef is set
+      if (!apiKey.status?.secretRef?.name || !apiKey.status?.secretRef?.key) {
+        res.status(404).json({
+          error: 'secret reference not found in apikey status',
+        });
+        return;
+      }
+
+      // get the secret
+      const secretName = apiKey.status.secretRef.name;
+
+      let secret;
+      try {
+        secret = await k8sClient.getSecret(namespace, secretName);
+      } catch (error) {
+        console.error('error fetching secret:', error);
+        res.status(404).json({
+          error: 'secret not found',
+        });
+        return;
+      }
+
+      // extract the api key value from secret
+      const secretData = secret.data || {};
+      const apiKeyValue = secretData[secretKey];
+
+      if (!apiKeyValue) {
+        res.status(404).json({
+          error: `secret key '${secretKey}' not found in secret`,
+        });
+        return;
+      }
+
+      // decode base64
+      const decodedApiKey = Buffer.from(apiKeyValue, 'base64').toString('utf-8');
+
+      // update canReadSecret to false
+      await k8sClient.patchCustomResourceStatus(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeys',
+        name,
+        {
+          ...apiKey.status,
+          canReadSecret: false,
+        },
+      );
+
+      res.json({
+        apiKey: decodedApiKey,
+      });
+    } catch (error) {
+      console.error('error reading api key secret:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to read api key secret' });
+      }
+    }
+  });
+
   router.use(createPermissionIntegrationRouter({
     permissions: kuadrantPermissions,
   }));
