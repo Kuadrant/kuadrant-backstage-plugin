@@ -15,7 +15,6 @@ export interface PlanLimits {
 export interface APIKeySpec {
   apiProductRef: {
     name: string;
-    namespace: string;
   };
   planTier: PlanTier;
   useCase: string;
