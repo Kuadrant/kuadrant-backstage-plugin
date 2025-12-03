@@ -1,10 +1,14 @@
 export {
   kuadrantPlugin,
   KuadrantPage,
+  ApiProductsPage,
+  ApiKeysPage,
+  ApiKeyDetailPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,
   EntityKuadrantApiProductInfoContent,
+  EntityKuadrantApiApprovalTab,
   KuadrantApprovalQueueCard,
   PlanPolicyDetailPage,
 } from './plugin';

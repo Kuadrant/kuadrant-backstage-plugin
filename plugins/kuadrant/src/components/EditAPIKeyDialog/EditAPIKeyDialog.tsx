@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from "react";
 import {
   Dialog,
   DialogTitle,
@@ -13,9 +13,9 @@ import {
   Select,
   MenuItem,
   CircularProgress,
-} from '@material-ui/core';
-import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
-import { APIKey } from '../../types/api-management';
+} from "@material-ui/core";
+import { useApi, configApiRef, fetchApiRef } from "@backstage/core-plugin-api";
+import { APIKey } from "../../types/api-management";
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -38,28 +38,28 @@ export const EditAPIKeyDialog = ({
 }: EditAPIKeyDialogProps) => {
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
+  const backendUrl = config.getString("backend.baseUrl");
 
-  const [planTier, setPlanTier] = useState('');
-  const [useCase, setUseCase] = useState('');
+  const [planTier, setPlanTier] = useState("");
+  const [useCase, setUseCase] = useState("");
   const [saving, setSaving] = useState(false);
-  const [error, setError] = useState('');
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (open && request) {
-      setPlanTier(request.spec.planTier || '');
-      setUseCase(request.spec.useCase || '');
-      setError('');
+      setPlanTier(request.spec.planTier || "");
+      setUseCase(request.spec.useCase || "");
+      setError("");
     }
   }, [open, request]);
 
   const handleSave = async () => {
     if (!planTier) {
-      setError('Please select a tier');
+      setError("Please select a tier");
       return;
     }
 
-    setError('');
+    setError("");
     setSaving(true);
 
     try {
@@ -73,24 +73,26 @@ export const EditAPIKeyDialog = ({
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}`,
         {
-          method: 'PATCH',
+          method: "PATCH",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify(patch),
-        }
+        },
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `Failed to update request: ${response.status}`);
+        throw new Error(
+          errorData.error || `Failed to update request: ${response.status}`,
+        );
       }
 
       onSuccess();
       onClose();
     } catch (err) {
-      console.error('Error updating API key request:', err);
-      setError(err instanceof Error ? err.message : 'Unknown error occurred');
+      console.error("Error updating API key request:", err);
+      setError(err instanceof Error ? err.message : "Unknown error occurred");
     } finally {
       setSaving(false);
     }
@@ -98,17 +100,23 @@ export const EditAPIKeyDialog = ({
 
   const handleClose = () => {
     if (!saving) {
-      setError('');
+      setError("");
       onClose();
     }
   };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Edit API Access Request</DialogTitle>
+      <DialogTitle>Edit API Key</DialogTitle>
       <DialogContent>
         {error && (
-          <Box mb={2} p={2} bgcolor="error.main" color="error.contrastText" borderRadius={1}>
+          <Box
+            mb={2}
+            p={2}
+            bgcolor="error.main"
+            color="error.contrastText"
+            borderRadius={1}
+          >
             <Typography variant="body2">{error}</Typography>
           </Box>
         )}
@@ -123,10 +131,10 @@ export const EditAPIKeyDialog = ({
             {availablePlans.map((plan) => {
               const limitDesc = Object.entries(plan.limits || {})
                 .map(([key, val]) => `${val} per ${key}`)
-                .join(', ');
+                .join(", ");
               return (
                 <MenuItem key={plan.tier} value={plan.tier}>
-                  {plan.tier} {limitDesc ? `(${limitDesc})` : ''}
+                  {plan.tier} {limitDesc ? `(${limitDesc})` : ""}
                 </MenuItem>
               );
             })}
@@ -155,9 +163,11 @@ export const EditAPIKeyDialog = ({
           color="primary"
           variant="contained"
           disabled={!planTier || saving}
-          startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
+          startIcon={
+            saving ? <CircularProgress size={16} color="inherit" /> : undefined
+          }
         >
-          {saving ? 'Saving...' : 'Save Changes'}
+          {saving ? "Saving..." : "Save Changes"}
         </Button>
       </DialogActions>
     </Dialog>

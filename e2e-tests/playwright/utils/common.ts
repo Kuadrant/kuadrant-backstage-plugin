@@ -426,38 +426,32 @@ export class Common {
   }
 
   async dexQuickLogin(userEmail: string) {
-    let popup: Page;
-
     await this.page.goto("/");
     await this.page.waitForSelector('h2:has-text("Select a sign-in method")', { timeout: 10000 });
 
-    // click the OIDC "Sign In" button to trigger the popup
-    this.page.once("popup", (asyncnewPage) => {
-      popup = asyncnewPage;
-    });
-
+    // click OIDC Sign In and wait for popup in parallel
     const oidcSignInButton = this.page.locator('button:has-text("Sign In")').last();
-    await oidcSignInButton.click();
+    const [popup] = await Promise.all([
+      this.page.waitForEvent("popup", { timeout: 20000 }),
+      oidcSignInButton.click(),
+    ]);
 
-    await expect(async () => {
-      await popup.waitForLoadState("domcontentloaded");
-      expect(popup).toBeTruthy();
-    }).toPass({
-      intervals: [5_000, 10_000],
-      timeout: 20 * 1000,
-    });
+    await popup.waitForLoadState("domcontentloaded");
 
-    if (popup.url().startsWith(process.env.BASE_URL)) {
+    if (popup.url().startsWith(process.env.BASE_URL!)) {
       return "Already logged in";
-    } else {
-      // extract role from email (e.g., "owner1@kuadrant.local" -> "owner1")
-      const role = userEmail.split('@')[0];
-      const quickLoginButton = popup.locator(`[data-testid="quick-login-${role}"]`);
-      await quickLoginButton.click();
-      await popup.waitForEvent("close", { timeout: 10000 });
-      await this.uiHelper.waitForSideBarVisible();
-      return "Login successful";
     }
+
+    // extract role from email (e.g., "owner1@kuadrant.local" -> "owner1")
+    const role = userEmail.split('@')[0];
+    const quickLoginButton = popup.locator(`[data-testid="quick-login-${role}"]`);
+    await quickLoginButton.click({ timeout: 10000 });
+    await popup.waitForEvent("close", { timeout: 10000 });
+
+    // wait for main page to redirect and load - login prompt must disappear
+    await expect(this.page.getByText("Select a sign-in method")).not.toBeVisible({ timeout: 20000 });
+    await this.uiHelper.waitForSideBarVisible();
+    return "Login successful";
   }
 }
 

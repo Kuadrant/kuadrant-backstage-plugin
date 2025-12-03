@@ -23,6 +23,24 @@ export const KuadrantPage = kuadrantPlugin.provide(
   }),
 );
 
+export const ApiProductsPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'ApiProductsPage',
+    component: () =>
+      import('./components/KuadrantPage').then(m => m.ApiProductsPage),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const ApiKeysPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'ApiKeysPage',
+    component: () =>
+      import('./components/ApiKeysPage').then(m => m.ApiKeysPage),
+    mountPoint: rootRouteRef,
+  }),
+);
+
 export const EntityKuadrantApiAccessCard = kuadrantPlugin.provide(
   createComponentExtension({
     name: 'EntityKuadrantApiAccessCard',
@@ -80,6 +98,25 @@ export const PlanPolicyDetailPage = kuadrantPlugin.provide(
     component: {
       lazy: () =>
         import('./components/PlanPolicyDetailPage').then(m => m.PlanPolicyDetailPage),
+    },
+  }),
+);
+
+export const ApiKeyDetailPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'ApiKeyDetailPage',
+    component: () =>
+      import('./components/ApiKeyDetailPage').then(m => m.ApiKeyDetailPage),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const EntityKuadrantApiApprovalTab = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'EntityKuadrantApiApprovalTab',
+    component: {
+      lazy: () =>
+        import('./components/EntityApiApprovalTab').then(m => m.EntityApiApprovalTab),
     },
   }),
 );

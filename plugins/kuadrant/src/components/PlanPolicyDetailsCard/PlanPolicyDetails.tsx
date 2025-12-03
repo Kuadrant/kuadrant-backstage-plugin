@@ -88,4 +88,3 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
     </Box>
   );
 };
-

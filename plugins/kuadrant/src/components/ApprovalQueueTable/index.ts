@@ -1,0 +1,1 @@
+export { ApprovalQueueTable } from './ApprovalQueueTable';

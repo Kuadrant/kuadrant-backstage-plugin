@@ -1252,6 +1252,61 @@ export async function createRouter({
     }
   });
 
+  // get single api key
+  router.get('/apikeys/:namespace/:name', async (req, res): Promise<void> => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { namespace, name } = req.params;
+
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyReadAllPermission }],
+        { credentials }
+      );
+      const canReadAll = readAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canReadAll) {
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyReadOwnPermission }],
+          { credentials }
+        );
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+      }
+
+      const apiKey = await k8sClient.getCustomResource(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeys',
+        name,
+      );
+
+      if (!apiKey) {
+        res.status(404).json({ error: 'API key not found' });
+        return;
+      }
+
+      // check ownership if not admin
+      if (!canReadAll) {
+        const ownerId = (apiKey as any).spec?.requestedBy?.userId;
+        if (ownerId !== userEntityRef) {
+          throw new NotAllowedError('not authorised to view this API key');
+        }
+      }
+
+      res.status(200).json(apiKey);
+    } catch (error) {
+      console.error('failed to get api key:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to get api key' });
+      }
+    }
+  });
+
   // get api key secret (show once)
   router.get('/apikeys/:namespace/:name/secret', async (req, res): Promise<void> => {
     try {
