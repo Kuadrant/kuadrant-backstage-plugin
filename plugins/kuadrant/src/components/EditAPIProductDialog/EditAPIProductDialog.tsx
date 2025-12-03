@@ -91,7 +91,10 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   }, [open, namespace, name, backendUrl, fetchApi]);
 
   // load planpolicies with full details to show associated plans
-  const { value: planPolicies } = useAsync(async () => {
+  const {
+    value: planPolicies,
+    error: planPoliciesError
+  } = useAsync(async () => {
     if (!open) return null;
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
     return await response.json();
@@ -185,7 +188,14 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
             {error}
           </Alert>
         )}
-
+        {planPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load PlanPolicies:</strong> {planPoliciesError.message}
+            <Typography variant="body2" style={{ marginTop: 8 }}>
+              Plan information may be incomplete.
+            </Typography>
+          </Alert>
+        )}
         {loading ? (
           <Progress />
         ) : (
