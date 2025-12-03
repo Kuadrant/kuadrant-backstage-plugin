@@ -37,6 +37,8 @@ import HourglassEmptyIcon from '@material-ui/icons/HourglassEmpty';
 import CancelIcon from '@material-ui/icons/Cancel';
 import AddIcon from '@material-ui/icons/Add';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
+import FileCopyIcon from '@material-ui/icons/FileCopy';
+import WarningIcon from '@material-ui/icons/Warning';
 import { APIKey } from '../../types/api-management';
 import {
   kuadrantApiKeyRequestCreatePermission,
@@ -109,6 +111,9 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   }>({ open: false, request: null });
   const [apiKeyValues, setApiKeyValues] = useState<Map<string, string>>(new Map());
   const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
+  const [alreadyReadKeys, setAlreadyReadKeys] = useState<Set<string>>(new Set());
+  const [showOnceWarningOpen, setShowOnceWarningOpen] = useState(false);
+  const [pendingKeyReveal, setPendingKeyReveal] = useState<{ namespace: string; name: string } | null>(null);
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -222,11 +227,21 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     setApiKeyLoading(prev => new Set(prev).add(key));
     try {
       const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${requestNamespace}/${requestName}/secret`
+        `${backendUrl}/api/kuadrant/apikeys/${requestNamespace}/${requestName}/secret`
       );
       if (response.ok) {
         const data = await response.json();
         setApiKeyValues(prev => new Map(prev).set(key, data.apiKey));
+        // after successful read, mark as already read (show-once behaviour)
+        setAlreadyReadKeys(prev => new Set(prev).add(key));
+      } else if (response.status === 403) {
+        // secret has already been read
+        setAlreadyReadKeys(prev => new Set(prev).add(key));
+        alertApi.post({
+          message: 'This API key has already been viewed and cannot be retrieved again.',
+          severity: 'warning',
+          display: 'transient',
+        });
       }
     } catch (err) {
       console.error('failed to fetch api key:', err);
@@ -357,44 +372,21 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           return <Box />;
         }
 
-        return <DetailPanelContent request={request} apiName={apiProductName} />;
+        // pass already-revealed key from parent state (don't auto-fetch - that consumes show-once)
+        const key = `${request.metadata.namespace}/${request.metadata.name}`;
+        const revealedKey = apiKeyValues.get(key);
+        return <DetailPanelContent request={request} apiName={apiProductName} revealedApiKey={revealedKey} />;
       },
     },
-  ], [apiProductName]);
+  ], [apiProductName, apiKeyValues]);
 
   // separate component to isolate state
-  const DetailPanelContent = ({ request, apiName: api }: { request: APIKey; apiName: string }) => {
+  const DetailPanelContent = ({ request, apiName: api, revealedApiKey }: { request: APIKey; apiName: string; revealedApiKey?: string }) => {
     const [selectedLanguage, setSelectedLanguage] = useState(0);
-    const [detailApiKey, setDetailApiKey] = useState<string | null>(null);
-    const [loading, setLoading] = useState(false);
     const hostname = request.status?.apiHostname || `${api}.apps.example.com`;
-    const hasSecretRef = request.status?.secretRef?.name;
 
-    React.useEffect(() => {
-      if (hasSecretRef && !detailApiKey && !loading) {
-        setLoading(true);
-        fetchApi.fetch(
-          `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}/secret`
-        )
-          .then(response => {
-            if (response.ok) {
-              return response.json();
-            }
-            throw new Error('failed to fetch secret');
-          })
-          .then(data => {
-            setDetailApiKey(data.apiKey);
-          })
-          .catch(err => {
-            console.error('failed to fetch api key for detail panel:', err);
-          })
-          .finally(() => {
-            setLoading(false);
-          });
-      }
-    }, [hasSecretRef, request.metadata.namespace, request.metadata.name]);
-
-    const displayApiKey = loading ? '<loading...>' : detailApiKey || '<your-api-key>';
+    // use revealed key if available, otherwise show placeholder
+    const displayApiKey = revealedApiKey || '<your-api-key>';
 
     return (
       <Box p={3} bgcolor="background.default" onClick={(e) => e.stopPropagation()}>
@@ -590,6 +582,8 @@ func main() {
         const isLoading = apiKeyLoading.has(key);
         const apiKeyValue = apiKeyValues.get(key);
         const hasSecretRef = row.status?.secretRef?.name;
+        const canReadSecret = row.status?.canReadSecret !== false;
+        const isAlreadyRead = alreadyReadKeys.has(key) || !canReadSecret;
 
         if (!hasSecretRef) {
           return (
@@ -599,15 +593,44 @@ func main() {
           );
         }
 
-        const handleToggle = () => {
+        // key has already been viewed and cannot be retrieved again
+        if (isAlreadyRead && !apiKeyValue) {
+          return (
+            <Tooltip title="This API key has already been viewed and cannot be retrieved again">
+              <Box display="flex" alignItems="center">
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  style={{ fontFamily: 'monospace', marginRight: 8 }}
+                >
+                  Already viewed
+                </Typography>
+                <VisibilityOffIcon fontSize="small" color="disabled" />
+              </Box>
+            </Tooltip>
+          );
+        }
+
+        const handleRevealClick = () => {
           if (isVisible) {
             // hiding - clear the value from memory
             clearApiKeyValue(row.metadata.namespace, row.metadata.name);
             toggleVisibility(row.metadata.name);
-          } else {
-            // showing - fetch fresh value
-            fetchApiKeyFromSecret(row.metadata.namespace, row.metadata.name);
-            toggleVisibility(row.metadata.name);
+          } else if (!isAlreadyRead) {
+            // show warning dialog before first reveal
+            setPendingKeyReveal({ namespace: row.metadata.namespace, name: row.metadata.name });
+            setShowOnceWarningOpen(true);
+          }
+        };
+
+        const handleCopy = async () => {
+          if (apiKeyValue) {
+            await navigator.clipboard.writeText(apiKeyValue);
+            alertApi.post({
+              message: 'API key copied to clipboard',
+              severity: 'success',
+              display: 'transient',
+            });
           }
         };
 
@@ -622,13 +645,24 @@ func main() {
             >
               {isLoading ? 'Loading...' : isVisible && apiKeyValue ? apiKeyValue : '••••••••••••••••'}
             </Typography>
-            <IconButton
-              size="small"
-              onClick={handleToggle}
-              disabled={isLoading}
-            >
-              {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
-            </IconButton>
+            {isVisible && apiKeyValue && (
+              <Tooltip title="Copy to clipboard">
+                <IconButton size="small" onClick={handleCopy}>
+                  <FileCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title={isVisible ? 'Hide API key' : 'Reveal API key (one-time only)'}>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleRevealClick}
+                  disabled={isLoading || (isAlreadyRead && !apiKeyValue)}
+                >
+                  {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
+                </IconButton>
+              </span>
+            </Tooltip>
           </Box>
         );
       },
@@ -972,6 +1006,54 @@ func main() {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
+
+      <Dialog
+        open={showOnceWarningOpen}
+        onClose={() => {
+          setShowOnceWarningOpen(false);
+          setPendingKeyReveal(null);
+        }}
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <WarningIcon color="primary" style={{ marginRight: 8 }} />
+            View API Key
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" paragraph>
+            This API key can only be viewed <strong>once</strong>. After you reveal it, you will not be able to retrieve it again.
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Make sure to copy and store it securely before closing this view.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowOnceWarningOpen(false);
+              setPendingKeyReveal(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              if (pendingKeyReveal) {
+                fetchApiKeyFromSecret(pendingKeyReveal.namespace, pendingKeyReveal.name);
+                toggleVisibility(pendingKeyReveal.name);
+              }
+              setShowOnceWarningOpen(false);
+              setPendingKeyReveal(null);
+            }}
+          >
+            Reveal API Key
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 };
