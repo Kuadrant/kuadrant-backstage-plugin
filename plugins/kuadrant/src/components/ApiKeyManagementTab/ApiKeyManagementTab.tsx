@@ -54,10 +54,20 @@ interface APIProduct {
     namespace: string;
   };
   spec: {
-    plans?: Array<{
+    displayName?: string;
+  };
+  status?: {
+    discoveredPlans?: Array<{
       tier: string;
       description?: string;
       limits?: any;
+    }>;
+    conditions?: Array<{
+      type: string;
+      status: 'True' | 'False' | 'Unknown';
+      reason?: string;
+      message?: string;
+      lastTransitionTime?: string;
     }>;
   };
 }
@@ -97,6 +107,8 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     open: boolean;
     request: APIKey | null;
   }>({ open: false, request: null });
+  const [apiKeyValues, setApiKeyValues] = useState<Map<string, string>>(new Map());
+  const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -199,6 +211,41 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     } finally {
       setDeleting(null);
     }
+  };
+
+  const fetchApiKeyFromSecret = async (requestNamespace: string, requestName: string) => {
+    const key = `${requestNamespace}/${requestName}`;
+    if (apiKeyLoading.has(key)) {
+      return;
+    }
+
+    setApiKeyLoading(prev => new Set(prev).add(key));
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/requests/${requestNamespace}/${requestName}/secret`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeyValues(prev => new Map(prev).set(key, data.apiKey));
+      }
+    } catch (err) {
+      console.error('failed to fetch api key:', err);
+    } finally {
+      setApiKeyLoading(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const clearApiKeyValue = (requestNamespace: string, requestName: string) => {
+    const key = `${requestNamespace}/${requestName}`;
+    setApiKeyValues(prev => {
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
+    });
   };
 
   const handleEditRequest = (request: APIKey) => {
@@ -318,7 +365,36 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
   // separate component to isolate state
   const DetailPanelContent = ({ request, apiName: api }: { request: APIKey; apiName: string }) => {
     const [selectedLanguage, setSelectedLanguage] = useState(0);
+    const [detailApiKey, setDetailApiKey] = useState<string | null>(null);
+    const [loading, setLoading] = useState(false);
     const hostname = request.status?.apiHostname || `${api}.apps.example.com`;
+    const hasSecretRef = request.status?.secretRef?.name;
+
+    React.useEffect(() => {
+      if (hasSecretRef && !detailApiKey && !loading) {
+        setLoading(true);
+        fetchApi.fetch(
+          `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}/secret`
+        )
+          .then(response => {
+            if (response.ok) {
+              return response.json();
+            }
+            throw new Error('failed to fetch secret');
+          })
+          .then(data => {
+            setDetailApiKey(data.apiKey);
+          })
+          .catch(err => {
+            console.error('failed to fetch api key for detail panel:', err);
+          })
+          .finally(() => {
+            setLoading(false);
+          });
+      }
+    }, [hasSecretRef, request.metadata.namespace, request.metadata.name]);
+
+    const displayApiKey = loading ? '<loading...>' : detailApiKey || '<your-api-key>';
 
     return (
       <Box p={3} bgcolor="background.default" onClick={(e) => e.stopPropagation()}>
@@ -366,7 +442,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
           {selectedLanguage === 0 && (
             <CodeSnippet
               text={`curl -X GET https://${hostname}/api/v1/endpoint \\
-  -H "Authorization: Bearer ${request.status?.apiKey}"`}
+  -H "Authorization: Bearer ${displayApiKey}"`} // notsecret - template for user's own api key
               language="bash"
               showCopyCodeButton
             />
@@ -375,7 +451,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
             <CodeSnippet
               text={`const fetch = require('node-fetch');
 
-const apiKey = '${request.status?.apiKey}';
+const apiKey = '${displayApiKey}';
 const endpoint = 'https://${hostname}/api/v1/endpoint';
 
 fetch(endpoint, {
@@ -395,7 +471,7 @@ fetch(endpoint, {
             <CodeSnippet
               text={`import requests
 
-api_key = '${request.status?.apiKey}'
+api_key = '${displayApiKey}'
 endpoint = 'https://${hostname}/api/v1/endpoint'
 
 headers = {
@@ -419,7 +495,7 @@ import (
 )
 
 func main() {
-    apiKey := "${request.status?.apiKey}"
+    apiKey := "${displayApiKey}"
     endpoint := "https://${hostname}/api/v1/endpoint"
 
     client := &http.Client{}
@@ -480,7 +556,7 @@ func main() {
   const myRequests = ((requests || []) as APIKey[]).filter(
     r => !optimisticallyDeleted.has(r.metadata.name)
   );
-  const plans = (apiProduct?.spec?.plans || []) as Plan[];
+  const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(r => !r.status?.phase || r.status.phase === 'Pending');
   const approvedRequests = myRequests.filter(r => r.status?.phase === 'Approved');
@@ -505,12 +581,35 @@ func main() {
     },
     {
       title: 'API Key',
-      field: 'status.apiKey',
+      field: 'status.secretRef',
       searchable: false,
       filtering: false,
       render: (row: APIKey) => {
+        const key = `${row.metadata.namespace}/${row.metadata.name}`;
         const isVisible = visibleKeys.has(row.metadata.name);
-        const apiKey = row.status?.apiKey || 'N/A';
+        const isLoading = apiKeyLoading.has(key);
+        const apiKeyValue = apiKeyValues.get(key);
+        const hasSecretRef = row.status?.secretRef?.name;
+
+        if (!hasSecretRef) {
+          return (
+            <Typography variant="body2" color="textSecondary">
+              Awaiting secret...
+            </Typography>
+          );
+        }
+
+        const handleToggle = () => {
+          if (isVisible) {
+            // hiding - clear the value from memory
+            clearApiKeyValue(row.metadata.namespace, row.metadata.name);
+            toggleVisibility(row.metadata.name);
+          } else {
+            // showing - fetch fresh value
+            fetchApiKeyFromSecret(row.metadata.namespace, row.metadata.name);
+            toggleVisibility(row.metadata.name);
+          }
+        };
 
         return (
           <Box display="flex" alignItems="center">
@@ -521,11 +620,12 @@ func main() {
                 marginRight: 8,
               }}
             >
-              {isVisible ? apiKey : '••••••••••••••••'}
+              {isLoading ? 'Loading...' : isVisible && apiKeyValue ? apiKeyValue : '••••••••••••••••'}
             </Typography>
             <IconButton
               size="small"
-              onClick={() => toggleVisibility(row.metadata.name)}
+              onClick={handleToggle}
+              disabled={isLoading}
             >
               {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
             </IconButton>
@@ -616,10 +716,10 @@ func main() {
     },
     {
       title: 'Requested',
-      field: 'spec.requestedAt',
+      field: 'metadata.creationTimestamp',
       render: (row: APIKey) => (
         <Typography variant="body2">
-          {row.status && row.status.requestedAt ? new Date(row.status.requestedAt).toLocaleDateString() : '-'}
+          {row.metadata.creationTimestamp ? new Date(row.metadata.creationTimestamp).toLocaleDateString() : '-'}
         </Typography>
       ),
     },
@@ -632,30 +732,6 @@ func main() {
           <Typography variant="body2">
             {new Date(row.status.reviewedAt).toLocaleDateString()}
           </Typography>
-        );
-      },
-    },
-    {
-      title: 'Reason',
-      field: 'status.reason',
-      render: (row: APIKey) => {
-        if (!row.status?.reason) {
-          return <Typography variant="body2">-</Typography>;
-        }
-        return (
-          <Tooltip title={row.status.reason} placement="top">
-            <Typography
-              variant="body2"
-              style={{
-                maxWidth: '200px',
-                overflow: 'hidden',
-                textOverflow: 'ellipsis',
-                whiteSpace: 'nowrap',
-              }}
-            >
-              {row.status.reason}
-            </Typography>
-          </Tooltip>
         );
       },
     },
@@ -716,7 +792,18 @@ func main() {
               </Button>
               {plans.length === 0 && (
                 <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
-                  {!apiProduct ? 'API product not found' : 'No plans available'}
+                  {!apiProduct ? 'API product not found' : (() => {
+                    const readyCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'Ready');
+                    const planCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'PlanPolicyDiscovered');
+
+                    if (readyCondition?.status !== 'True') {
+                      return `HTTPRoute not ready: ${readyCondition?.message || 'unknown'}`;
+                    }
+                    if (planCondition?.status !== 'True') {
+                      return `No plans discovered: ${planCondition?.message || 'no PlanPolicy found'}`;
+                    }
+                    return 'No plans available';
+                  })()}
                 </Typography>
               )}
             </Box>

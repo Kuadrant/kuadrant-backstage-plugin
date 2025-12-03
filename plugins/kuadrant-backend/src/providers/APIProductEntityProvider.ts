@@ -16,22 +16,19 @@ interface APIProduct {
     labels?: Record<string, string>;
   };
   spec: {
-    displayName?: string;
+    displayName: string;
     description?: string;
     version?: string;
     tags?: string[];
-    publishStatus?: 'Draft' | 'Published';
-    plans?: Array<{
-      tier: string;
-      description?: string;
-      limits?: any;
-    }>;
-    planPolicyRef?: {
+    targetRef: {
+      group: string;
+      kind: string;
       name: string;
-      namespace: string;
     };
+    approvalMode: 'automatic' | 'manual';
+    publishStatus: 'Draft' | 'Published';
     documentation?: {
-      openAPISpec?: string;
+      openAPISpecURL?: string;
       docsURL?: string;
       gitRepository?: string;
       techdocsRef?: string;
@@ -42,12 +39,16 @@ interface APIProduct {
       slack?: string;
     };
   };
-  status: {
+  status?: {
+    discoveredPlans?: Array<{
+      tier: string;
+      limits?: any;
+    }>;
     openapi?: {
       raw?: string;
       lastSyncTime?: string;
     };
-  }
+  };
 }
 
 export class APIProductEntityProvider implements EntityProvider {
@@ -175,8 +176,8 @@ export class APIProductEntityProvider implements EntityProvider {
           'kuadrant.io/apiproduct': name,
           // add httproute annotation if we can infer it (usually same as apiproduct name without -api suffix)
           'kuadrant.io/httproute': name.endsWith('-api') ? name.slice(0, -4) : name,
-          ...(product.spec.documentation?.openAPISpec && {
-            'kuadrant.io/openapi-spec-url': product.spec.documentation.openAPISpec,
+          ...(product.spec.documentation?.openAPISpecURL && {
+            'kuadrant.io/openapi-spec-url': product.spec.documentation.openAPISpecURL,
           }),
           ...(product.spec.documentation?.docsURL && {
             'kuadrant.io/docs-url': product.spec.documentation.docsURL,

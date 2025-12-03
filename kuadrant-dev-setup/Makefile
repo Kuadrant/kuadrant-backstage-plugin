@@ -1,4 +1,4 @@
-.PHONY: help kind-create kind-delete kuadrant-install demo-install demo-uninstall clean
+.PHONY: help kind-create kind-delete kuadrant-install controller-deploy demo-install demo-uninstall clean
 
 CLUSTER_NAME ?= local-cluster
 LOCALBIN ?= $(shell pwd)/bin
@@ -18,6 +18,7 @@ help:
 	@echo ""
 	@echo "kuadrant:"
 	@echo "  make kuadrant-install   - install kuadrant v1.3.0"
+	@echo "  make controller-deploy  - build and deploy devportal controller"
 	@echo "  make demo-install       - install toystore demo"
 	@echo "  make demo-uninstall     - remove toystore demo"
 	@echo ""
@@ -126,17 +127,36 @@ kuadrant-install: $(LOCALBIN)/helm-$(HELM_VERSION)
 	@echo "creating kuadrant instance..."
 	@kubectl apply -f kuadrant-instance.yaml
 	@echo ""
-	@echo "installing custom crds..."
-	@kubectl apply -f crds/
+	@echo "deploying devportal controller..."
+	@$(MAKE) controller-deploy
 	@echo ""
 	@echo "kuadrant v1.3.0 installed!"
+
+# deploy devportal-controller from local sibling directory
+CONTROLLER_DIR ?= $(shell pwd)/../../developer-portal-controller
+
+controller-deploy: $(LOCALBIN)/kind-$(KIND_VERSION)
+	@echo "deploying devportal controller from $(CONTROLLER_DIR)..."
+	@if [ ! -d "$(CONTROLLER_DIR)" ]; then \
+		echo "error: controller directory not found at $(CONTROLLER_DIR)"; \
+		echo "clone: git clone https://github.com/Kuadrant/developer-portal-controller.git $(CONTROLLER_DIR)"; \
+		exit 1; \
+	fi
+	@echo "building controller image..."
+	@$(MAKE) -C $(CONTROLLER_DIR) docker-build
+	@echo "loading controller image into kind cluster..."
+	@$(LOCALBIN)/kind-$(KIND_VERSION) load docker-image controller:latest --name $(CLUSTER_NAME)
+	@echo "installing CRDs and deploying controller..."
+	@$(MAKE) -C $(CONTROLLER_DIR) install deploy
+	@echo "patching imagePullPolicy for local image..."
+	@kubectl patch deployment -n developer-portal-controller-system developer-portal-controller-controller-manager \
+		-p '{"spec":{"template":{"spec":{"containers":[{"name":"manager","imagePullPolicy":"IfNotPresent"}]}}}}'
+	@echo "devportal controller deployed!"
 
 demo-install:
 	@echo "installing toystore demo resources..."
 	@kubectl apply -f demo/toystore-demo.yaml
 	@kubectl apply -f demo/additional-demos.yaml
-	# temp solution until developer-portal-controller does this
-	@kubectl patch apiproduct toystore-api -n toystore --subresource status --type=merge --patch "$$(cat demo/toystore-status.yaml)"
 	@echo ""
 	@echo "demo resources installed!"
 	@echo ""

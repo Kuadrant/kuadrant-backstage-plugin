@@ -30,10 +30,6 @@ import {
   kuadrantApiKeyRequestDeleteAllPermission,
 } from './permissions';
 
-function generateApiKey(): string {
-  return randomBytes(32).toString('hex');
-}
-
 /**
  * Extract a kubernetes-safe name from entity ref
  * e.g., "user:default/alice" -> "alice"
@@ -169,7 +165,6 @@ export async function createRouter({
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const data = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = data.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
 
         if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only read your own api products');
@@ -222,44 +217,6 @@ export async function createRouter({
         apiProduct.metadata.annotations = {};
       }
       apiProduct.metadata.annotations['backstage.io/owner'] = userEntityRef;
-
-      // temporary: populate plans from planpolicy until controller implements this
-      // look up httproute and find planpolicy targeting it
-      const httpRouteNamespace = namespace;
-      const httpRouteName = targetRef.name;
-
-      try {
-        // list all planpolicies in the httproute's namespace
-        const planPoliciesResponse = await k8sClient.listCustomResources(
-          'extensions.kuadrant.io',
-          'v1alpha1',
-          'planpolicies',
-          httpRouteNamespace
-        );
-
-        // find planpolicy targeting this httproute
-        const planPolicy = (planPoliciesResponse.items || []).find((pp: any) => {
-          const ref = pp.spec?.targetRef;
-          return ref?.kind === 'HTTPRoute' &&
-                 ref?.name === httpRouteName &&
-                 (!ref?.namespace || ref?.namespace === httpRouteNamespace);
-        });
-
-        if (planPolicy && planPolicy.spec?.plans) {
-          // copy plans from planpolicy to apiproduct spec
-          apiProduct.spec.plans = planPolicy.spec.plans.map((plan: any) => ({
-            tier: plan.tier,
-            description: plan.description,
-            limits: plan.limits
-          }));
-          console.log(`copied ${apiProduct.spec.plans.length} plans from planpolicy ${planPolicy.metadata.name}`);
-        } else {
-          console.log(`no planpolicy found for httproute ${httpRouteNamespace}/${httpRouteName}`);
-        }
-      } catch (error) {
-        console.warn('failed to populate plans from planpolicy:', error);
-        // continue without plans rather than failing the creation
-      }
 
       const created = await k8sClient.createCustomResource(
         'devportal.kuadrant.io',
@@ -317,82 +274,51 @@ export async function createRouter({
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const existing = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = existing.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
 
         if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only delete your own api products');
         }
       }
-      console.log(`cascading delete: finding apikeyrequests for ${namespace}/${name}`);
+      console.log(`cascading delete: finding apikeys for ${namespace}/${name}`);
 
       let allRequests;
       try {
         allRequests = await k8sClient.listCustomResources(
-          'extensions.kuadrant.io',
+          'devportal.kuadrant.io',
           'v1alpha1',
-          'apikeyrequests',
+          'apikeys',
           namespace
         );
       } catch (error) {
-        console.warn('failed to list apikeyrequests during cascade delete:', error);
+        console.warn('failed to list apikeys during cascade delete:', error);
         allRequests = { items: [] };
       }
 
       // filter requests that belong to this APIProduct
       const relatedRequests = (allRequests.items || []).filter((req: any) =>
-        req.spec?.apiName === name && req.spec?.apiNamespace === namespace
+        req.spec?.apiProductRef?.name === name
       );
 
-      console.log(`found ${relatedRequests.length} apikeyrequests to delete`);
+      console.log(`found ${relatedRequests.length} apikeys to delete`);
 
-      // delete each APIKeyRequest and its associated Secret
+      // delete each APIKey - controller's OwnerReference handles Secret cleanup
       const deletionResults = await Promise.allSettled(
         relatedRequests.map(async (request: any) => {
           const requestName = request.metadata.name;
-          const requestUserId = request.spec?.requestedBy?.userId;
-          const planTier = request.spec?.planTier;
-
-          console.log(`deleting apikeyrequest: ${namespace}/${requestName}`);
-
-          // iff request is approved, delete the associated secret first
-          if (request.status?.phase === 'Approved') {
-            try {
-              console.log(`finding secret for approved request: ${namespace}/${requestName}`);
-              const secrets = await k8sClient.listSecrets(namespace);
-              const matchingSecret = secrets.items?.find((s: any) => {
-                const annotations = s.metadata?.annotations || {};
-                return (
-                  annotations['secret.kuadrant.io/user-id'] === requestUserId &&
-                  annotations['secret.kuadrant.io/plan-id'] === planTier &&
-                  s.metadata?.labels?.app === name
-                );
-              });
-
-              if (matchingSecret) {
-                console.log(`deleting secret: ${namespace}/${matchingSecret.metadata.name}`);
-                await k8sClient.deleteSecret(namespace, matchingSecret.metadata.name);
-              }
-            } catch (error) {
-              console.warn(`failed to delete secret for request ${requestName}:`, error);
-              // continue with request deletion even if secret deletion fails
-            }
-          }
-
-          // delete the ApiKeyRequest
+          console.log(`deleting apikey: ${namespace}/${requestName}`);
           await k8sClient.deleteCustomResource(
-            'extensions.kuadrant.io',
+            'devportal.kuadrant.io',
             'v1alpha1',
             namespace,
-            'apikeyrequests',
+            'apikeys',
             requestName
           );
         })
       );
 
-      // log any failures (but don't block APIProduct deletion)
       const failures = deletionResults.filter(r => r.status === 'rejected');
       if (failures.length > 0) {
-        console.warn(`${failures.length} apikeyrequests/secret failed to delete:`,
+        console.warn(`${failures.length} apikeys failed to delete:`,
           failures.map((f: any) => f.reason)
         );
       }
@@ -505,7 +431,6 @@ export async function createRouter({
         const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
         const existing = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
         const owner = existing.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
 
         if (owner !== userEntityRef) {
           throw new NotAllowedError('you can only update your own api products');
@@ -685,97 +610,8 @@ export async function createRouter({
         request,
       );
 
-      // check if apiproduct has automatic approval mode
-      try {
-        const apiProduct = await k8sClient.getCustomResource(
-          'devportal.kuadrant.io',
-          'v1alpha1',
-          namespace,
-          'apiproducts',
-          apiProductName,
-        );
-
-        if (apiProduct.spec?.approvalMode === 'automatic') {
-          // automatically approve and create secret
-          const apiKey = generateApiKey();
-          const timestamp = Date.now();
-          const userName = extractNameFromEntityRef(userEntityRef);
-          const secretName = `${userName}-${apiProductName}-${timestamp}`
-            .toLowerCase()
-            .replace(/[^a-z0-9-]/g, '-');
-
-          const secret = {
-            apiVersion: 'v1',
-            kind: 'Secret',
-            metadata: {
-              name: secretName,
-              namespace,
-              labels: {
-                app: apiProductName,
-              },
-              annotations: {
-                'secret.kuadrant.io/plan-id': planTier,
-                'secret.kuadrant.io/user-id': userEntityRef,
-              },
-            },
-            stringData: {
-              api_key: apiKey,
-            },
-            type: 'Opaque',
-          };
-
-          await k8sClient.createSecret(namespace, secret);
-
-          // get plan limits
-          let planLimits: any = null;
-          const plan = apiProduct.spec?.plans?.find((p: any) => p.tier === planTier);
-          if (plan) {
-            planLimits = plan.limits;
-          }
-
-          // fetch httproute to get hostname
-          let apiHostname = `${apiProductName}.apps.example.com`;
-          try {
-            const httproute = await k8sClient.getCustomResource(
-              'gateway.networking.k8s.io',
-              'v1',
-              namespace,
-              'httproutes',
-              apiProductName,
-            );
-            if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
-              apiHostname = httproute.spec.hostnames[0];
-            }
-          } catch (error) {
-            console.warn('could not fetch httproute for hostname, using default:', error);
-          }
-
-          // update request status to approved
-          const status = {
-            phase: 'Approved',
-            reviewedBy: 'system',
-            reviewedAt: new Date().toISOString(),
-            reason: 'automatic approval',
-            apiKey,
-            apiHostname,
-            apiBasePath: '/api/v1',
-            apiDescription: `${apiProductName} api`,
-            planLimits,
-          };
-
-          await k8sClient.patchCustomResourceStatus(
-            'devportal.kuadrant.io',
-            'v1alpha1',
-            namespace,
-            'apikeys',
-            requestName,
-            status,
-          );
-        }
-      } catch (error) {
-        console.warn('could not check approval mode or auto-approve:', error);
-        // continue anyway - request was created successfully
-      }
+      // controller handles automatic approval and secret creation
+      // we just create the APIKey resource and let the controller reconcile
 
       res.status(201).json(created);
     } catch (error) {
@@ -817,9 +653,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'aPIKeys');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
       }
 
       let filteredItems = data.items || [];
@@ -839,7 +675,7 @@ export async function createRouter({
 
         // filter requests to only those for owned api products
         filteredItems = filteredItems.filter((req: any) =>
-          ownedApiProducts.includes(req.spec?.apiName)
+          ownedApiProducts.includes(req.spec?.apiProductRef?.name)
         );
       }
 
@@ -900,6 +736,62 @@ export async function createRouter({
     }
   });
 
+  // fetch api key value from secret - only for own approved requests
+  router.get('/requests/:namespace/:name/secret', async (req, res) => {
+    try {
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { namespace, name } = req.params;
+
+      // get the APIKey resource
+      const apiKey = await k8sClient.getCustomResource(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeys',
+        name,
+      );
+
+      // verify ownership - users can only read their own api key secrets
+      const requestUserId = apiKey.spec?.requestedBy?.userId;
+      if (requestUserId !== userEntityRef) {
+        throw new NotAllowedError('you can only read your own api key secrets');
+      }
+
+      // check if approved and has secretRef
+      if (apiKey.status?.phase !== 'Approved') {
+        res.status(400).json({ error: 'api key request is not approved' });
+        return;
+      }
+
+      const secretRef = apiKey.status?.secretRef;
+      if (!secretRef?.name || !secretRef?.key) {
+        res.status(404).json({ error: 'secret not yet created by controller' });
+        return;
+      }
+
+      // fetch the secret
+      const secret = await k8sClient.getSecret(namespace, secretRef.name);
+      const apiKeyValue = secret.data?.[secretRef.key];
+
+      if (!apiKeyValue) {
+        res.status(404).json({ error: 'api key not found in secret' });
+        return;
+      }
+
+      // secret data is base64 encoded
+      const decodedKey = Buffer.from(apiKeyValue, 'base64').toString('utf-8');
+
+      res.json({ apiKey: decodedKey });
+    } catch (error) {
+      console.error('error fetching api key secret:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch api key secret' });
+      }
+    }
+  });
+
   const approveRejectSchema = z.object({
     comment: z.string().optional(),
   });
@@ -915,7 +807,6 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const { namespace, name } = req.params;
-      const { comment } = parsed.data;
       const reviewedBy = userEntityRef;
 
       const request = await k8sClient.getCustomResource(
@@ -943,7 +834,6 @@ export async function createRouter({
       );
 
       const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
@@ -967,97 +857,12 @@ export async function createRouter({
           throw new NotAllowedError('you can only approve requests for your own api products');
         }
       }
-      const apiKey = generateApiKey();
-      const timestamp = Date.now();
-      const userName = extractNameFromEntityRef(spec.requestedBy.userId);
-      const secretName = `${userName}-${apiProductName}-${timestamp}`
-        .toLowerCase()
-        .replace(/[^a-z0-9-]/g, '-');
 
-      const secret = {
-        apiVersion: 'v1',
-        kind: 'Secret',
-        metadata: {
-          name: secretName,
-          namespace,
-          labels: {
-            app: apiProductName,
-          },
-          annotations: {
-            'secret.kuadrant.io/plan-id': spec.planTier,
-            'secret.kuadrant.io/user-id': spec.requestedBy.userId,
-          },
-        },
-        stringData: {
-          api_key: apiKey,
-        },
-        type: 'Opaque',
-      };
-
-      await k8sClient.createSecret(namespace, secret);
-
-      // try to get plan limits from apiproduct or planpolicy
-      let planLimits: any = null;
-      try {
-        const products = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
-        const product = (products.items || []).find((p: any) =>
-          p.metadata.name.includes(apiProductName) || p.spec?.displayName?.toLowerCase().includes(apiProductName.toLowerCase())
-        );
-        if (product) {
-          const plan = product.spec?.plans?.find((p: any) => p.tier === spec.planTier);
-          if (plan) {
-            planLimits = plan.limits;
-          }
-        }
-      } catch (e) {
-        console.warn('could not fetch apiproduct for plan limits:', e);
-      }
-
-      if (!planLimits) {
-        try {
-          const policy = await k8sClient.getCustomResource(
-            'extensions.kuadrant.io',
-            'v1alpha1',
-            namespace,
-            'planpolicies',
-            `${apiProductName}-plan`,
-          );
-          const plan = policy.spec?.plans?.find((p: any) => p.tier === spec.planTier);
-          if (plan) {
-            planLimits = plan.limits;
-          }
-        } catch (e) {
-          console.warn('could not fetch planpolicy for plan limits:', e);
-        }
-      }
-
-      // fetch httproute to get hostname
-      let apiHostname = `${apiProductName}.apps.example.com`;
-      try {
-        const httproute = await k8sClient.getCustomResource(
-          'gateway.networking.k8s.io',
-          'v1',
-          namespace,
-          'httproutes',
-          apiProductName,
-        );
-        if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
-          apiHostname = httproute.spec.hostnames[0];
-        }
-      } catch (error) {
-        console.warn('could not fetch httproute for hostname, using default:', error);
-      }
-
+      // backend sets phase, controller reconciles and creates Secret
       const status = {
         phase: 'Approved',
         reviewedBy,
         reviewedAt: new Date().toISOString(),
-        reason: comment || 'approved',
-        apiKey,
-        apiHostname,
-        apiBasePath: '/api/v1',
-        apiDescription: `${apiProductName} api`,
-        planLimits,
       };
 
       await k8sClient.patchCustomResourceStatus(
@@ -1069,7 +874,7 @@ export async function createRouter({
         status,
       );
 
-      res.json({ secretName });
+      res.json({ success: true });
     } catch (error) {
       console.error('error approving api key request:', error);
       if (error instanceof NotAllowedError) {
@@ -1091,7 +896,6 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const { namespace, name } = req.params;
-      const { comment } = parsed.data;
       const reviewedBy = userEntityRef;
 
       // fetch request to get apiproduct info
@@ -1149,7 +953,6 @@ export async function createRouter({
         phase: 'Rejected',
         reviewedBy,
         reviewedAt: new Date().toISOString(),
-        reason: comment || 'rejected',
       };
 
       await k8sClient.patchCustomResourceStatus(
@@ -1199,147 +1002,17 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      const { requests, comment } = parsed.data;
+      const { requests } = parsed.data;
       const reviewedBy = userEntityRef;
       const results = [];
 
       for (const reqRef of requests) {
         try {
-          const request = await k8sClient.getCustomResource(
-            'devportal.kuadrant.io',
-            'v1alpha1',
-            reqRef.namespace,
-            'apikeys',
-            reqRef.name,
-          );
-
-          const spec = request.spec as any;
-
-          // verify user owns/admins the apiproduct this request is for
-          const apiProduct = await k8sClient.getCustomResource(
-            'devportal.kuadrant.io',
-            'v1alpha1',
-            spec.apiNamespace,
-            'apiproducts',
-            spec.apiName,
-          );
-
-          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
-
-          // try update all permission first (admin)
-          const updateAllDecision = await permissions.authorize(
-            [{ permission: kuadrantApiProductUpdateAllPermission }],
-            { credentials },
-          );
-
-          if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
-            // fallback to update own permission
-            const updateOwnDecision = await permissions.authorize(
-              [{ permission: kuadrantApiProductUpdateOwnPermission }],
-              { credentials },
-            );
-
-            if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-              throw new NotAllowedError('unauthorised');
-            }
-
-            // verify ownership of the apiproduct
-            if (owner !== userEntityRef) {
-              throw new NotAllowedError('you can only approve requests for your own api products');
-            }
-          }
-          const apiKey = generateApiKey();
-          const timestamp = Date.now();
-          const userName = extractNameFromEntityRef(spec.requestedBy.userId);
-          const secretName = `${userName}-${spec.apiName}-${timestamp}`
-            .toLowerCase()
-            .replace(/[^a-z0-9-]/g, '-');
-
-          const secret = {
-            apiVersion: 'v1',
-            kind: 'Secret',
-            metadata: {
-              name: secretName,
-              namespace: spec.apiNamespace,
-              labels: {
-                app: spec.apiName,
-              },
-              annotations: {
-                'secret.kuadrant.io/plan-id': spec.planTier,
-                'secret.kuadrant.io/user-id': spec.requestedBy.userId,
-              },
-            },
-            stringData: {
-              api_key: apiKey,
-            },
-            type: 'Opaque',
-          };
-
-          await k8sClient.createSecret(spec.apiNamespace, secret);
-
-          // try to get plan limits from apiproduct or planpolicy
-          let planLimits: any = null;
-          try {
-            const products = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apiproducts');
-            const product = (products.items || []).find((p: any) =>
-              p.metadata.name.includes(spec.apiName) || p.spec?.displayName?.toLowerCase().includes(spec.apiName.toLowerCase())
-            );
-            if (product) {
-              const plan = product.spec?.plans?.find((p: any) => p.tier === spec.planTier);
-              if (plan) {
-                planLimits = plan.limits;
-              }
-            }
-          } catch (e) {
-            console.warn('could not fetch apiproduct for plan limits:', e);
-          }
-
-          if (!planLimits) {
-            try {
-              const policy = await k8sClient.getCustomResource(
-                'devportal.kuadrant.io',
-                'v1alpha1',
-                spec.apiNamespace,
-                'planpolicies',
-                `${spec.apiName}-plan`,
-              );
-              const plan = policy.spec?.plans?.find((p: any) => p.tier === spec.planTier);
-              if (plan) {
-                planLimits = plan.limits;
-              }
-            } catch (e) {
-              console.warn('could not fetch planpolicy for plan limits:', e);
-            }
-          }
-
-          // fetch httproute to get hostname
-          let apiHostname = `${spec.apiName}.apps.example.com`;
-          try {
-            const httproute = await k8sClient.getCustomResource(
-              'gateway.networking.k8s.io',
-              'v1',
-              spec.apiNamespace,
-              'httproutes',
-              spec.apiName,
-            );
-            if (httproute.spec?.hostnames && httproute.spec.hostnames.length > 0) {
-              apiHostname = httproute.spec.hostnames[0];
-            }
-          } catch (error) {
-            console.warn('could not fetch httproute for hostname, using default:', error);
-          }
-
+          // backend sets phase, controller reconciles and creates Secret
           const status = {
             phase: 'Approved',
             reviewedBy,
             reviewedAt: new Date().toISOString(),
-            reason: comment || 'approved',
-            apiKey,
-            apiHostname,
-            apiBasePath: '/api/v1',
-            apiDescription: `${spec.apiName} api`,
-            planLimits,
           };
 
           await k8sClient.patchCustomResourceStatus(
@@ -1351,7 +1024,7 @@ export async function createRouter({
             status,
           );
 
-          results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true, secretName });
+          results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true });
         } catch (error) {
           console.error(`error approving request ${reqRef.namespace}/${reqRef.name}:`, error);
           results.push({
@@ -1393,7 +1066,7 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      const { requests, comment } = parsed.data;
+      const { requests } = parsed.data;
       const reviewedBy = userEntityRef;
       const results = [];
 
@@ -1411,12 +1084,13 @@ export async function createRouter({
           const spec = request.spec as any;
 
           // verify user owns/admins the apiproduct this request is for
+          // apikey and apiproduct are in the same namespace
           const apiProduct = await k8sClient.getCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
-            spec.apiNamespace,
+            reqRef.namespace,
             'apiproducts',
-            spec.apiName,
+            spec.apiProductRef?.name,
           );
 
           const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
@@ -1449,7 +1123,6 @@ export async function createRouter({
             phase: 'Rejected',
             reviewedBy,
             reviewedAt: new Date().toISOString(),
-            reason: comment || 'rejected',
           };
 
           await k8sClient.patchCustomResourceStatus(
@@ -1526,33 +1199,7 @@ export async function createRouter({
         }
       }
 
-      // if request is approved, find and delete associated secret
-      if (request.status?.phase === 'Approved') {
-        try {
-          const apiNamespace = request.spec?.apiNamespace;
-          const apiName = request.spec?.apiName;
-          const planTier = request.spec?.planTier;
-
-          // list secrets in the api namespace and find the one with matching annotations
-          const secrets = await k8sClient.listSecrets(apiNamespace);
-          const matchingSecret = secrets.items?.find((s: any) => {
-            const annotations = s.metadata?.annotations || {};
-            return (
-              annotations['secret.kuadrant.io/user-id'] === requestUserId &&
-              annotations['secret.kuadrant.io/plan-id'] === planTier &&
-              s.metadata?.labels?.app === apiName
-            );
-          });
-
-          if (matchingSecret) {
-            await k8sClient.deleteSecret(apiNamespace, matchingSecret.metadata.name);
-          }
-        } catch (error) {
-          console.warn('failed to delete associated secret:', error);
-          // continue with request deletion even if secret deletion fails
-        }
-      }
-
+      // controller owns the Secret via OwnerReference - it will be garbage collected
       await k8sClient.deleteCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',

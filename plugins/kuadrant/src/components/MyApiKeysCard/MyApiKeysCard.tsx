@@ -32,6 +32,8 @@ export const MyApiKeysCard = () => {
     open: boolean;
     request: APIKey | null;
   }>({ open: false, request: null });
+  const [apiKeyValues, setApiKeyValues] = useState<Map<string, string>>(new Map());
+  const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -85,6 +87,41 @@ export const MyApiKeysCard = () => {
         newSet.add(keyName);
       }
       return newSet;
+    });
+  };
+
+  const fetchApiKeyFromSecret = async (requestNamespace: string, requestName: string) => {
+    const key = `${requestNamespace}/${requestName}`;
+    if (apiKeyLoading.has(key)) {
+      return;
+    }
+
+    setApiKeyLoading(prev => new Set(prev).add(key));
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/requests/${requestNamespace}/${requestName}/secret`
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setApiKeyValues(prev => new Map(prev).set(key, data.apiKey));
+      }
+    } catch (err) {
+      console.error('failed to fetch api key:', err);
+    } finally {
+      setApiKeyLoading(prev => {
+        const next = new Set(prev);
+        next.delete(key);
+        return next;
+      });
+    }
+  };
+
+  const clearApiKeyValue = (requestNamespace: string, requestName: string) => {
+    const key = `${requestNamespace}/${requestName}`;
+    setApiKeyValues(prev => {
+      const next = new Map(prev);
+      next.delete(key);
+      return next;
     });
   };
 
@@ -226,32 +263,6 @@ export const MyApiKeysCard = () => {
       },
     },
     {
-      title: 'Reason',
-      field: 'status.reason',
-      render: (row: APIKey) => {
-        if (row.status?.reason) {
-          const color = row.status.phase === 'Rejected' ? 'error' : 'textPrimary';
-          return (
-            <Tooltip title={row.status.reason} placement="top">
-              <Typography
-                variant="body2"
-                color={color}
-                style={{
-                  maxWidth: '200px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap',
-                }}
-              >
-                {row.status.reason}
-              </Typography>
-            </Tooltip>
-          );
-        }
-        return <Typography variant="body2" color="textSecondary">-</Typography>;
-      },
-    },
-    {
       title: 'Reviewed By',
       field: 'status.reviewedBy',
       render: (row: APIKey) => {
@@ -273,28 +284,55 @@ export const MyApiKeysCard = () => {
     },
     {
       title: 'API Key',
-      field: 'status.apiKey',
+      field: 'status.secretRef',
       filtering: false,
       render: (row: APIKey) => {
-        if (row.status?.phase === 'Approved' && row.status.apiKey) {
-          const isVisible = visibleKeys.has(row.metadata.name);
+        if (row.status?.phase !== 'Approved') {
+          return <Typography variant="body2" color="textSecondary">-</Typography>;
+        }
+
+        const key = `${row.metadata.namespace}/${row.metadata.name}`;
+        const hasSecretRef = row.status?.secretRef?.name;
+        const isVisible = visibleKeys.has(row.metadata.name);
+        const isLoading = apiKeyLoading.has(key);
+        const apiKeyValue = apiKeyValues.get(key);
+
+        if (!hasSecretRef) {
           return (
-            <Box display="flex" alignItems="center" style={{ gap: 8 }}>
-              <Box fontFamily="monospace" fontSize="0.875rem">
-                {isVisible ? row.status.apiKey : '•'.repeat(20) + '...'}
-              </Box>
-              <Tooltip title={isVisible ? 'hide key' : 'show key'}>
-                <IconButton
-                  size="small"
-                  onClick={() => toggleKeyVisibility(row.metadata.name)}
-                >
-                  {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-                </IconButton>
-              </Tooltip>
-            </Box>
+            <Typography variant="body2" color="textSecondary">
+              Awaiting secret...
+            </Typography>
           );
         }
-        return <Typography variant="body2" color="textSecondary">-</Typography>;
+
+        const handleToggle = () => {
+          if (isVisible) {
+            // hiding - clear the value from memory
+            clearApiKeyValue(row.metadata.namespace, row.metadata.name);
+            toggleKeyVisibility(row.metadata.name);
+          } else {
+            // showing - fetch fresh value
+            fetchApiKeyFromSecret(row.metadata.namespace, row.metadata.name);
+            toggleKeyVisibility(row.metadata.name);
+          }
+        };
+
+        return (
+          <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+            <Box fontFamily="monospace" fontSize="0.875rem">
+              {isLoading ? 'Loading...' : isVisible && apiKeyValue ? apiKeyValue : '•'.repeat(20) + '...'}
+            </Box>
+            <Tooltip title={isVisible ? 'hide key' : 'show key'}>
+              <IconButton
+                size="small"
+                onClick={handleToggle}
+                disabled={isLoading}
+              >
+                {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+              </IconButton>
+            </Tooltip>
+          </Box>
+        );
       },
     },
     {

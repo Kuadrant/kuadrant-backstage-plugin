@@ -1,0 +1,7 @@
+[allowlist]
+  description = "Global Allowlist"
+
+  paths = [
+    # code examples showing users how to use their api key - template strings, not real secrets
+    '''plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab\.tsx''',
+  ]
