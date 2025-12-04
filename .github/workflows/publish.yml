@@ -36,6 +36,11 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Upgrade npm for trusted publishing
+        run: |
+          npm install -g npm@latest
+          npm --version
+
       - name: Determine version
         id: version
         run: |
