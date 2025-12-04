@@ -740,62 +740,6 @@ export async function createRouter({
     }
   });
 
-  // fetch api key value from secret - only for own approved requests
-  router.get('/requests/:namespace/:name/secret', async (req, res) => {
-    try {
-      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-      const { namespace, name } = req.params;
-
-      // get the APIKey resource
-      const apiKey = await k8sClient.getCustomResource(
-        'devportal.kuadrant.io',
-        'v1alpha1',
-        namespace,
-        'apikeys',
-        name,
-      );
-
-      // verify ownership - users can only read their own api key secrets
-      const requestUserId = apiKey.spec?.requestedBy?.userId;
-      if (requestUserId !== userEntityRef) {
-        throw new NotAllowedError('you can only read your own api key secrets');
-      }
-
-      // check if approved and has secretRef
-      if (apiKey.status?.phase !== 'Approved') {
-        res.status(400).json({ error: 'api key request is not approved' });
-        return;
-      }
-
-      const secretRef = apiKey.status?.secretRef;
-      if (!secretRef?.name || !secretRef?.key) {
-        res.status(404).json({ error: 'secret not yet created by controller' });
-        return;
-      }
-
-      // fetch the secret
-      const secret = await k8sClient.getSecret(namespace, secretRef.name);
-      const apiKeyValue = secret.data?.[secretRef.key];
-
-      if (!apiKeyValue) {
-        res.status(404).json({ error: 'api key not found in secret' });
-        return;
-      }
-
-      // secret data is base64 encoded
-      const decodedKey = Buffer.from(apiKeyValue, 'base64').toString('utf-8');
-
-      res.json({ apiKey: decodedKey });
-    } catch (error) {
-      console.error('error fetching api key secret:', error);
-      if (error instanceof NotAllowedError) {
-        res.status(403).json({ error: error.message });
-      } else {
-        res.status(500).json({ error: 'failed to fetch api key secret' });
-      }
-    }
-  });
-
   const approveRejectSchema = z.object({
     comment: z.string().optional(),
   });

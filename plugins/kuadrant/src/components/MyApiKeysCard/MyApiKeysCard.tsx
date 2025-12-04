@@ -2,10 +2,12 @@ import React, { useState } from 'react';
 import { InfoCard, Table, TableColumn, Link, Progress } from '@backstage/core-components';
 import { useApi, configApiRef, fetchApiRef, identityApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
-import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem, CircularProgress } from '@material-ui/core';
+import { Box, Chip, Typography, Tabs, Tab, IconButton, Tooltip, Menu, MenuItem, CircularProgress, Dialog, DialogTitle, DialogContent, DialogActions, Button } from '@material-ui/core';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
+import FileCopyIcon from '@material-ui/icons/FileCopy';
+import WarningIcon from '@material-ui/icons/Warning';
 import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 import { APIKey } from '../../types/api-management';
@@ -34,6 +36,9 @@ export const MyApiKeysCard = () => {
   }>({ open: false, request: null });
   const [apiKeyValues, setApiKeyValues] = useState<Map<string, string>>(new Map());
   const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
+  const [alreadyReadKeys, setAlreadyReadKeys] = useState<Set<string>>(new Set());
+  const [showOnceWarningOpen, setShowOnceWarningOpen] = useState(false);
+  const [pendingKeyReveal, setPendingKeyReveal] = useState<{ namespace: string; name: string } | null>(null);
 
   useAsync(async () => {
     const identity = await identityApi.getBackstageIdentity();
@@ -99,11 +104,21 @@ export const MyApiKeysCard = () => {
     setApiKeyLoading(prev => new Set(prev).add(key));
     try {
       const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${requestNamespace}/${requestName}/secret`
+        `${backendUrl}/api/kuadrant/apikeys/${requestNamespace}/${requestName}/secret`
       );
       if (response.ok) {
         const data = await response.json();
         setApiKeyValues(prev => new Map(prev).set(key, data.apiKey));
+        // after successful read, mark as already read (show-once behaviour)
+        setAlreadyReadKeys(prev => new Set(prev).add(key));
+      } else if (response.status === 403) {
+        // secret has already been read
+        setAlreadyReadKeys(prev => new Set(prev).add(key));
+        alertApi.post({
+          message: 'This API key has already been viewed and cannot be retrieved again.',
+          severity: 'warning',
+          display: 'transient',
+        });
       }
     } catch (err) {
       console.error('failed to fetch api key:', err);
@@ -296,6 +311,8 @@ export const MyApiKeysCard = () => {
         const isVisible = visibleKeys.has(row.metadata.name);
         const isLoading = apiKeyLoading.has(key);
         const apiKeyValue = apiKeyValues.get(key);
+        const canReadSecret = row.status?.canReadSecret !== false;
+        const isAlreadyRead = alreadyReadKeys.has(key) || !canReadSecret;
 
         if (!hasSecretRef) {
           return (
@@ -305,15 +322,44 @@ export const MyApiKeysCard = () => {
           );
         }
 
-        const handleToggle = () => {
+        // key has already been viewed and cannot be retrieved again
+        if (isAlreadyRead && !apiKeyValue) {
+          return (
+            <Tooltip title="This API key has already been viewed and cannot be retrieved again">
+              <Box display="flex" alignItems="center">
+                <Typography
+                  variant="body2"
+                  color="textSecondary"
+                  style={{ fontFamily: 'monospace', marginRight: 8 }}
+                >
+                  Already viewed
+                </Typography>
+                <VisibilityOffIcon fontSize="small" color="disabled" />
+              </Box>
+            </Tooltip>
+          );
+        }
+
+        const handleRevealClick = () => {
           if (isVisible) {
             // hiding - clear the value from memory
             clearApiKeyValue(row.metadata.namespace, row.metadata.name);
             toggleKeyVisibility(row.metadata.name);
-          } else {
-            // showing - fetch fresh value
-            fetchApiKeyFromSecret(row.metadata.namespace, row.metadata.name);
-            toggleKeyVisibility(row.metadata.name);
+          } else if (!isAlreadyRead) {
+            // show warning dialog before first reveal
+            setPendingKeyReveal({ namespace: row.metadata.namespace, name: row.metadata.name });
+            setShowOnceWarningOpen(true);
+          }
+        };
+
+        const handleCopy = async () => {
+          if (apiKeyValue) {
+            await navigator.clipboard.writeText(apiKeyValue);
+            alertApi.post({
+              message: 'API key copied to clipboard',
+              severity: 'success',
+              display: 'transient',
+            });
           }
         };
 
@@ -322,14 +368,23 @@ export const MyApiKeysCard = () => {
             <Box fontFamily="monospace" fontSize="0.875rem">
               {isLoading ? 'Loading...' : isVisible && apiKeyValue ? apiKeyValue : '•'.repeat(20) + '...'}
             </Box>
-            <Tooltip title={isVisible ? 'hide key' : 'show key'}>
-              <IconButton
-                size="small"
-                onClick={handleToggle}
-                disabled={isLoading}
-              >
-                {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
-              </IconButton>
+            {isVisible && apiKeyValue && (
+              <Tooltip title="Copy to clipboard">
+                <IconButton size="small" onClick={handleCopy}>
+                  <FileCopyIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+            )}
+            <Tooltip title={isVisible ? 'Hide API key' : 'Reveal API key (one-time only)'}>
+              <span>
+                <IconButton
+                  size="small"
+                  onClick={handleRevealClick}
+                  disabled={isLoading || (isAlreadyRead && !apiKeyValue)}
+                >
+                  {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
+                </IconButton>
+              </span>
             </Tooltip>
           </Box>
         );
@@ -491,6 +546,54 @@ export const MyApiKeysCard = () => {
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
+
+      <Dialog
+        open={showOnceWarningOpen}
+        onClose={() => {
+          setShowOnceWarningOpen(false);
+          setPendingKeyReveal(null);
+        }}
+        maxWidth="sm"
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center">
+            <WarningIcon color="primary" style={{ marginRight: 8 }} />
+            View API Key
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body1" paragraph>
+            This API key can only be viewed <strong>once</strong>. After you reveal it, you will not be able to retrieve it again.
+          </Typography>
+          <Typography variant="body2" color="textSecondary">
+            Make sure to copy and store it securely before closing this view.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button
+            onClick={() => {
+              setShowOnceWarningOpen(false);
+              setPendingKeyReveal(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={() => {
+              if (pendingKeyReveal) {
+                fetchApiKeyFromSecret(pendingKeyReveal.namespace, pendingKeyReveal.name);
+                toggleKeyVisibility(pendingKeyReveal.name);
+              }
+              setShowOnceWarningOpen(false);
+              setPendingKeyReveal(null);
+            }}
+          >
+            Reveal API Key
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 };
