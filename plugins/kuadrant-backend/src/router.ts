@@ -455,6 +455,12 @@ export async function createRouter({
         parsed.data,
       );
 
+      // trigger immediate catalog sync
+      const provider = getAPIProductEntityProvider();
+      if (provider) {
+        await provider.refresh();
+      }
+
       return res.json(updated);
     } catch (error) {
       console.error('error updating apiproduct:', error);

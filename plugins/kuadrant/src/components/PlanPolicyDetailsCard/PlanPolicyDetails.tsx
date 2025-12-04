@@ -74,15 +74,6 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
                   );
                 })}
               </Box>
-              {selectedPolicy.plans.some((p: any) => p.description) && (
-                <Box mt={1}>
-                  {selectedPolicy.plans.filter((p: any) => p.description).map((plan: any, idx: number) => (
-                    <Typography key={idx} variant="caption" display="block" color="textSecondary">
-                      • <strong>{plan.tier}:</strong> {plan.description}
-                    </Typography>
-                  ))}
-                </Box>
-              )}
             </>
           ) : (
             <Typography variant="caption" color="textSecondary">
