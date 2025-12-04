@@ -83,15 +83,11 @@ jobs:
         run: |
           cd plugins/kuadrant
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
 
       - name: Publish backend
         run: |
           cd plugins/kuadrant-backend
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN_GIT }}
 
       - name: Summary
         run: |
