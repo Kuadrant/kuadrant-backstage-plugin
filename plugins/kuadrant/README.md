@@ -256,6 +256,259 @@ kubectl config current-context  # verify cluster
 kubectl get apiproducts -A      # test access
 ```
 
+## Dynamic Plugin Installation (RHDH)
+
+For Red Hat Developer Hub deployments, the Kuadrant plugins can be installed as dynamic plugins without modifying source code.
+
+### Package Names
+
+| Plugin | Package Name | Type |
+|--------|--------------|------|
+| Frontend | `@kuadrant/kuadrant-backstage-plugin-frontend` | Frontend |
+| Backend | `@kuadrant/kuadrant-backstage-plugin-backend` | Backend |
+
+### 1. Install Dynamic Plugins
+
+Add the plugins to your RHDH dynamic plugins configuration. The plugins can be loaded from a local path or npm registry.
+
+**Option A: From npm registry**
+
+```yaml
+# dynamic-plugins.yaml
+plugins:
+  - package: '@kuadrant/kuadrant-backstage-plugin-frontend'
+    disabled: false
+  - package: '@kuadrant/kuadrant-backstage-plugin-backend'
+    disabled: false
+```
+
+**Option B: From local path (development)**
+
+```yaml
+# dynamic-plugins.yaml
+plugins:
+  - package: './local-plugins/kuadrant-frontend'
+    disabled: false
+  - package: './local-plugins/kuadrant-backend'
+    disabled: false
+```
+
+### 2. Configure Frontend Dynamic Plugin
+
+Add the frontend plugin configuration to `app-config.yaml`:
+
+```yaml
+dynamicPlugins:
+  frontend:
+    internal.plugin-kuadrant:
+      # App icons
+      appIcons:
+        - name: kuadrant
+          importName: ExtensionIcon
+
+      # Main route with menu item
+      dynamicRoutes:
+        - path: /kuadrant
+          importName: KuadrantPage
+          menuItem:
+            icon: kuadrant
+            text: Kuadrant
+
+      # Entity page mount points
+      mountPoints:
+        # API Keys tab for API entities
+        - mountPoint: entity.page.api-keys/cards
+          importName: EntityKuadrantApiKeysContent
+          config:
+            layout:
+              gridColumn: "1 / -1"
+            if:
+              allOf:
+                - isKind: api
+
+        # API Access card on API entity overview
+        - mountPoint: entity.page.overview/cards
+          importName: EntityKuadrantApiAccessCard
+          config:
+            layout:
+              gridColumnEnd:
+                lg: "span 6"
+                md: "span 6"
+                xs: "span 12"
+            if:
+              allOf:
+                - isKind: api
+                - hasAnnotation: kuadrant.io/httproute
+
+        # API Product Info tab for APIProduct entities
+        - mountPoint: entity.page.api-product-info/cards
+          importName: EntityKuadrantApiProductInfoContent
+          config:
+            layout:
+              gridColumn: "1 / -1"
+            if:
+              allOf:
+                - isKind: API
+                - hasLabel: kuadrant.io/synced
+```
+
+### 3. Configure Backend Dynamic Plugin
+
+The backend plugin is automatically registered when loaded. Ensure Kubernetes access is configured:
+
+```yaml
+# app-config.yaml
+kubernetes:
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: production
+          url: ${K8S_URL}
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+          skipTLSVerify: false
+```
+
+### 4. Configure Catalog Rules
+
+Allow APIProduct entities in the catalog:
+
+```yaml
+catalog:
+  rules:
+    - allow: [Component, System, Group, Resource, Location, Template, API, APIProduct]
+```
+
+### 5. Configure RBAC (Optional)
+
+Enable RBAC with the Kuadrant permissions:
+
+```yaml
+permission:
+  enabled: true
+  rbac:
+    policies-csv-file: ./rbac-policy.csv
+    policyFileReload: true
+```
+
+Example `rbac-policy.csv`:
+
+```csv
+# API Consumer role
+p, role:default/api-consumer, kuadrant.apiproduct.read.all, read, allow
+p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
+p, role:default/api-consumer, kuadrant.apikeyrequest.create, create, allow
+p, role:default/api-consumer, kuadrant.apikeyrequest.read.own, read, allow
+p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
+
+# API Owner role
+p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
+p, role:default/api-owner, kuadrant.apiproduct.read.all, read, allow
+p, role:default/api-owner, kuadrant.apiproduct.update.own, update, allow
+p, role:default/api-owner, kuadrant.apiproduct.delete.own, delete, allow
+p, role:default/api-owner, kuadrant.apikeyrequest.update.own, update, allow
+p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
+
+# API Admin role (full access)
+p, role:default/api-admin, kuadrant.apiproduct.*, *, allow
+p, role:default/api-admin, kuadrant.apikeyrequest.*, *, allow
+p, role:default/api-admin, kuadrant.apikey.*, *, allow
+p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
+
+# Assign groups to roles
+g, group:default/api-consumers, role:default/api-consumer
+g, group:default/api-owners, role:default/api-owner
+g, group:default/api-admins, role:default/api-admin
+```
+
+### Exposed Modules Reference
+
+The frontend plugin exposes these modules for dynamic loading:
+
+| Import Name | Description |
+|-------------|-------------|
+| `KuadrantPage` | Main Kuadrant page with API products and approval queue |
+| `EntityKuadrantApiAccessCard` | Quick API key request card for entity overview |
+| `EntityKuadrantApiKeyManagementTab` | Full API keys management tab |
+| `EntityKuadrantApiKeysContent` | API keys content component |
+| `EntityKuadrantApiProductInfoContent` | APIProduct details tab |
+| `KuadrantApprovalQueueCard` | Standalone approval queue card |
+
+The backend plugin exposes:
+
+| Export Path | Description |
+|-------------|-------------|
+| Default | Main backend plugin with HTTP router |
+| `/alpha` | Catalog entity provider for APIProduct sync |
+| `/rbac` | RBAC module for permission integration |
+
+### Full Example Configuration
+
+Complete `app-config.yaml` for RHDH with Kuadrant:
+
+```yaml
+app:
+  title: Red Hat Developer Hub
+  baseUrl: https://rhdh.example.com
+
+backend:
+  baseUrl: https://rhdh.example.com
+  cors:
+    origin: https://rhdh.example.com
+    credentials: true
+
+kubernetes:
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: production
+          url: ${K8S_URL}
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_CLUSTER_TOKEN}
+          skipTLSVerify: false
+
+catalog:
+  rules:
+    - allow: [Component, System, API, APIProduct, Group, User, Resource, Location, Template]
+
+permission:
+  enabled: true
+  rbac:
+    policies-csv-file: ./rbac-policy.csv
+    policyFileReload: true
+
+dynamicPlugins:
+  frontend:
+    internal.plugin-kuadrant:
+      appIcons:
+        - name: kuadrant
+          importName: ExtensionIcon
+      dynamicRoutes:
+        - path: /kuadrant
+          importName: KuadrantPage
+          menuItem:
+            icon: kuadrant
+            text: Kuadrant
+      mountPoints:
+        - mountPoint: entity.page.api-keys/cards
+          importName: EntityKuadrantApiKeysContent
+          config:
+            layout:
+              gridColumn: "1 / -1"
+            if:
+              allOf:
+                - isKind: api
+        - mountPoint: entity.page.overview/cards
+          importName: EntityKuadrantApiAccessCard
+          config:
+            layout:
+              gridColumnEnd: "span 6"
+            if:
+              allOf:
+                - isKind: api
+                - hasAnnotation: kuadrant.io/httproute
+```
+
 ## Configuring API Entities
 
 To enable Kuadrant features for an API entity, add annotations:
@@ -345,6 +598,126 @@ spec:
   - Platform Engineer: member of `platform-engineers` or `platform-admins`
   - API Owner: member of `api-owners` or `app-developers`
   - API Consumer: member of `api-consumers`
+
+## Backend API Reference
+
+The backend plugin exposes REST API endpoints at `/api/kuadrant/*`. All endpoints require authentication and enforce RBAC permissions.
+
+### APIProduct Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/apiproducts` | List all API Products (filtered by ownership for non-admins) | `kuadrant.apiproduct.list` |
+| GET | `/api/kuadrant/apiproducts/:namespace/:name` | Get specific API Product | `kuadrant.apiproduct.read.own` or `.read.all` |
+| POST | `/api/kuadrant/apiproducts` | Create new API Product | `kuadrant.apiproduct.create` |
+| PATCH | `/api/kuadrant/apiproducts/:namespace/:name` | Update API Product | `kuadrant.apiproduct.update.own` or `.update.all` |
+| DELETE | `/api/kuadrant/apiproducts/:namespace/:name` | Delete API Product (cascades to APIKeys) | `kuadrant.apiproduct.delete.own` or `.delete.all` |
+
+### HTTPRoute Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/httproutes` | List all HTTPRoutes | `kuadrant.apiproduct.list` |
+
+### PlanPolicy Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/planpolicies` | List all Plan Policies | `kuadrant.planpolicy.list` |
+| GET | `/api/kuadrant/planpolicies/:namespace/:name` | Get specific Plan Policy | `kuadrant.planpolicy.read` |
+
+### API Key Request Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/requests` | List API Key requests (filtered by ownership) | `kuadrant.apikeyrequest.read.own` or `.read.all` |
+| GET | `/api/kuadrant/requests/my` | List current user's requests | `kuadrant.apikeyrequest.read.own` |
+| POST | `/api/kuadrant/requests` | Create API Key request | `kuadrant.apikeyrequest.create` |
+| PATCH | `/api/kuadrant/requests/:namespace/:name` | Edit pending request | `kuadrant.apikeyrequest.update.own` or `.update.all` |
+| DELETE | `/api/kuadrant/requests/:namespace/:name` | Delete/cancel request | `kuadrant.apikeyrequest.delete.own` or `.delete.all` |
+| POST | `/api/kuadrant/requests/:namespace/:name/approve` | Approve request | `kuadrant.apikeyrequest.update.own` or `.update.all` |
+| POST | `/api/kuadrant/requests/:namespace/:name/reject` | Reject request | `kuadrant.apikeyrequest.update.own` or `.update.all` |
+| POST | `/api/kuadrant/requests/bulk-approve` | Bulk approve requests | `kuadrant.apikeyrequest.update.all` |
+| POST | `/api/kuadrant/requests/bulk-reject` | Bulk reject requests | `kuadrant.apikeyrequest.update.all` |
+
+### API Key Secret Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/apikeys/:namespace/:name/secret` | Get API key secret (one-time read) | `kuadrant.apikey.read.own` or `.read.all` |
+
+### Query Parameters
+
+**`GET /api/kuadrant/requests`:**
+- `status` - Filter by status: `Pending`, `Approved`, `Rejected`
+- `namespace` - Filter by Kubernetes namespace
+
+**`GET /api/kuadrant/requests/my`:**
+- `namespace` - Filter by Kubernetes namespace
+
+### Request/Response Examples
+
+**Create API Key Request:**
+
+```bash
+POST /api/kuadrant/requests
+Content-Type: application/json
+
+{
+  "apiProductName": "toystore-api",
+  "namespace": "toystore",
+  "planTier": "silver",
+  "useCase": "Integration testing",
+  "userEmail": "user@example.com"
+}
+```
+
+**Approve Request:**
+
+```bash
+POST /api/kuadrant/requests/toystore/guest-toystore-abc123/approve
+Content-Type: application/json
+
+{
+  "comment": "Approved for testing purposes"
+}
+```
+
+**Create API Product:**
+
+```bash
+POST /api/kuadrant/apiproducts
+Content-Type: application/json
+
+{
+  "apiVersion": "devportal.kuadrant.io/v1alpha1",
+  "kind": "APIProduct",
+  "metadata": {
+    "name": "my-api"
+  },
+  "spec": {
+    "displayName": "My API",
+    "description": "API description",
+    "targetRef": {
+      "group": "gateway.networking.k8s.io",
+      "kind": "HTTPRoute",
+      "name": "my-route",
+      "namespace": "my-namespace"
+    },
+    "approvalMode": "manual",
+    "publishStatus": "Draft"
+  }
+}
+```
+
+### Error Responses
+
+| Status | Description |
+|--------|-------------|
+| 400 | Invalid request body (validation error) |
+| 403 | Unauthorized (missing permission or ownership check failed) |
+| 404 | Resource not found |
+| 500 | Internal server error |
 
 ## Kubernetes Resources
 
