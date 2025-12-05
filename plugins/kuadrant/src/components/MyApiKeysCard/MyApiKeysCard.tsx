@@ -468,16 +468,17 @@ export const MyApiKeysCard = () => {
         title="My API Keys"
         subheader={`${approvedRequests.length} active, ${pendingRequests.length} pending`}
       >
-        <Box mb={2}>
+        <Box mb={2} data-testid="my-api-keys-card">
           <Tabs
             value={selectedTab}
             onChange={(_, newValue) => setSelectedTab(newValue)}
             indicatorColor="primary"
             textColor="primary"
+            data-testid="my-api-keys-tabs"
           >
-            <Tab label={`Active (${approvedRequests.length})`} />
-            <Tab label={`Pending (${pendingRequests.length})`} />
-            <Tab label={`Rejected (${rejectedRequests.length})`} />
+            <Tab label={`Active (${approvedRequests.length})`} data-testid="my-api-keys-active-tab" />
+            <Tab label={`Pending (${pendingRequests.length})`} data-testid="my-api-keys-pending-tab" />
+            <Tab label={`Rejected (${rejectedRequests.length})`} data-testid="my-api-keys-rejected-tab" />
           </Tabs>
         </Box>
         {tabData.length === 0 ? (

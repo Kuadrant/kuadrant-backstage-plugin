@@ -665,7 +665,7 @@ export const ApprovalQueueCard = () => {
         title="API Access Requests"
         subheader={`${pending.length} pending, ${approved.length} approved, ${rejected.length} rejected`}
       >
-        <Box mb={2}>
+        <Box mb={2} data-testid="approval-queue-card">
           <Tabs
             value={selectedTab}
             onChange={(_, newValue) => {
@@ -674,10 +674,11 @@ export const ApprovalQueueCard = () => {
             }}
             indicatorColor="primary"
             textColor="primary"
+            data-testid="approval-queue-tabs"
           >
-            <Tab label={`Pending (${pending.length})`} />
-            <Tab label={`Approved (${approved.length})`} />
-            <Tab label={`Rejected (${rejected.length})`} />
+            <Tab label={`Pending (${pending.length})`} data-testid="approval-queue-pending-tab" />
+            <Tab label={`Approved (${approved.length})`} data-testid="approval-queue-approved-tab" />
+            <Tab label={`Rejected (${rejected.length})`} data-testid="approval-queue-rejected-tab" />
           </Tabs>
         </Box>
 

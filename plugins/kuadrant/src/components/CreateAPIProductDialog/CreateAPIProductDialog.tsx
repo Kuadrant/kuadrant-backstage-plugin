@@ -417,6 +417,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                   asterisk: classes.asterisk,
                 },
               }}
+              SelectProps={{
+                'data-testid': 'httproute-select',
+              } as any}
             >
               {httpRoutesLoading && (
                 <MenuItem value="">Loading...</MenuItem>
