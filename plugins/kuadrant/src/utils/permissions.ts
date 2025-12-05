@@ -27,7 +27,7 @@ export interface PermissionCheckResult {
  * @example
  * // resource permission
  * const { allowed, loading, error } = useKuadrantPermission(
- *   kuadrantApiKeyRequestCreatePermission,
+ *   kuadrantApiKeyCreatePermission,
  *   'apiproduct:namespace/name'
  * );
  */

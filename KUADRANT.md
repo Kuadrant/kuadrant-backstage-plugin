@@ -243,20 +243,13 @@ The backend exports these permissions (defined in `plugins/kuadrant-backend/src/
 - `kuadrant.apiproduct.list` - list APIProduct resources (backend filters by ownership)
 
 **APIKey (access requests with ownership):**
-- `kuadrant.apikeyrequest.create` - create APIKey resources (resource permission scoped to APIProduct)
-- `kuadrant.apikeyrequest.read.own` - read own APIKey resources
-- `kuadrant.apikeyrequest.read.all` - read all APIKey resources
-- `kuadrant.apikeyrequest.update` - update any APIKey (approve/reject)
-- `kuadrant.apikeyrequest.update.own` - update own APIKey resources
-- `kuadrant.apikeyrequest.delete.own` - delete own APIKey resources
-- `kuadrant.apikeyrequest.delete.all` - delete any APIKey resource
-- `kuadrant.apikeyrequest.list` - list APIKey resources
-
-**API Keys (managed secrets with ownership):**
-- `kuadrant.apikey.read.own` - read own API keys
-- `kuadrant.apikey.read.all` - read all API keys
-- `kuadrant.apikey.delete.own` - delete own API keys
-- `kuadrant.apikey.delete.all` - delete any API key
+- `kuadrant.apikey.create` - create APIKey resources (resource permission scoped to APIProduct)
+- `kuadrant.apikey.read.own` - read own APIKey resources
+- `kuadrant.apikey.read.all` - read all APIKey resources
+- `kuadrant.apikey.update.own` - update own APIKey resources
+- `kuadrant.apikey.update.all` - update any APIKey (approve/reject)
+- `kuadrant.apikey.delete.own` - delete own APIKey resources
+- `kuadrant.apikey.delete.all` - delete any APIKey resource
 
 **Ownership Model:**
 

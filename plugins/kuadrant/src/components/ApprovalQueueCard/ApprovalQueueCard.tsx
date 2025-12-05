@@ -8,7 +8,7 @@ import {
   ResponseErrorPanel,
   InfoCard,
 } from '@backstage/core-components';
-import { kuadrantApiKeyRequestUpdateAllPermission, kuadrantApiKeyRequestUpdateOwnPermission } from '../../permissions';
+import { kuadrantApiKeyUpdateAllPermission, kuadrantApiKeyUpdateOwnPermission } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
 import {
   Button,
@@ -169,13 +169,13 @@ export const ApprovalQueueCard = () => {
     allowed: canUpdateAllRequests,
     loading: updateAllPermissionLoading,
     error: updateAllPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateAllPermission);
+  } = useKuadrantPermission(kuadrantApiKeyUpdateAllPermission);
 
   const {
     allowed: canUpdateOwnRequests,
     loading: updateOwnPermissionLoading,
     error: updateOwnPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
+  } = useKuadrantPermission(kuadrantApiKeyUpdateOwnPermission);
 
   const updatePermissionLoading = updateAllPermissionLoading || updateOwnPermissionLoading;
   const updatePermissionError = updateAllPermissionError || updateOwnPermissionError;
@@ -358,7 +358,7 @@ export const ApprovalQueueCard = () => {
           Unable to check permissions: {updatePermissionError.message}
         </Typography>
         <Typography variant="body2" color="textSecondary">
-          Permission: kuadrant.apikeyrequest.update.all
+          Permission: kuadrant.apikey.update.all
         </Typography>
         <Typography variant="body2" color="textSecondary">
           Please try again or contact your administrator

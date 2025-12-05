@@ -122,87 +122,26 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikey request permissions
+// apikey permissions
 
 /**
- * permission to create API key requests
+ * permission to create API keys (request API access)
  *
  * this is a ResourcePermission scoped to 'apiproduct', allowing
  * fine-grained control over which API products users can request access to.
  *
- * use in frontend: useKuadrantPermission(kuadrantAPIKeyCreatePermission)
+ * use in frontend: useKuadrantPermission(kuadrantApiKeyCreatePermission)
  * use in backend with resource: { permission, resourceRef: 'apiproduct:namespace/name' }
  */
-export const kuadrantApiKeyRequestCreatePermission = createPermission({
-  name: 'kuadrant.apikeyrequest.create',
+export const kuadrantApiKeyCreatePermission = createPermission({
+  name: 'kuadrant.apikey.create',
   attributes: { action: 'create' },
   resourceType: 'apiproduct',
 });
 
 /**
- * permission to read API key requests created by the current user
- * use this for allowing users to see their own request history
- */
-export const kuadrantApiKeyRequestReadOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.own',
-  attributes: { action: 'read' },
-});
-
-/**
- * permission to read all API key requests regardless of who created them
- * use this for platform engineers/admins who need to view the approval queue
- */
-export const kuadrantApiKeyRequestReadAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.all',
-  attributes: { action: 'read' },
-});
-
-/**
- * permission to update API key requests owned by the current user
- * allows users to edit their own pending requests (change plan tier, use case)
- */
-export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.own',
-  attributes: { action: 'update' },
-});
-
-/**
- * permission to update any API key request regardless of ownership
- * typically granted to API owners and platform engineers for approving/rejecting requests
- */
-export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.all',
-  attributes: { action: 'update' },
-});
-
-/**
- * permission to delete API key requests created by the current user
- * allows users to cancel their own pending requests
- */
-export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.own',
-  attributes: { action: 'delete' },
-});
-
-/**
- * permission to delete any API key request regardless of ownership
- * for platform engineers/admins
- */
-export const kuadrantApiKeyRequestDeleteAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.all',
-  attributes: { action: 'delete' },
-});
-
-export const kuadrantApiKeyRequestListPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.list',
-  attributes: { action: 'read' },
-});
-
-// api key permissions
-
-/**
  * permission to read API keys owned by the current user
- * allows users to view their own active API keys
+ * allows users to view their own API keys and request history
  */
 export const kuadrantApiKeyReadOwnPermission = createPermission({
   name: 'kuadrant.apikey.read.own',
@@ -211,7 +150,7 @@ export const kuadrantApiKeyReadOwnPermission = createPermission({
 
 /**
  * permission to read all API keys regardless of ownership
- * for platform engineers/admins who need to audit keys
+ * for platform engineers/admins who need to view the approval queue and audit keys
  */
 export const kuadrantApiKeyReadAllPermission = createPermission({
   name: 'kuadrant.apikey.read.all',
@@ -219,8 +158,26 @@ export const kuadrantApiKeyReadAllPermission = createPermission({
 });
 
 /**
+ * permission to update API keys owned by the current user
+ * allows users to edit their own pending requests (change plan tier, use case)
+ */
+export const kuadrantApiKeyUpdateOwnPermission = createPermission({
+  name: 'kuadrant.apikey.update.own',
+  attributes: { action: 'update' },
+});
+
+/**
+ * permission to update any API key regardless of ownership
+ * typically granted to API owners and platform engineers for approving/rejecting requests
+ */
+export const kuadrantApiKeyUpdateAllPermission = createPermission({
+  name: 'kuadrant.apikey.update.all',
+  attributes: { action: 'update' },
+});
+
+/**
  * permission to delete API keys owned by the current user
- * allows users to revoke their own access
+ * allows users to cancel their own requests or revoke their own access
  */
 export const kuadrantApiKeyDeleteOwnPermission = createPermission({
   name: 'kuadrant.apikey.delete.own',
@@ -234,6 +191,16 @@ export const kuadrantApiKeyDeleteOwnPermission = createPermission({
 export const kuadrantApiKeyDeleteAllPermission = createPermission({
   name: 'kuadrant.apikey.delete.all',
   attributes: { action: 'delete' },
+});
+
+/**
+ * permission to approve/reject API key requests
+ * grants access to the approval queue - for API owners and admins only
+ * separate from update.own which consumers use to edit their pending requests
+ */
+export const kuadrantApiKeyApprovePermission = createPermission({
+  name: 'kuadrant.apikey.approve',
+  attributes: { action: 'update' },
 });
 
 export const kuadrantPermissions = [
@@ -250,16 +217,12 @@ export const kuadrantPermissions = [
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiKeyRequestCreatePermission,
-  kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
-  kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestDeleteOwnPermission,
-  kuadrantApiKeyRequestDeleteAllPermission,
-  kuadrantApiKeyRequestListPermission,
+  kuadrantApiKeyCreatePermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
+  kuadrantApiKeyUpdateOwnPermission,
+  kuadrantApiKeyUpdateAllPermission,
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
+  kuadrantApiKeyApprovePermission,
 ];

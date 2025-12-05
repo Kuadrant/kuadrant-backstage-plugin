@@ -21,15 +21,13 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
-  kuadrantApiKeyRequestCreatePermission,
-  kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
-  kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestDeleteOwnPermission,
-  kuadrantApiKeyRequestDeleteAllPermission,
+  kuadrantApiKeyCreatePermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
+  kuadrantApiKeyUpdateOwnPermission,
+  kuadrantApiKeyUpdateAllPermission,
+  kuadrantApiKeyDeleteOwnPermission,
+  kuadrantApiKeyDeleteAllPermission,
 } from './permissions';
 
 const secretKey = 'api_key';
@@ -577,7 +575,7 @@ export async function createRouter({
       const resourceRef = `apiproduct:${namespace}/${apiProductName}`;
       const decision = await permissions.authorize(
         [{
-          permission: kuadrantApiKeyRequestCreatePermission,
+          permission: kuadrantApiKeyCreatePermission,
           resourceRef,
         }],
         { credentials }
@@ -640,7 +638,7 @@ export async function createRouter({
 
       // check if user can read all requests or only own
       const readAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestReadAllPermission }],
+        [{ permission: kuadrantApiKeyReadAllPermission }],
         { credentials }
       );
 
@@ -649,7 +647,7 @@ export async function createRouter({
       if (!canReadAll) {
         // try read own permission
         const readOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+          [{ permission: kuadrantApiKeyReadOwnPermission }],
           { credentials }
         );
 
@@ -712,7 +710,7 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestReadOwnPermission }],
+        [{ permission: kuadrantApiKeyReadOwnPermission }],
         { credentials }
       );
 
@@ -791,14 +789,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
           { credentials },
         );
 
@@ -882,14 +880,14 @@ export async function createRouter({
 
       // try update all permission first (admin)
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // fallback to update own permission
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
           { credentials },
         );
 
@@ -948,7 +946,7 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
@@ -1012,7 +1010,7 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
@@ -1130,7 +1128,7 @@ export async function createRouter({
 
       // check if user can delete all requests or just their own
       const deleteAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestDeleteAllPermission }],
+        [{ permission: kuadrantApiKeyDeleteAllPermission }],
         { credentials }
       );
 
@@ -1139,7 +1137,7 @@ export async function createRouter({
       if (!canDeleteAll) {
         // check if user can delete their own requests
         const deleteOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestDeleteOwnPermission }],
+          [{ permission: kuadrantApiKeyDeleteOwnPermission }],
           { credentials }
         );
 
@@ -1210,14 +1208,14 @@ export async function createRouter({
 
       // check if user can update all requests or just their own
       const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyRequestUpdateAllPermission }],
+        [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials }
       );
 
       if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
         // check if user can update their own requests
         const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyRequestUpdateOwnPermission }],
+          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
           { credentials }
         );
 
