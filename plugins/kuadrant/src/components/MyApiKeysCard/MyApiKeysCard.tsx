@@ -8,7 +8,7 @@ import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import MoreVertIcon from '@material-ui/icons/MoreVert';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
 import WarningIcon from '@material-ui/icons/Warning';
-import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
+import { EditAPIKeyDialog } from '../EditAPIKeyDialog';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 import { APIKey } from '../../types/api-management';
 
@@ -526,7 +526,7 @@ export const MyApiKeysCard = () => {
       </Menu>
 
       {editDialogState.request && (
-        <EditAPIKeyRequestDialog
+        <EditAPIKeyDialog
           open={editDialogState.open}
           request={editDialogState.request}
           availablePlans={editDialogState.plans}

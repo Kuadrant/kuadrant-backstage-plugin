@@ -29,7 +29,7 @@ interface EditAPIKeyDialogProps {
   }>;
 }
 
-export const EditAPIKeyRequestDialog = ({
+export const EditAPIKeyDialog = ({
   open,
   onClose,
   onSuccess,

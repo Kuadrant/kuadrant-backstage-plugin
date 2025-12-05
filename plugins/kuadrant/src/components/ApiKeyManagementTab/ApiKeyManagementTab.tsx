@@ -41,13 +41,13 @@ import FileCopyIcon from '@material-ui/icons/FileCopy';
 import WarningIcon from '@material-ui/icons/Warning';
 import { APIKey } from '../../types/api-management';
 import {
-  kuadrantApiKeyRequestCreatePermission,
+  kuadrantApiKeyCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
+  kuadrantApiKeyUpdateOwnPermission,
 } from '../../permissions';
 import { useKuadrantPermission, canDeleteResource } from '../../utils/permissions';
-import { EditAPIKeyRequestDialog } from '../EditAPIKeyRequestDialog';
+import { EditAPIKeyDialog } from '../EditAPIKeyDialog';
 import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
 
 interface APIProduct {
@@ -162,7 +162,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     allowed: canCreateRequest,
     loading: createRequestPermissionLoading,
     error: createRequestPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestCreatePermission, resourceRef);
+  } = useKuadrantPermission(kuadrantApiKeyCreatePermission, resourceRef);
 
   const {
     allowed: canDeleteOwnKey,
@@ -180,7 +180,7 @@ export const ApiKeyManagementTab = ({ namespace: propNamespace }: ApiKeyManageme
     allowed: canUpdateRequest,
     loading: updateRequestPermissionLoading,
     error: updateRequestPermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestUpdateOwnPermission);
+  } = useKuadrantPermission(kuadrantApiKeyUpdateOwnPermission);
 
   const handleDeleteRequest = async (name: string) => {
     // optimistic update - remove from UI immediately
@@ -526,10 +526,10 @@ func main() {
   }
 
   if (permissionError) {
-    const failedPermission = createRequestPermissionError ? 'kuadrant.apikeyrequest.create' :
+    const failedPermission = createRequestPermissionError ? 'kuadrant.apikey.create' :
       deleteOwnPermissionError ? 'kuadrant.apikey.delete.own' :
         deleteAllPermissionError ? 'kuadrant.apikey.delete.all' :
-          updateRequestPermissionError ? 'kuadrant.apikeyrequest.update.own' : 'unknown';
+          updateRequestPermissionError ? 'kuadrant.apikey.update.own' : 'unknown';
     return (
       <Box p={2}>
         <Typography color="error">
@@ -986,7 +986,7 @@ func main() {
       </Menu>
 
       {requestToEdit && (
-        <EditAPIKeyRequestDialog
+        <EditAPIKeyDialog
           open={editDialogOpen}
           onClose={() => {
             setEditDialogOpen(false);

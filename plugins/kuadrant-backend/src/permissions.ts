@@ -3,7 +3,7 @@ import { createPermission } from '@backstage/plugin-permission-common';
 /**
  * Permission definitions for the Kuadrant plugin
  *
- * These permissions control access to PlanPolicy, APIProduct, APIKeyRequest,
+ * These permissions control access to PlanPolicy, APIProduct, APIKey,
  * and API key management within the Kuadrant Backstage plugin.
  *
  * Permissions are composable - use them to build custom roles beyond the
@@ -77,44 +77,13 @@ export const kuadrantApiProductListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
-// apikey request permissions (access requests)
-export const kuadrantApiKeyRequestCreatePermission = createPermission({
-  name: 'kuadrant.apikeyrequest.create',
+// apikey permissions (access requests to APIKey CRD)
+export const kuadrantApiKeyCreatePermission = createPermission({
+  name: 'kuadrant.apikey.create',
   attributes: { action: 'create' },
   resourceType: 'apiproduct',
 });
 
-export const kuadrantApiKeyRequestReadOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.own',
-  attributes: { action: 'read' },
-});
-
-export const kuadrantApiKeyRequestReadAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.read.all',
-  attributes: { action: 'read' },
-});
-
-export const kuadrantApiKeyRequestUpdateOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.own',
-  attributes: { action: 'update' },
-});
-
-export const kuadrantApiKeyRequestUpdateAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.update.all',
-  attributes: { action: 'update' },
-});
-
-export const kuadrantApiKeyRequestDeleteOwnPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.own',
-  attributes: { action: 'delete' },
-});
-
-export const kuadrantApiKeyRequestDeleteAllPermission = createPermission({
-  name: 'kuadrant.apikeyrequest.delete.all',
-  attributes: { action: 'delete' },
-});
-
-// api key permissions (managed secrets)
 export const kuadrantApiKeyReadOwnPermission = createPermission({
   name: 'kuadrant.apikey.read.own',
   attributes: { action: 'read' },
@@ -125,6 +94,16 @@ export const kuadrantApiKeyReadAllPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+export const kuadrantApiKeyUpdateOwnPermission = createPermission({
+  name: 'kuadrant.apikey.update.own',
+  attributes: { action: 'update' },
+});
+
+export const kuadrantApiKeyUpdateAllPermission = createPermission({
+  name: 'kuadrant.apikey.update.all',
+  attributes: { action: 'update' },
+});
+
 export const kuadrantApiKeyDeleteOwnPermission = createPermission({
   name: 'kuadrant.apikey.delete.own',
   attributes: { action: 'delete' },
@@ -133,6 +112,12 @@ export const kuadrantApiKeyDeleteOwnPermission = createPermission({
 export const kuadrantApiKeyDeleteAllPermission = createPermission({
   name: 'kuadrant.apikey.delete.all',
   attributes: { action: 'delete' },
+});
+
+// approval permission - separate from update.own which consumers use to edit pending requests
+export const kuadrantApiKeyApprovePermission = createPermission({
+  name: 'kuadrant.apikey.approve',
+  attributes: { action: 'update' },
 });
 
 /**
@@ -152,15 +137,12 @@ export const kuadrantPermissions = [
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiKeyRequestCreatePermission,
-  kuadrantApiKeyRequestReadOwnPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestUpdateOwnPermission,
-  kuadrantApiKeyRequestUpdateAllPermission,
-  kuadrantApiKeyRequestDeleteOwnPermission,
-  kuadrantApiKeyRequestDeleteAllPermission,
+  kuadrantApiKeyCreatePermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
+  kuadrantApiKeyUpdateOwnPermission,
+  kuadrantApiKeyUpdateAllPermission,
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
+  kuadrantApiKeyApprovePermission,
 ];

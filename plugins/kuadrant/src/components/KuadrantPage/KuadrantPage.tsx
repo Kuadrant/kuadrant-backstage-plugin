@@ -28,8 +28,7 @@ import {
   kuadrantApiProductUpdateOwnPermission,
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiKeyRequestReadAllPermission,
-  kuadrantApiKeyRequestReadOwnPermission,
+  kuadrantApiKeyApprovePermission,
   kuadrantPlanPolicyListPermission,
 } from '../../permissions';
 import { useKuadrantPermission } from '../../utils/permissions';
@@ -73,18 +72,10 @@ export const ResourceList = () => {
   } = useKuadrantPermission(kuadrantApiProductCreatePermission);
 
   const {
-    allowed: canViewAllRequests,
-    loading: approvalQueueAllPermissionLoading,
-  } = useKuadrantPermission(kuadrantApiKeyRequestReadAllPermission);
-
-  const {
-    allowed: canViewOwnRequests,
-    loading: approvalQueueOwnPermissionLoading,
+    allowed: canViewApprovalQueue,
+    loading: approvalQueuePermissionLoading,
     error: approvalQueuePermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyRequestReadOwnPermission);
-
-  const canViewApprovalQueue = canViewAllRequests || canViewOwnRequests;
-  const approvalQueuePermissionLoading = approvalQueueAllPermissionLoading || approvalQueueOwnPermissionLoading;
+  } = useKuadrantPermission(kuadrantApiKeyApprovePermission);
 
   const {
     allowed: canDeleteOwnApiProduct,
@@ -392,7 +383,7 @@ export const ResourceList = () => {
             <Typography variant="body2" color="textSecondary">
               permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
                          deletePermissionError ? 'kuadrant.apiproduct.delete' :
-                         approvalQueuePermissionError ? 'kuadrant.apikeyrequest.read.all' :
+                         approvalQueuePermissionError ? 'kuadrant.apikey.read.all' :
                          planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
             </Typography>
             <Typography variant="body2" color="textSecondary">
