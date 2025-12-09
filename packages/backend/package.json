@@ -84,7 +84,7 @@
     "global-agent": "3.0.0",
     "jose": "5.10.0",
     "undici": "6.21.3",
-    "winston": "3.14.2",
+    "winston": "3.18.3",
     "zod": "3.23.8"
   },
   "devDependencies": {
