@@ -821,11 +821,13 @@ func main() {
                 startIcon={<AddIcon />}
                 onClick={() => setOpen(true)}
                 disabled={plans.length === 0}
+                data-testid="request-api-access-button"
+                data-plans-count={plans.length}
               >
                 Request API Access
               </Button>
               {plans.length === 0 && (
-                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }}>
+                <Typography variant="caption" color="textSecondary" style={{ marginTop: 4 }} data-testid="no-plans-message">
                   {!apiProduct ? 'API product not found' : (() => {
                     const readyCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'Ready');
                     const planCondition = apiProduct.status?.conditions?.find((c: any) => c.type === 'PlanPolicyDiscovered');
@@ -918,9 +920,11 @@ func main() {
               <Typography variant="body2">{createError}</Typography>
             </Box>
           )}
-          <FormControl fullWidth margin="normal" disabled={creating}>
-            <InputLabel>Select Tier</InputLabel>
+          <FormControl fullWidth margin="normal" disabled={creating} data-testid="tier-select-form">
+            <InputLabel id="tier-select-label">Select Tier</InputLabel>
             <Select
+              labelId="tier-select-label"
+              data-testid="tier-select"
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as string)}
               disabled={creating}
@@ -930,7 +934,7 @@ func main() {
                   .map(([key, val]) => `${val} per ${key}`)
                   .join(', ');
                 return (
-                  <MenuItem key={plan.tier} value={plan.tier}>
+                  <MenuItem key={plan.tier} value={plan.tier} data-testid={`tier-option-${plan.tier}`}>
                     {plan.tier} {limitDesc ? `(${limitDesc})` : ''}
                   </MenuItem>
                 );
