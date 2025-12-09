@@ -68,7 +68,7 @@
     "@scalprum/react-test-utils": "0.2.7",
     "@testing-library/dom": "9.3.4",
     "@testing-library/jest-dom": "6.9.1",
-    "@testing-library/react": "14.3.1",
+    "@testing-library/react": "16.3.0",
     "@testing-library/react-hooks": "8.0.1",
     "@testing-library/user-event": "14.6.1",
     "@types/node": "22.18.12",
