@@ -2,8 +2,9 @@
 
 Backstage plugins for API access management using Kuadrant Gateway API primitives.
 
-**Based on:** [Red Hat Developer Hub (RHDH)](https://github.com/redhat-developer/rhdh)
-**Development mode:** Hot reload with full catalog integration
+**Looking to install the plugins?** See the [Installation Guide](docs/installation.md).
+
+This repository is for plugin development. It's based on [Red Hat Developer Hub (RHDH)](https://github.com/redhat-developer/rhdh).
 
 ## Features
 
@@ -228,11 +229,11 @@ This repo is a fork of RHDH with Kuadrant-specific customisations. See [KUADRANT
 
 ## Documentation
 
-- [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
-- [CLAUDE.md](CLAUDE.md) - Development guidance and patterns
+- [docs/installation.md](docs/installation.md) - Plugin installation guide (for RHDH users)
 - [docs/rbac-permissions.md](docs/rbac-permissions.md) - RBAC and permissions guide
-- [plugins/kuadrant/README.md](plugins/kuadrant/README.md) - Plugin installation guide
-- [kuadrant-dev-setup/README.md](kuadrant-dev-setup/README.md) - Cluster setup guide
+- [docs/api-reference.md](docs/api-reference.md) - Backend API reference
+- [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
+- [kuadrant-dev-setup/README.md](kuadrant-dev-setup/README.md) - Development cluster setup
 
 ## Technical Details
 
