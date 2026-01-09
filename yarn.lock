@@ -10865,7 +10865,7 @@ __metadata:
     "@material-ui/icons": ^4.9.1
     "@material-ui/lab": ^4.0.0-alpha.61
     "@testing-library/jest-dom": ^6.0.0
-    "@testing-library/react": ^14.0.0
+    "@testing-library/react": ^16.3.0
     "@testing-library/user-event": ^14.0.0
     msw: ^1.0.0
     react: ^16.13.1 || ^17.0.0 || ^18.0.0
@@ -16422,7 +16422,7 @@ __metadata:
     "@backstage/test-utils": 1.7.11
     "@testing-library/dom": 9.3.4
     "@testing-library/jest-dom": 6.9.1
-    "@testing-library/react": 14.3.1
+    "@testing-library/react": 16.3.0
     "@testing-library/react-hooks": 8.0.1
     "@types/node": 22.18.12
     "@types/react": 18.3.26
@@ -19140,7 +19140,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@testing-library/dom@npm:9.3.4, @testing-library/dom@npm:^9.0.0":
+"@testing-library/dom@npm:9.3.4":
   version: 9.3.4
   resolution: "@testing-library/dom@npm:9.3.4"
   dependencies:
@@ -19207,17 +19207,23 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@testing-library/react@npm:14.3.1, @testing-library/react@npm:^14.0.0":
-  version: 14.3.1
-  resolution: "@testing-library/react@npm:14.3.1"
+"@testing-library/react@npm:16.3.0, @testing-library/react@npm:^16.3.0":
+  version: 16.3.0
+  resolution: "@testing-library/react@npm:16.3.0"
   dependencies:
     "@babel/runtime": ^7.12.5
-    "@testing-library/dom": ^9.0.0
-    "@types/react-dom": ^18.0.0
   peerDependencies:
-    react: ^18.0.0
-    react-dom: ^18.0.0
-  checksum: b057d4c9db5a523acfc24d7bc4665a924ab8d6f252c7f51eecf7dd30f1239413e1134925fd5cc9cbdef80496af64c04e6719b2081f89fe05ba87e8c6305bcc16
+    "@testing-library/dom": ^10.0.0
+    "@types/react": ^18.0.0 || ^19.0.0
+    "@types/react-dom": ^18.0.0 || ^19.0.0
+    react: ^18.0.0 || ^19.0.0
+    react-dom: ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+    "@types/react-dom":
+      optional: true
+  checksum: 85728ea8a1bcc9d865782a3d3bcc1db6632cb77907b47fb99c7f338e3ebdfc74dc6d21dfc5526a215a4f4f7b7d8a6392de87f48da3848866ab088f327ebb3e92
   languageName: node
   linkType: hard
 
@@ -21380,7 +21386,7 @@ __metadata:
     "@octokit/rest": 19.0.13
     "@testing-library/dom": 9.3.4
     "@testing-library/jest-dom": 6.9.1
-    "@testing-library/react": 14.3.1
+    "@testing-library/react": 16.3.0
     "@testing-library/user-event": 14.6.1
     "@types/jquery": 3.5.33
     "@types/react": 18.3.26
@@ -21450,7 +21456,7 @@ __metadata:
     "@scalprum/react-test-utils": 0.2.7
     "@testing-library/dom": 9.3.4
     "@testing-library/jest-dom": 6.9.1
-    "@testing-library/react": 14.3.1
+    "@testing-library/react": 16.3.0
     "@testing-library/react-hooks": 8.0.1
     "@testing-library/user-event": 14.6.1
     "@types/node": 22.18.12
