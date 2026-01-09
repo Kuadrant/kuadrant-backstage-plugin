@@ -1,5 +1,5 @@
 import React from 'react';
-import { Box, Typography, Chip } from '@material-ui/core';
+import { Box, Typography, Chip, useTheme } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 
 interface PlanPolicyDetailsProps {
@@ -28,13 +28,14 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
   alertMessage = 'No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available.',
   includeTopMargin = true,
 }) => {
+  const theme = useTheme();
   return (
     <Box
       mt={includeTopMargin ? 1 : 0}
       p={2}
-      bgcolor="#f5f5f5"
+      bgcolor={theme.palette.background.default}
       borderRadius={1}
-      border="1px solid #e0e0e0"
+      border={`1px solid ${theme.palette.divider}`}
     >
       {selectedPolicy ? (
         <>
@@ -51,7 +52,7 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
                 color="textSecondary"
                 style={{ marginTop: 8 }}
               >
-                Available Plans:
+                Available Tiers:
               </Typography>
               <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
                 {selectedPolicy.plans.map((plan: any, idx: number) => {
