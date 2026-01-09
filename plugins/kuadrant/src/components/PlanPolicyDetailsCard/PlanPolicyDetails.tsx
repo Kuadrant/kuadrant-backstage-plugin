@@ -52,7 +52,7 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
                 color="textSecondary"
                 style={{ marginTop: 8 }}
               >
-                Available Plans:
+                Available Tiers:
               </Typography>
               <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
                 {selectedPolicy.plans.map((plan: any, idx: number) => {

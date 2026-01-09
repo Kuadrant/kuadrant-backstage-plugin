@@ -229,11 +229,12 @@ This repo is a fork of RHDH with Kuadrant-specific customisations. See [KUADRANT
 
 ## Documentation
 
+- [docs/getting-started.md](docs/getting-started.md) - End-to-end tutorial
 - [docs/installation.md](docs/installation.md) - Plugin installation guide (for RHDH users)
 - [docs/rbac-permissions.md](docs/rbac-permissions.md) - RBAC and permissions guide
 - [docs/api-reference.md](docs/api-reference.md) - Backend API reference
-- [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
 - [kuadrant-dev-setup/README.md](kuadrant-dev-setup/README.md) - Development cluster setup
+- [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
 
 ## Technical Details
 
