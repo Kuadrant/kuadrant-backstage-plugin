@@ -16623,15 +16623,15 @@ __metadata:
   linkType: hard
 
 "@smithy/config-resolver@npm:^3.0.10, @smithy/config-resolver@npm:^3.0.5":
-  version: 3.0.10
-  resolution: "@smithy/config-resolver@npm:3.0.10"
+  version: 3.0.13
+  resolution: "@smithy/config-resolver@npm:3.0.13"
   dependencies:
-    "@smithy/node-config-provider": ^3.1.9
-    "@smithy/types": ^3.6.0
+    "@smithy/node-config-provider": ^3.1.12
+    "@smithy/types": ^3.7.2
     "@smithy/util-config-provider": ^3.0.0
-    "@smithy/util-middleware": ^3.0.8
+    "@smithy/util-middleware": ^3.0.11
     tslib: ^2.6.2
-  checksum: 55c2355db7eabfd70f0bf288d58cb0238f43b754d91f46febf7fd04617e6107d26e2899ede2b37fbd977980bb12fdbdb688fc5f53654202e946fe3c258cef5d1
+  checksum: d31b1b01733f0e9442817651c8a5f1a5feb04e0656ece431c39c8bd96d782636f7e0b3f729c05d25ab4b0155473c17116b6fe46216a6eee9eeceab4d7477393e
   languageName: node
   linkType: hard
 
@@ -16904,6 +16904,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@smithy/node-config-provider@npm:^3.1.12":
+  version: 3.1.12
+  resolution: "@smithy/node-config-provider@npm:3.1.12"
+  dependencies:
+    "@smithy/property-provider": ^3.1.11
+    "@smithy/shared-ini-file-loader": ^3.1.12
+    "@smithy/types": ^3.7.2
+    tslib: ^2.6.2
+  checksum: 42b61e2286387046f55130f2e0c11048c41310789441fee708bc498bb2a3b44c75d4b4e1a6fcca5c3ac593b73d1b73c082e556f0d4eab3966561eae52513db2e
+  languageName: node
+  linkType: hard
+
 "@smithy/node-config-provider@npm:^3.1.4, @smithy/node-config-provider@npm:^3.1.9":
   version: 3.1.9
   resolution: "@smithy/node-config-provider@npm:3.1.9"
@@ -16926,6 +16938,16 @@ __metadata:
     "@smithy/types": ^3.6.0
     tslib: ^2.6.2
   checksum: ea8d4148dd760f031f9eeb2aec2480685bb1a40d7ac9c482eb3170df0316cae58433a6c803d85b046c132a19b8b4874741fae054355b5584facbd46c18889c83
+  languageName: node
+  linkType: hard
+
+"@smithy/property-provider@npm:^3.1.11":
+  version: 3.1.11
+  resolution: "@smithy/property-provider@npm:3.1.11"
+  dependencies:
+    "@smithy/types": ^3.7.2
+    tslib: ^2.6.2
+  checksum: c6f4d4bb241381254083df95c36e8632fb7e54437ab5ad56cb6b1bf6c6b81072f396fa958a700037b1ab3efb6c25fb1f7aeb92560366f35fa14055c34077ea30
   languageName: node
   linkType: hard
 
@@ -16976,6 +16998,16 @@ __metadata:
   dependencies:
     "@smithy/types": ^3.6.0
   checksum: cba6d33eb0e7482e557c303638416ea8678f80fa5782c97dd67e5b72741f22e2446370dc0ef9b16802d73cdfb7a5e4e5587c1d4abb5aa5ca9c33525137b4cf2b
+  languageName: node
+  linkType: hard
+
+"@smithy/shared-ini-file-loader@npm:^3.1.12":
+  version: 3.1.12
+  resolution: "@smithy/shared-ini-file-loader@npm:3.1.12"
+  dependencies:
+    "@smithy/types": ^3.7.2
+    tslib: ^2.6.2
+  checksum: f726604f0f176d8f05eb0adc0878474a04ebefc2796ad72ca7c40d83f8bac65ef1239c9b1f8faa25838787a9aa3f83f28c50f150db76000b900bf220934d4bc7
   languageName: node
   linkType: hard
 
@@ -17051,6 +17083,15 @@ __metadata:
   dependencies:
     tslib: ^2.6.2
   checksum: 4f581dc1c3e2dee8e1134fafb47de2c301330ea668214eb1a81d26b85acdb48a7e52008da0d15a402e998a79bed285a74b88949a5a4a3fe0aef38c28620ab795
+  languageName: node
+  linkType: hard
+
+"@smithy/types@npm:^3.7.2":
+  version: 3.7.2
+  resolution: "@smithy/types@npm:3.7.2"
+  dependencies:
+    tslib: ^2.6.2
+  checksum: f3ae277d2f81eeb67c12e651b2e999225cda115dff8fab257a77fbe3739d32c515dbd19218590dd2c33d203259b00c80c9fc6027f8484c50725390a8fc0f1e3e
   languageName: node
   linkType: hard
 
@@ -17196,6 +17237,16 @@ __metadata:
   dependencies:
     tslib: ^2.5.0
   checksum: 4c30f83355a2c455ec2d6ee8a1907c673a16955a33e8f220a2bb774f55310db1b1f9eea8c2760238916e04191ccb85583e91930e5710ba79e0be4dd4986940e8
+  languageName: node
+  linkType: hard
+
+"@smithy/util-middleware@npm:^3.0.11":
+  version: 3.0.11
+  resolution: "@smithy/util-middleware@npm:3.0.11"
+  dependencies:
+    "@smithy/types": ^3.7.2
+    tslib: ^2.6.2
+  checksum: 74079b9b10af88699c1cbdfd8f8bf8750899c9a36076c256997c3eafa18993178a05ef5fae83cfcdecf63c0e89c23fdd4fea9893419d1d481deecf580292fc33
   languageName: node
   linkType: hard
 
@@ -21722,7 +21773,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"buffer-equal-constant-time@npm:1.0.1":
+"buffer-equal-constant-time@npm:1.0.1, buffer-equal-constant-time@npm:^1.0.1":
   version: 1.0.1
   resolution: "buffer-equal-constant-time@npm:1.0.1"
   checksum: 80bb945f5d782a56f374b292770901065bad21420e34936ecbe949e57724b4a13874f735850dd1cc61f078773c4fb5493a41391e7bda40d1fa388d6bd80daaab
@@ -24598,7 +24649,7 @@ __metadata:
   resolution: "dynamic-plugins-utils@workspace:_utils"
   dependencies:
     "@backstage/cli": ^0.34.1
-    glob: 11.1.0
+    glob: 12.0.0
     yaml: 2.8.1
   languageName: unknown
   linkType: soft
@@ -27265,9 +27316,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"glob@npm:11.1.0":
-  version: 11.1.0
-  resolution: "glob@npm:11.1.0"
+"glob@npm:12.0.0":
+  version: 12.0.0
+  resolution: "glob@npm:12.0.0"
   dependencies:
     foreground-child: ^3.3.1
     jackspeak: ^4.1.1
@@ -27277,7 +27328,7 @@ __metadata:
     path-scurry: ^2.0.0
   bin:
     glob: dist/esm/bin.mjs
-  checksum: 1cfbdc743db77688727411f00233404eb9c67d7c89a4ff1f8b8e60031382d4f695ecf60f279d0d45e5ba2377610572d013a858a433b45a133cf20aba6e3206e0
+  checksum: e40a6d3f57c999f4157bf82330c369e9383ed09a7cd5c36528f496c7fd237131f9b9da6e81779e15e4b18a31f65b13dac62ff324f4fe8029521e1330f6e259dd
   languageName: node
   linkType: hard
 
@@ -30411,14 +30462,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"jwa@npm:^1.4.1":
-  version: 1.4.1
-  resolution: "jwa@npm:1.4.1"
+"jwa@npm:^1.4.2":
+  version: 1.4.2
+  resolution: "jwa@npm:1.4.2"
   dependencies:
-    buffer-equal-constant-time: 1.0.1
+    buffer-equal-constant-time: ^1.0.1
     ecdsa-sig-formatter: 1.0.11
     safe-buffer: ^5.0.1
-  checksum: ff30ea7c2dcc61f3ed2098d868bf89d43701605090c5b21b5544b512843ec6fd9e028381a4dda466cbcdb885c2d1150f7c62e7168394ee07941b4098e1035e2f
+  checksum: fd1a6de6c649a4b16f0775439ac9173e4bc9aa0162c7f3836699af47736ae000fafe89f232a2345170de6c14021029cb94b488f7882c6caf61e6afef5fce6494
   languageName: node
   linkType: hard
 
@@ -30434,12 +30485,12 @@ __metadata:
   linkType: hard
 
 "jws@npm:^3.2.2":
-  version: 3.2.2
-  resolution: "jws@npm:3.2.2"
+  version: 3.2.3
+  resolution: "jws@npm:3.2.3"
   dependencies:
-    jwa: ^1.4.1
+    jwa: ^1.4.2
     safe-buffer: ^5.0.1
-  checksum: f0213fe5b79344c56cd443428d8f65c16bf842dc8cb8f5aed693e1e91d79c20741663ad6eff07a6d2c433d1831acc9814e8d7bada6a0471fbb91d09ceb2bf5c2
+  checksum: 58f88f1898899e47e9eb0fe61e6347268a498ef75a3d6563158cca855fe0c628138c9c42964d60a4daad8a955696c69fbae5c3e66da8e0f0138bdd7a140cbb27
   languageName: node
   linkType: hard
 
