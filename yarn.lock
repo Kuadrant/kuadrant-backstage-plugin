@@ -28098,9 +28098,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"glob@npm:11.1.0":
-  version: 11.1.0
-  resolution: "glob@npm:11.1.0"
+"glob@npm:12.0.0":
+  version: 12.0.0
+  resolution: "glob@npm:12.0.0"
   dependencies:
     foreground-child: ^3.3.1
     jackspeak: ^4.1.1
@@ -28110,7 +28110,7 @@ __metadata:
     path-scurry: ^2.0.0
   bin:
     glob: dist/esm/bin.mjs
-  checksum: 1cfbdc743db77688727411f00233404eb9c67d7c89a4ff1f8b8e60031382d4f695ecf60f279d0d45e5ba2377610572d013a858a433b45a133cf20aba6e3206e0
+  checksum: e40a6d3f57c999f4157bf82330c369e9383ed09a7cd5c36528f496c7fd237131f9b9da6e81779e15e4b18a31f65b13dac62ff324f4fe8029521e1330f6e259dd
   languageName: node
   linkType: hard
 
@@ -38083,7 +38083,7 @@ __metadata:
     "@manypkg/cli": 0.25.1
     concurrently: ^9.2.1
     dotenv: ^17.2.3
-    glob: 11.1.0
+    glob: 12.0.0
     husky: 8.0.3
     jsdom: ^26.1.0
     lint-staged: 15.5.2
