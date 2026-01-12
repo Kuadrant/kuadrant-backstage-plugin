@@ -70,10 +70,10 @@ spec:
 EOF
 ```
 
-Verify the deployment:
+Wait for the deployment to be available:
 
 ```bash
-kubectl get pods -n getting-started-tutorial
+kubectl -n getting-started-tutorial wait --timeout=120s --for=condition=Available deployment/toystore
 ```
 
 ### Step 2: Create the Gateway and HTTPRoute

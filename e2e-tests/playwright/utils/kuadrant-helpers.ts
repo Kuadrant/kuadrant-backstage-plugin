@@ -115,13 +115,22 @@ export async function expectElementPermission(
 }
 
 /**
- * Wait for page to be ready without relying on networkidle.
- * Waits for a known element to appear instead.
+ * Navigate to Kuadrant page via sidebar click.
+ * More reliable than page.goto as it doesn't cause full page reload.
+ */
+export async function navigateToKuadrant(page: Page): Promise<void> {
+  const kuadrantLink = page.locator('nav a:has-text("Kuadrant")').first();
+  await kuadrantLink.waitFor({ state: "visible", timeout: TIMEOUTS.DEFAULT });
+  await kuadrantLink.click();
+  await waitForKuadrantPageReady(page);
+}
+
+/**
+ * Wait for Kuadrant page content to be ready.
  */
 export async function waitForKuadrantPageReady(page: Page): Promise<void> {
-  // wait for the kuadrant heading to appear
-  const heading = page.locator("h1, h2").filter({ hasText: /kuadrant/i }).first();
-  await expect(heading).toBeVisible({ timeout: TIMEOUTS.SLOW });
+  const apiProductsSection = page.getByText(/api products/i).first();
+  await expect(apiProductsSection).toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
 }
 
 /**

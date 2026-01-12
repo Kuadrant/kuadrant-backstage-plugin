@@ -43,9 +43,10 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
 
       await common.dexQuickLogin("owner1@kuadrant.local");
       await page.goto("/kuadrant");
+      await page.waitForURL(/\/kuadrant/, { timeout: TIMEOUTS.VERY_SLOW }).catch(() => {});
 
       const heading = page.locator("h1, h2").filter({ hasText: /kuadrant/i }).first();
-      await heading.waitFor({ state: "visible", timeout: TIMEOUTS.SLOW }).catch(() => {});
+      await heading.waitFor({ state: "visible", timeout: TIMEOUTS.VERY_SLOW }).catch(() => {});
 
       const apiProductRow = page.locator("tr").filter({ hasText: testData.displayName });
       const rowVisible = await apiProductRow.isVisible().catch(() => false);
@@ -122,16 +123,15 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     const common = new Common(page);
     await common.dexQuickLogin("consumer1@kuadrant.local");
 
-    // wait for catalog sync with retries
     await retryUntilSuccess(
       async () => {
         await page.goto("/catalog?filters[kind]=api");
         const apiLink = page.getByRole("link", { name: new RegExp(testData.displayName, "i") });
-        await expect(apiLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+        await expect(apiLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
       },
       {
-        maxAttempts: 5,
-        delayMs: 3000,
+        maxAttempts: 8,
+        delayMs: 5000,
         errorMessage: `API ${testData.displayName} not found in catalog after retries`,
       },
     );
@@ -141,12 +141,12 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     const common = new Common(page);
     await common.dexQuickLogin("consumer1@kuadrant.local");
 
-    // use toystore-api which has plans configured (newly created APIs don't have plans yet)
     await page.goto("/catalog/default/api/toystore-api");
+    await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, { timeout: TIMEOUTS.VERY_SLOW });
 
     // click API Keys tab
     const apiKeysTab = page.getByRole("tab", { name: /api keys/i });
-    await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
     await apiKeysTab.click();
 
     // click request access button

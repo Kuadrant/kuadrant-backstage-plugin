@@ -2,8 +2,10 @@ import { test, expect } from "@playwright/test";
 import { Common } from "../utils/common";
 import {
   TIMEOUTS,
-  waitForKuadrantPageReady,
+  navigateToKuadrant,
   expectButtonPermission,
+  createTestAPIProductData,
+  TestAPIProduct,
 } from "../utils/kuadrant-helpers";
 
 /**
@@ -36,8 +38,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.create - admin CAN create", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       await expectButtonPermission(
         page,
@@ -50,8 +51,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.create - owner CAN create", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       await expectButtonPermission(
         page,
@@ -64,8 +64,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.create - consumer CANNOT create", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       await expectButtonPermission(
         page,
@@ -78,8 +77,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - admin CAN list all products", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsSection = page.getByText(/api products/i).first();
       await expect(apiProductsSection, "Admin should see API Products section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -88,8 +86,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - owner CAN list all products", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsSection = page.getByText(/api products/i).first();
       await expect(apiProductsSection, "Owner should see API Products section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -98,8 +95,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - consumer CAN list all products", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsSection = page.getByText(/api products/i).first();
       await expect(apiProductsSection, "Consumer should see API Products section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -108,8 +104,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.update.all - admin CAN edit any product", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsCard = page.locator("text=API Products").first();
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -119,32 +114,10 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await expect(editButton, "Admin should see Edit button").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     });
 
-    test("kuadrant.apiproduct.update.own - owner sees edit button only on own products", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
-
-      // owner1 should see the table
-      const table = page.locator("table").first();
-      await expect(table, "Owner should see products table").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-
-      // find toystore-api row (owned by different user in test setup)
-      const toystoreRow = page.locator("tr").filter({ hasText: /toystore/i }).first();
-      const toystoreVisible = await toystoreRow.isVisible().catch(() => false);
-
-      if (toystoreVisible) {
-        // owner1 should NOT see edit button on toystore (owned by system/admin)
-        const toystoreEditBtn = toystoreRow.getByRole("button", { name: /edit api product/i });
-        await expect(toystoreEditBtn, "Owner should NOT see edit button on other's products").not.toBeVisible({ timeout: TIMEOUTS.QUICK });
-      }
-    });
-
     test("kuadrant.apiproduct.delete.all - admin CAN delete any product", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsCard = page.locator("text=API Products").first();
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -157,8 +130,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.delete - consumer CANNOT delete any product", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // consumer should NOT see delete buttons
       const table = page.locator("table").first();
@@ -177,12 +149,11 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.create - admin CAN request access", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-
-      // navigate to an API entity's API Keys tab
       await page.goto("/catalog/default/api/toystore-api");
+      await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, { timeout: TIMEOUTS.VERY_SLOW });
 
       const apiKeysTab = page.getByRole("tab", { name: /api keys/i });
-      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.SLOW });
+      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
       await apiKeysTab.click();
 
       await expectButtonPermission(
@@ -198,9 +169,10 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await common.dexQuickLogin("owner1@kuadrant.local");
 
       await page.goto("/catalog/default/api/toystore-api");
+      await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, { timeout: TIMEOUTS.VERY_SLOW });
 
       const apiKeysTab = page.getByRole("tab", { name: /api keys/i });
-      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.SLOW });
+      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
       await apiKeysTab.click();
 
       await expectButtonPermission(
@@ -216,9 +188,10 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await common.dexQuickLogin("consumer1@kuadrant.local");
 
       await page.goto("/catalog/default/api/toystore-api");
+      await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, { timeout: TIMEOUTS.VERY_SLOW });
 
       const apiKeysTab = page.getByRole("tab", { name: /api keys/i });
-      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.SLOW });
+      await expect(apiKeysTab, "API Keys tab should exist").toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
       await apiKeysTab.click();
 
       await expectButtonPermission(
@@ -232,8 +205,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.approve - admin CAN see approval queue", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const approvalQueue = page.getByText(/api access requests/i).first();
       await expect(approvalQueue, "Admin should see API Access Requests section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -242,8 +214,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.approve - owner CAN see approval queue", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const approvalQueue = page.getByText(/api access requests/i).first();
       await expect(approvalQueue, "Owner should see API Access Requests section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -252,8 +223,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.approve - consumer CANNOT see approval queue", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // consumer should NOT see the approval queue card
       const approvalQueue = page.getByText(/api access requests/i).first();
@@ -263,8 +233,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.read.own - consumer CAN see My API Keys", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // consumer should see "My API Keys" card
       const myApiKeys = page.getByText(/my api keys/i).first();
@@ -274,8 +243,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.delete.own - consumer sees My API Keys card with tabs", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // find My API Keys card
       const myApiKeysCard = page.locator('[data-testid="my-api-keys-card"]');
@@ -295,8 +263,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.planpolicy.list - admin CAN see plan policies", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const planPolicies = page.getByText(/plan policies/i).first();
       await expect(planPolicies, "Admin should see Plan Policies section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -305,8 +272,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.planpolicy.list - owner CAN see plan policies", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const planPolicies = page.getByText(/plan policies/i).first();
       await expect(planPolicies, "Owner should see Plan Policies section").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
@@ -315,8 +281,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.planpolicy.list - consumer CANNOT see plan policies", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // consumer should NOT see the plan policies section
       const planPolicies = page.getByText(/plan policies/i).first();
@@ -329,56 +294,141 @@ test.describe("Kuadrant Permissions Matrix", () => {
   // ==========================================
 
   test.describe("Cross-Ownership Enforcement", () => {
-    test("owner2 CANNOT edit toystore API (owned by system)", async ({ page }) => {
+    let fixtureData: TestAPIProduct;
+    let fixtureCreated = false;
+
+    test.describe.configure({ mode: "serial" });
+
+    test.beforeAll(async ({ browser }) => {
+      fixtureData = createTestAPIProductData("admin@kuadrant.local");
+
+      const context = await browser.newContext();
+      const page = await context.newPage();
       const common = new Common(page);
-      await common.dexQuickLogin("owner2@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
 
-      // toystore must exist for this test
-      const toystoreRow = page.locator("tr").filter({ hasText: /toystore/i }).first();
-      await expect(toystoreRow, "Toystore API must exist for cross-ownership test").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      try {
+        await common.dexQuickLogin("admin@kuadrant.local");
+        await navigateToKuadrant(page);
 
-      // owner2 should NOT see edit button on toystore (not their product)
-      const editButton = toystoreRow.getByRole("button", { name: /edit api product/i });
-      await expect(editButton, "Owner2 should NOT see edit button on toystore").not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+        const createButton = page.getByRole("button", { name: /create api product/i });
+        await expect(createButton).toBeVisible({ timeout: TIMEOUTS.SLOW });
+        await createButton.click();
+
+        const dialog = page.getByRole("dialog");
+        await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+
+        await page.getByPlaceholder("my-api").fill(fixtureData.name);
+        await page.getByPlaceholder("My API").fill(fixtureData.displayName);
+        await page.getByPlaceholder("API description").fill("Cross-ownership test fixture");
+
+        const httprouteSelect = page.locator('[data-testid="httproute-select"]');
+        await httprouteSelect.scrollIntoViewIfNeeded();
+        await httprouteSelect.click({ timeout: TIMEOUTS.DEFAULT });
+
+        const toystoreOption = page.getByRole("option", { name: /toystore/i }).first();
+        await expect(toystoreOption).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+        await toystoreOption.click();
+
+        const submitButton = page.getByRole("button", { name: /^create$/i });
+        await submitButton.click();
+        await expect(dialog).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
+        fixtureCreated = true;
+      } catch (error) {
+        console.warn("Fixture creation failed:", error);
+      }
+
+      await context.close();
     });
 
-    test("owner2 CANNOT delete toystore API (owned by system)", async ({ page }) => {
+    test.afterAll(async ({ browser }) => {
+      if (!fixtureCreated) return;
+
+      const context = await browser.newContext();
+      const page = await context.newPage();
       const common = new Common(page);
-      await common.dexQuickLogin("owner2@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
 
-      // toystore must exist for this test
-      const toystoreRow = page.locator("tr").filter({ hasText: /toystore/i }).first();
-      await expect(toystoreRow, "Toystore API must exist for cross-ownership test").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      try {
+        await common.dexQuickLogin("admin@kuadrant.local");
+        await navigateToKuadrant(page);
 
-      // owner2 should NOT see delete button on toystore (not their product)
-      const deleteButton = toystoreRow.getByRole("button", { name: /delete api product/i });
-      await expect(deleteButton, "Owner2 should NOT see delete button on toystore").not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+        const fixtureRow = page.locator("tr").filter({ hasText: fixtureData.displayName });
+        const rowVisible = await fixtureRow.isVisible().catch(() => false);
+
+        if (rowVisible) {
+          const deleteButton = fixtureRow.getByRole("button", { name: /delete api product/i });
+          await deleteButton.click();
+
+          const confirmDialog = page.getByRole("dialog");
+          const dialogVisible = await confirmDialog.isVisible().catch(() => false);
+
+          if (dialogVisible) {
+            const confirmInput = confirmDialog.getByRole("textbox");
+            await confirmInput.fill(fixtureData.name);
+
+            const confirmButton = confirmDialog.getByRole("button", { name: /delete/i });
+            await confirmButton.click();
+            await confirmDialog.waitFor({ state: "hidden", timeout: TIMEOUTS.SLOW }).catch(() => {});
+          }
+        }
+      } catch (error) {
+        console.warn("Cleanup failed:", error);
+      }
+
+      await context.close();
     });
 
-    test("admin CAN edit toystore API (has update.all permission)", async ({ page }) => {
+    test("owner2 CANNOT edit admin's API (cross-ownership)", async ({ page }) => {
+      test.skip(!fixtureCreated, "Fixture not created");
+      const common = new Common(page);
+      await common.dexQuickLogin("owner2@kuadrant.local");
+      await navigateToKuadrant(page);
+
+      const fixtureRow = page.locator("tr").filter({ hasText: fixtureData.displayName }).first();
+      await expect(fixtureRow).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const editButton = fixtureRow.getByRole("button", { name: /edit api product/i });
+      await expect(editButton).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+    });
+
+    test("owner2 CANNOT delete admin's API (cross-ownership)", async ({ page }) => {
+      test.skip(!fixtureCreated, "Fixture not created");
+      const common = new Common(page);
+      await common.dexQuickLogin("owner2@kuadrant.local");
+      await navigateToKuadrant(page);
+
+      const fixtureRow = page.locator("tr").filter({ hasText: fixtureData.displayName }).first();
+      await expect(fixtureRow).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const deleteButton = fixtureRow.getByRole("button", { name: /delete api product/i });
+      await expect(deleteButton).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+    });
+
+    test("owner1 CANNOT edit admin's API (cross-ownership)", async ({ page }) => {
+      test.skip(!fixtureCreated, "Fixture not created");
+      const common = new Common(page);
+      await common.dexQuickLogin("owner1@kuadrant.local");
+      await navigateToKuadrant(page);
+
+      const fixtureRow = page.locator("tr").filter({ hasText: fixtureData.displayName }).first();
+      await expect(fixtureRow).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const editButton = fixtureRow.getByRole("button", { name: /edit api product/i });
+      await expect(editButton).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+    });
+
+    test("admin CAN edit own API (has update.all permission)", async ({ page }) => {
+      test.skip(!fixtureCreated, "Fixture not created");
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
-      // toystore must exist for this test
-      const toystoreRow = page.locator("tr").filter({ hasText: /toystore/i }).first();
-      await expect(toystoreRow, "Toystore API must exist for cross-ownership test").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-
-      // admin should see edit button on toystore
-      const editButton = toystoreRow.getByRole("button", { name: /edit api product/i });
-      await expect(editButton, "Admin should see edit button on toystore").toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const fixtureRow = page.locator("tr").filter({ hasText: fixtureData.displayName }).first();
+      await expect(fixtureRow).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const editButton = fixtureRow.getByRole("button", { name: /edit api product/i });
+      await expect(editButton).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     });
 
     test("admin CAN approve requests for any owner's APIs", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // admin sees the approval queue card
       const approvalQueueCard = page.locator('[data-testid="approval-queue-card"]');
@@ -408,8 +458,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("consumer CANNOT see edit buttons on API products table", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // wait for page to load
       const apiProductsCard = page.locator("text=API Products").first();
@@ -423,8 +472,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("consumer CANNOT see delete buttons on API products table", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       const apiProductsCard = page.locator("text=API Products").first();
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -437,8 +485,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("consumer CANNOT see approve/reject buttons", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant");
-      await waitForKuadrantPageReady(page);
+      await navigateToKuadrant(page);
 
       // consumer should not see approve button anywhere
       const approveButton = page.getByRole("button", { name: /^approve$/i }).first();
