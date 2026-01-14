@@ -129,4 +129,81 @@ spec:
     email: api-owners@example.com
     slack: "#api-support"
 ---
-
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: gamestore-admin
+  namespace: gamestore
+  annotations:
+    backstage.io/expose: "true"
+spec:
+  parentRefs:
+    - name: external
+      namespace: gamestore
+  hostnames:
+    - admin.gamestore.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          method: GET
+      backendRefs:
+        - name: gamestore
+          port: 80
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: gamestore-admin
+  namespace: gamestore
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: gamestore-admin
+  rules:
+    authentication:
+      "demo-admin-realm":
+        jwt:
+          issuerUrl: https://oidc.example.com/realms/demo-admin
+      "vip-users":
+        apiKey:
+          selector:
+            matchLabels:
+              app: gamestore
+              role: admin
+          allNamespaces: true
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+---
+apiVersion: devportal.kuadrant.io/v1alpha1
+kind: APIProduct
+metadata:
+  name: gamestore-admin
+  namespace: gamestore
+  annotations:
+    backstage.io/owner: user:default/guest
+spec:
+  displayName: Gamestore Admin API
+  description: Simple game store admin api for demonstration
+  version: v1
+  approvalMode: manual
+  publishStatus: Published
+  tags:
+    - demo
+    - admin
+    - retail
+    - games
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: gamestore-admin
+  documentation:
+    openAPISpecURL: https://raw.githubusercontent.com/Kuadrant/kuadrantctl/main/examples/oas3/petstore.yaml
+    docsURL: https://github.com/Kuadrant/kuadrantctl/blob/main/examples/oas3/petstore.yaml
+  contact:
+    team: api-owners
+    email: api-owners@example.com
+    slack: "#api-support"
