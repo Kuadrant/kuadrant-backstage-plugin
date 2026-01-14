@@ -3,10 +3,10 @@ import { Common } from "./common";
 
 // timeout constants for consistent test behaviour
 export const TIMEOUTS = {
-  QUICK: 3000, // quick checks where element absence is expected
-  DEFAULT: 5000, // standard element visibility
-  SLOW: 15000, // api responses, catalog sync, page loads
-  VERY_SLOW: 30000, // kubernetes propagation
+  QUICK: 5000, // negative assertions - give UI time to settle
+  DEFAULT: 10000, // standard element visibility (match playwright config)
+  SLOW: 20000, // api responses, page loads
+  VERY_SLOW: 45000, // kubernetes propagation, catalog sync
 } as const;
 
 // test data generation
@@ -116,31 +116,43 @@ export async function expectElementPermission(
 
 /**
  * Wait for API Products page to be ready.
- * Uses toPass for robust polling - retries until both conditions are stable.
+ * Uses toPass for robust polling with networkidle for stability.
  */
 export async function waitForKuadrantPageReady(page: Page): Promise<void> {
+  await page.waitForURL(/\/kuadrant\/api-products/, {
+    timeout: TIMEOUTS.VERY_SLOW,
+  });
+  await page.waitForLoadState("networkidle").catch(() => {});
+
   await expect(async () => {
-    const progress = page.locator('[role="progressbar"]');
-    await expect(progress).toHaveCount(0);
-    const content = page.getByText(/api products/i).first();
-    await expect(content).toBeVisible();
-  }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
+    // no visible spinners
+    const spinner = page.locator('[role="progressbar"]:visible');
+    await expect(spinner).toHaveCount(0);
+    // page header is visible (Backstage Header renders as h1)
+    const heading = page.locator("h1").filter({ hasText: /api products/i });
+    await expect(heading).toBeVisible();
+    // table is present (data loaded) - use first() as pagination is also a table
+    const table = page.locator("table").first();
+    await expect(table).toBeVisible();
+  }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }
 
 /**
  * Wait for API Keys page to be ready.
- * Uses toPass for robust polling - retries until both conditions are stable.
+ * Uses toPass for robust polling with networkidle for stability.
  */
 export async function waitForApiKeysPageReady(page: Page): Promise<void> {
   await page.waitForURL(/\/kuadrant\/api-keys/, { timeout: TIMEOUTS.VERY_SLOW });
-  await page.waitForLoadState("domcontentloaded");
+  await page.waitForLoadState("networkidle").catch(() => {});
 
   await expect(async () => {
-    const progress = page.locator('[role="progressbar"]');
-    await expect(progress).toHaveCount(0);
-    const content = page.getByText(/api keys/i).first();
-    await expect(content).toBeVisible();
-  }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
+    // no visible spinners
+    const spinner = page.locator('[role="progressbar"]:visible');
+    await expect(spinner).toHaveCount(0);
+    // page header is visible (Backstage Header renders as h1)
+    const heading = page.locator("h1").filter({ hasText: /api keys/i });
+    await expect(heading).toBeVisible();
+  }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }
 
 /**

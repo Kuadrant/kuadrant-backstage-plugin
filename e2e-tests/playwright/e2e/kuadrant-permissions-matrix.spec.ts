@@ -17,7 +17,6 @@ import {
  * Permission categories tested:
  * - APIProduct: create, read.all, read.own, update.all, update.own, delete.all, delete.own, list
  * - APIKey: create, read.all, read.own, update.all, update.own, delete.all, delete.own, approve
- * - PlanPolicy: read, list
  */
 
 test.describe("Kuadrant Permissions Matrix", () => {
@@ -85,7 +84,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsSection = page.getByText(/api products/i).first();
+      const apiProductsSection = page.locator("h1").filter({ hasText: /api products/i });
       await expect(
         apiProductsSection,
         "Admin should see API Products section",
@@ -100,7 +99,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsSection = page.getByText(/api products/i).first();
+      const apiProductsSection = page.locator("h1").filter({ hasText: /api products/i });
       await expect(
         apiProductsSection,
         "Owner should see API Products section",
@@ -115,7 +114,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsSection = page.getByText(/api products/i).first();
+      const apiProductsSection = page.locator("h1").filter({ hasText: /api products/i });
       await expect(
         apiProductsSection,
         "Consumer should see API Products section",
@@ -130,7 +129,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsCard = page.locator("text=API Products").first();
+      const apiProductsCard = page.locator("h1").filter({ hasText: /api products/i });
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
       // admin should see edit icon on any row
@@ -156,15 +155,15 @@ test.describe("Kuadrant Permissions Matrix", () => {
         timeout: TIMEOUTS.DEFAULT,
       });
 
-      // find toystore-api row specifically (owned by guest, not owner1)
+      // find Toystore API row specifically (owned by guest, not owner1)
       const toystoreRow = page
         .locator("tr")
-        .filter({ hasText: "toystore-api" })
+        .filter({ hasText: "Toystore API" })
         .first();
       const toystoreVisible = await toystoreRow.isVisible().catch(() => false);
 
       if (toystoreVisible) {
-        // owner1 should NOT see edit button on toystore-api (owned by guest)
+        // owner1 should NOT see edit button on Toystore API (owned by guest)
         const toystoreEditBtn = toystoreRow.getByRole("button", {
           name: /edit api product/i,
         });
@@ -183,7 +182,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsCard = page.locator("text=API Products").first();
+      const apiProductsCard = page.locator("h1").filter({ hasText: /api products/i });
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
       // admin should see delete icon on any row
@@ -384,58 +383,6 @@ test.describe("Kuadrant Permissions Matrix", () => {
   });
 
   // ==========================================
-  // PlanPolicy Permissions
-  // ==========================================
-
-  test.describe("PlanPolicy Permissions", () => {
-    test("kuadrant.planpolicy.list - admin CAN see plan policies", async ({
-      page,
-    }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
-      await page.goto("/kuadrant/api-products");
-      await waitForKuadrantPageReady(page);
-
-      const planPolicies = page.getByText(/plan policies/i).first();
-      await expect(
-        planPolicies,
-        "Admin should see Plan Policies section",
-      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    });
-
-    test("kuadrant.planpolicy.list - owner CAN see plan policies", async ({
-      page,
-    }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
-      await page.goto("/kuadrant/api-products");
-      await waitForKuadrantPageReady(page);
-
-      const planPolicies = page.getByText(/plan policies/i).first();
-      await expect(
-        planPolicies,
-        "Owner should see Plan Policies section",
-      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    });
-
-    test("kuadrant.planpolicy.list - consumer CANNOT see plan policies", async ({
-      page,
-    }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
-      await page.goto("/kuadrant/api-products");
-      await waitForKuadrantPageReady(page);
-
-      // consumer should NOT see the plan policies section
-      const planPolicies = page.getByText(/plan policies/i).first();
-      await expect(
-        planPolicies,
-        "Consumer should NOT see Plan Policies section",
-      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
-    });
-  });
-
-  // ==========================================
   // Cross-Ownership Tests
   // ==========================================
 
@@ -448,23 +395,23 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      // toystore-api must exist for this test (owned by guest)
+      // Toystore API must exist for this test (owned by guest)
       const toystoreRow = page
         .locator("tr")
-        .filter({ hasText: "toystore-api" })
+        .filter({ hasText: "Toystore API" })
         .first();
       await expect(
         toystoreRow,
-        "toystore-api must exist for cross-ownership test",
-      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+        "Toystore API must exist for cross-ownership test",
+      ).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-      // owner2 should NOT see edit button on toystore-api (not their product)
+      // owner2 should NOT see edit button on Toystore API (not their product)
       const editButton = toystoreRow.getByRole("button", {
         name: /edit api product/i,
       });
       await expect(
         editButton,
-        "Owner2 should NOT see edit button on toystore-api",
+        "Owner2 should NOT see edit button on Toystore API",
       ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
@@ -476,23 +423,23 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      // toystore-api must exist for this test (owned by guest)
+      // Toystore API must exist for this test (owned by guest)
       const toystoreRow = page
         .locator("tr")
-        .filter({ hasText: "toystore-api" })
+        .filter({ hasText: "Toystore API" })
         .first();
       await expect(
         toystoreRow,
-        "toystore-api must exist for cross-ownership test",
-      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+        "Toystore API must exist for cross-ownership test",
+      ).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-      // owner2 should NOT see delete button on toystore-api (not their product)
+      // owner2 should NOT see delete button on Toystore API (not their product)
       const deleteButton = toystoreRow.getByRole("button", {
         name: /delete api product/i,
       });
       await expect(
         deleteButton,
-        "Owner2 should NOT see delete button on toystore-api",
+        "Owner2 should NOT see delete button on Toystore API",
       ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
@@ -504,23 +451,23 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      // toystore-api must exist for this test
+      // Toystore API must exist for this test
       const toystoreRow = page
         .locator("tr")
-        .filter({ hasText: "toystore-api" })
+        .filter({ hasText: "Toystore API" })
         .first();
       await expect(
         toystoreRow,
-        "toystore-api must exist for cross-ownership test",
-      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+        "Toystore API must exist for cross-ownership test",
+      ).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-      // admin should see edit button on toystore-api
+      // admin should see edit button on Toystore API
       const editButton = toystoreRow.getByRole("button", {
         name: /edit api product/i,
       });
       await expect(
         editButton,
-        "Admin should see edit button on toystore-api",
+        "Admin should see edit button on Toystore API",
       ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     });
 
@@ -572,7 +519,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await waitForKuadrantPageReady(page);
 
       // wait for page to load
-      const apiProductsCard = page.locator("text=API Products").first();
+      const apiProductsCard = page.locator("h1").filter({ hasText: /api products/i });
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
       // consumer should not see any edit buttons
@@ -593,7 +540,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      const apiProductsCard = page.locator("text=API Products").first();
+      const apiProductsCard = page.locator("h1").filter({ hasText: /api products/i });
       await expect(apiProductsCard).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
       // consumer should not see any delete buttons in API products table

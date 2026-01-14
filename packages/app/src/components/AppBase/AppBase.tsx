@@ -24,6 +24,7 @@ import { RbacPage } from '@backstage-community/plugin-rbac';
 import {
   ApiKeyDetailPage,
   ApiKeysPage,
+  ApiProductDetailPage,
   ApiProductsPage,
   PlanPolicyDetailPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
@@ -152,6 +153,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/api-products"
                 element={<ApiProductsPage />}
+              />
+              <Route
+                path="/kuadrant/api-products/:namespace/:name"
+                element={<ApiProductDetailPage />}
               />
               <Route path="/kuadrant/api-keys" element={<ApiKeysPage />} />
               <Route
