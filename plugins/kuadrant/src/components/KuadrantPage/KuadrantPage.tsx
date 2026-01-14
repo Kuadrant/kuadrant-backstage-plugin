@@ -3,6 +3,8 @@ import { Typography, Grid, Box, Chip, Button, IconButton } from '@material-ui/co
 import AddIcon from '@material-ui/icons/Add';
 import DeleteIcon from '@material-ui/icons/Delete';
 import EditIcon from '@material-ui/icons/Edit';
+import VpnKeyIcon from '@material-ui/icons/VpnKey';
+import LockIcon from '@material-ui/icons/Lock';
 import {
   InfoCard,
   Header,
@@ -63,7 +65,7 @@ export const ResourceList = () => {
   const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
   const [apiProductToEdit, setApiProductToEdit] = useState<{ namespace: string; name: string } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteStats, setDeleteStats] = useState<{requests: number; secrets: number} | null>(null);
+  const [deleteStats, setDeleteStats] = useState<{ requests: number; secrets: number } | null>(null);
 
   const {
     allowed: canCreateApiProduct,
@@ -270,6 +272,44 @@ export const ResourceList = () => {
       },
     },
     {
+      title: 'Authentication',
+      field: 'status.discoveredAuthScheme',
+      render: (row: any) => {
+        const authSchemes = row.status?.discoveredAuthScheme?.authentication || {};
+        const schemeObjects = Object.values(authSchemes);
+
+        console.log(`[${row.metadata.name}] schemeObjects count:`, schemeObjects.length, 'data:', schemeObjects);
+
+        const hasApiKey = schemeObjects.some((scheme: any) => scheme.hasOwnProperty('apiKey'));
+        const hasJwt = schemeObjects.some((scheme: any) => scheme.hasOwnProperty('jwt'));
+
+        if (!hasApiKey && !hasJwt) {
+          return <Typography variant="body2" style={{ fontStyle: 'italic' }}>unknown</Typography>;
+        }
+
+        return (
+          <Box display="flex" style={{ gap: 4 }}>
+            {hasApiKey && (
+              <Chip
+                icon={<VpnKeyIcon />}
+                label="API Key"
+                size="small"
+                color="primary"
+              />
+            )}
+            {hasJwt && (
+              <Chip
+                icon={<LockIcon />}
+                label="OIDC"
+                size="small"
+                color="secondary"
+              />
+            )}
+          </Box>
+        );
+      },
+    },
+    {
       title: 'Namespace',
       field: 'metadata.namespace',
     },
@@ -382,9 +422,9 @@ export const ResourceList = () => {
             </Typography>
             <Typography variant="body2" color="textSecondary">
               permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
-                         deletePermissionError ? 'kuadrant.apiproduct.delete' :
-                         approvalQueuePermissionError ? 'kuadrant.apikey.read.all' :
-                         planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
+                deletePermissionError ? 'kuadrant.apiproduct.delete' :
+                  approvalQueuePermissionError ? 'kuadrant.apikey.read.all' :
+                    planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               please try again or contact your administrator
