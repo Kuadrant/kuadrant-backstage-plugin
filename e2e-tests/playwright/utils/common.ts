@@ -427,14 +427,44 @@ export class Common {
 
   async dexQuickLogin(userEmail: string) {
     await this.page.goto("/");
-    await this.page.waitForSelector('h2:has-text("Select a sign-in method")', { timeout: 10000 });
 
-    // click OIDC Sign In and wait for popup in parallel
-    const oidcSignInButton = this.page.locator('button:has-text("Sign In")').last();
-    const [popup] = await Promise.all([
-      this.page.waitForEvent("popup", { timeout: 20000 }),
-      oidcSignInButton.click(),
-    ]);
+    // check if already logged in (sidebar visible means authenticated)
+    const alreadyLoggedIn = await this.page
+      .locator("nav a")
+      .first()
+      .isVisible({ timeout: 2000 })
+      .catch(() => false);
+    if (alreadyLoggedIn) {
+      return "Already logged in";
+    }
+
+    await this.page.waitForSelector('h2:has-text("Select a sign-in method")', {
+      timeout: 15000,
+    });
+
+    // use more specific selector
+    const oidcSignInButton = this.page
+      .getByRole("button", { name: /sign in/i })
+      .first();
+    await expect(oidcSignInButton).toBeVisible({ timeout: 5000 });
+
+    // attach popup listener BEFORE clicking to avoid race condition
+    const popupPromise = this.page.waitForEvent("popup", { timeout: 30000 });
+    await oidcSignInButton.click();
+
+    let popup: Page;
+    try {
+      popup = await popupPromise;
+    } catch {
+      // popup may have been blocked or session already exists
+      const loginStillVisible = await this.page
+        .getByText("Select a sign-in method")
+        .isVisible();
+      if (!loginStillVisible) {
+        return "Already logged in";
+      }
+      throw new Error("Popup failed to open");
+    }
 
     await popup.waitForLoadState("domcontentloaded");
 
@@ -443,13 +473,15 @@ export class Common {
     }
 
     // extract role from email (e.g., "owner1@kuadrant.local" -> "owner1")
-    const role = userEmail.split('@')[0];
+    const role = userEmail.split("@")[0];
     const quickLoginButton = popup.locator(`[data-testid="quick-login-${role}"]`);
     await quickLoginButton.click({ timeout: 10000 });
     await popup.waitForEvent("close", { timeout: 10000 });
 
-    // wait for main page to redirect and load - login prompt must disappear
-    await expect(this.page.getByText("Select a sign-in method")).not.toBeVisible({ timeout: 20000 });
+    // wait for main page to redirect and load
+    await expect(
+      this.page.getByText("Select a sign-in method"),
+    ).not.toBeVisible({ timeout: 20000 });
     await this.uiHelper.waitForSideBarVisible();
     return "Login successful";
   }
