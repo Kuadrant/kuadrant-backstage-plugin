@@ -1,1 +1,1 @@
-export { KuadrantPage } from './KuadrantPage';
+export { KuadrantPage, KuadrantPage as ApiProductsPage } from './KuadrantPage';

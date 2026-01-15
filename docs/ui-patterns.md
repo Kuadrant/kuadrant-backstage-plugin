@@ -60,3 +60,37 @@ The Kuadrant frontend uses Backstage's permission framework for fine-grained acc
 **Key files:**
 - Permission hook: [`plugins/kuadrant/src/utils/permissions.ts`](../plugins/kuadrant/src/utils/permissions.ts)
 - Permission definitions: [`plugins/kuadrant/src/permissions.ts`](../plugins/kuadrant/src/permissions.ts)
+
+## Sidebar Menu Configuration
+
+RHDH uses a specific pattern for sidebar menu items with parent-child relationships. This is configured in [`packages/app/src/consts.ts`](../packages/app/src/consts.ts).
+
+**Key pattern:** Parent-child relationships use the `parent` property on child items, NOT nested `children` arrays.
+
+```typescript
+// parent item - no `to` property makes it expandable
+'default.kuadrant': {
+  title: 'Kuadrant',
+  icon: 'extension',
+  priority: 55,
+},
+// child items reference parent via `parent` property
+'default.kuadrant.api-products': {
+  title: 'API Products',
+  icon: 'category',
+  to: '/kuadrant/api-products',
+  parent: 'default.kuadrant',
+  priority: 20,
+},
+```
+
+**Properties:**
+- `title`: Display text in sidebar
+- `icon`: Icon name registered in [`packages/app/src/components/DynamicRoot/CommonIcons.tsx`](../packages/app/src/components/DynamicRoot/CommonIcons.tsx) (home, group, category, extension, key, add, admin, etc.)
+- `to`: Route path (omit for parent-only expandable items)
+- `parent`: Reference to parent menu item key
+- `priority`: Higher values appear higher in the list
+
+**Adding new icons:** Import from `@mui/icons-material` and add to the `CommonIcons` map in `CommonIcons.tsx`.
+
+**Documentation:** [RHDH Customizing Appearance](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/html/customizing_red_hat_developer_hub/customizing-appearance)

@@ -945,13 +945,24 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
+      // try update all permission first (admin)
+      const updateAllDecision = await permissions.authorize(
         [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+      const canUpdateAll = updateAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canUpdateAll) {
+        // fallback to update own permission
+        const updateOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
+          { credentials },
+        );
+
+        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
       }
 
       const { requests } = parsed.data;
@@ -960,6 +971,46 @@ export async function createRouter({
 
       for (const reqRef of requests) {
         try {
+          // if user only has updateOwn permission, verify ownership of the api product
+          if (!canUpdateAll) {
+            const request = await k8sClient.getCustomResource(
+              'devportal.kuadrant.io',
+              'v1alpha1',
+              reqRef.namespace,
+              'apikeys',
+              reqRef.name,
+            );
+            const apiProductName = request.spec?.apiProductRef?.name;
+            if (!apiProductName) {
+              results.push({
+                namespace: reqRef.namespace,
+                name: reqRef.name,
+                success: false,
+                error: 'API key has no associated API product.'
+              });
+              continue;
+            }
+
+            const apiProduct = await k8sClient.getCustomResource(
+              'devportal.kuadrant.io',
+              'v1alpha1',
+              reqRef.namespace,
+              'apiproducts',
+              apiProductName,
+            );
+            const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+
+            if (owner !== userEntityRef) {
+              results.push({
+                namespace: reqRef.namespace,
+                name: reqRef.name,
+                success: false,
+                error: 'You can only approve requests for your own API products.'
+              });
+              continue;
+            }
+          }
+
           // backend sets phase, controller reconciles and creates Secret
           const status = {
             phase: 'Approved',
@@ -1009,13 +1060,24 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
-      const decision = await permissions.authorize(
+      // try update all permission first (admin)
+      const updateAllDecision = await permissions.authorize(
         [{ permission: kuadrantApiKeyUpdateAllPermission }],
         { credentials },
       );
 
-      if (decision[0].result !== AuthorizeResult.ALLOW) {
-        throw new NotAllowedError('unauthorised');
+      const canUpdateAll = updateAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canUpdateAll) {
+        // fallback to update own permission
+        const updateOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
+          { credentials },
+        );
+
+        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
       }
 
       const { requests } = parsed.data;
@@ -1046,29 +1108,16 @@ export async function createRouter({
           );
 
           const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
 
-          // try update all permission first (admin)
-          const updateAllDecision = await permissions.authorize(
-            [{ permission: kuadrantApiProductUpdateAllPermission }],
-            { credentials },
-          );
-
-          if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
-            // fallback to update own permission
-            const updateOwnDecision = await permissions.authorize(
-              [{ permission: kuadrantApiProductUpdateOwnPermission }],
-              { credentials },
-            );
-
-            if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-              throw new NotAllowedError('unauthorised');
-            }
-
-            // verify ownership of the apiproduct
-            if (owner !== userEntityRef) {
-              throw new NotAllowedError('you can only reject requests for your own api products');
-            }
+          // if user only has updateOwn permission, verify ownership of the api product
+          if (!canUpdateAll && owner !== userEntityRef) {
+            results.push({
+              namespace: reqRef.namespace,
+              name: reqRef.name,
+              success: false,
+              error: 'You can only reject requests for your own API products.'
+            });
+            continue;
           }
 
           const status = {
@@ -1248,6 +1297,61 @@ export async function createRouter({
         res.status(400).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'failed to update api key request' });
+      }
+    }
+  });
+
+  // get single api key
+  router.get('/apikeys/:namespace/:name', async (req, res): Promise<void> => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { namespace, name } = req.params;
+
+      const readAllDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyReadAllPermission }],
+        { credentials }
+      );
+      const canReadAll = readAllDecision[0].result === AuthorizeResult.ALLOW;
+
+      if (!canReadAll) {
+        const readOwnDecision = await permissions.authorize(
+          [{ permission: kuadrantApiKeyReadOwnPermission }],
+          { credentials }
+        );
+        if (readOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+      }
+
+      const apiKey = await k8sClient.getCustomResource(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apikeys',
+        name,
+      );
+
+      if (!apiKey) {
+        res.status(404).json({ error: 'API key not found' });
+        return;
+      }
+
+      // check ownership if not admin
+      if (!canReadAll) {
+        const ownerId = (apiKey as any).spec?.requestedBy?.userId;
+        if (ownerId !== userEntityRef) {
+          throw new NotAllowedError('not authorised to view this API key');
+        }
+      }
+
+      res.status(200).json(apiKey);
+    } catch (error) {
+      console.error('failed to get api key:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to get api key' });
       }
     }
   });

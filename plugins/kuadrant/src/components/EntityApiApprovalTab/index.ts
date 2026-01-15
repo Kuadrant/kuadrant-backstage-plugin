@@ -1,0 +1,1 @@
+export { EntityApiApprovalTab } from './EntityApiApprovalTab';

@@ -1,10 +1,17 @@
-import React, { useState } from 'react';
-import { Typography, Grid, Box, Chip, Button, IconButton } from '@material-ui/core';
-import AddIcon from '@material-ui/icons/Add';
-import DeleteIcon from '@material-ui/icons/Delete';
-import EditIcon from '@material-ui/icons/Edit';
-import VpnKeyIcon from '@material-ui/icons/VpnKey';
-import LockIcon from '@material-ui/icons/Lock';
+import React, { useState } from "react";
+import {
+  Typography,
+  Grid,
+  Box,
+  Chip,
+  Button,
+  IconButton,
+} from "@material-ui/core";
+import AddIcon from "@material-ui/icons/Add";
+import DeleteIcon from "@material-ui/icons/Delete";
+import EditIcon from "@material-ui/icons/Edit";
+import VpnKeyIcon from "@material-ui/icons/VpnKey";
+import LockIcon from "@material-ui/icons/Lock";
 import {
   InfoCard,
   Header,
@@ -16,13 +23,17 @@ import {
   Link,
   Table,
   TableColumn,
-} from '@backstage/core-components';
-import useAsync from 'react-use/lib/useAsync';
-import { useApi, configApiRef, fetchApiRef, alertApiRef, identityApiRef } from '@backstage/core-plugin-api';
-import { ApprovalQueueCard } from '../ApprovalQueueCard';
-import { MyApiKeysCard } from '../MyApiKeysCard';
-import { PermissionGate } from '../PermissionGate';
-import { CreateAPIProductDialog } from '../CreateAPIProductDialog';
+} from "@backstage/core-components";
+import useAsync from "react-use/lib/useAsync";
+import {
+  useApi,
+  configApiRef,
+  fetchApiRef,
+  alertApiRef,
+  identityApiRef,
+} from "@backstage/core-plugin-api";
+import { PermissionGate } from "../PermissionGate";
+import { CreateAPIProductDialog } from "../CreateAPIProductDialog";
 import {
   kuadrantApiProductCreatePermission,
   kuadrantApiProductDeleteOwnPermission,
@@ -30,12 +41,11 @@ import {
   kuadrantApiProductUpdateOwnPermission,
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductListPermission,
-  kuadrantApiKeyApprovePermission,
   kuadrantPlanPolicyListPermission,
-} from '../../permissions';
-import { useKuadrantPermission } from '../../utils/permissions';
-import { EditAPIProductDialog } from '../EditAPIProductDialog';
-import { ConfirmDeleteDialog } from '../ConfirmDeleteDialog';
+} from "../../permissions";
+import { useKuadrantPermission } from "../../utils/permissions";
+import { EditAPIProductDialog } from "../EditAPIProductDialog";
+import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 
 type KuadrantResource = {
   metadata: {
@@ -56,28 +66,31 @@ export const ResourceList = () => {
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
   const identityApi = useApi(identityApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
-  const [userEntityRef, setUserEntityRef] = useState<string>('');
+  const backendUrl = config.getString("backend.baseUrl");
+  const [userEntityRef, setUserEntityRef] = useState<string>("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [apiProductToDelete, setApiProductToDelete] = useState<{ namespace: string; name: string } | null>(null);
-  const [apiProductToEdit, setApiProductToEdit] = useState<{ namespace: string; name: string } | null>(null);
+  const [apiProductToDelete, setApiProductToDelete] = useState<{
+    namespace: string;
+    name: string;
+  } | null>(null);
+  const [apiProductToEdit, setApiProductToEdit] = useState<{
+    namespace: string;
+    name: string;
+  } | null>(null);
   const [deleting, setDeleting] = useState(false);
-  const [deleteStats, setDeleteStats] = useState<{ requests: number; secrets: number } | null>(null);
+  const [deleteStats, setDeleteStats] = useState<{
+    requests: number;
+    secrets: number;
+  } | null>(null);
 
   const {
     allowed: canCreateApiProduct,
     loading: createPermissionLoading,
     error: createPermissionError,
   } = useKuadrantPermission(kuadrantApiProductCreatePermission);
-
-  const {
-    allowed: canViewApprovalQueue,
-    loading: approvalQueuePermissionLoading,
-    error: approvalQueuePermissionError,
-  } = useKuadrantPermission(kuadrantApiKeyApprovePermission);
 
   const {
     allowed: canDeleteOwnApiProduct,
@@ -90,15 +103,16 @@ export const ResourceList = () => {
     error: deletePermissionError,
   } = useKuadrantPermission(kuadrantApiProductDeleteAllPermission);
 
-  const {
-    allowed: canUpdateOwnApiProduct,
-  } = useKuadrantPermission(kuadrantApiProductUpdateOwnPermission);
+  const { allowed: canUpdateOwnApiProduct } = useKuadrantPermission(
+    kuadrantApiProductUpdateOwnPermission,
+  );
 
-  const {
-    allowed: canUpdateAllApiProducts,
-  } = useKuadrantPermission(kuadrantApiProductUpdateAllPermission);
+  const { allowed: canUpdateAllApiProducts } = useKuadrantPermission(
+    kuadrantApiProductUpdateAllPermission,
+  );
 
-  const deletePermissionLoading = deleteOwnPermissionLoading || deleteAllPermissionLoading;
+  const deletePermissionLoading =
+    deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
     allowed: canListPlanPolicies,
@@ -111,23 +125,45 @@ export const ResourceList = () => {
     setUserEntityRef(identity.userEntityRef);
   }, [identityApi]);
 
-  const { value: apiProducts, loading: apiProductsLoading, error: apiProductsError } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`);
+  const {
+    value: apiProducts,
+    loading: apiProductsLoading,
+    error: apiProductsError,
+  } = useAsync(async (): Promise<KuadrantList> => {
+    const response = await fetchApi.fetch(
+      `${backendUrl}/api/kuadrant/apiproducts`,
+    );
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
-  const { value: planPolicies, loading: planPoliciesLoading, error: planPoliciesError } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+  const {
+    value: planPolicies,
+    loading: planPoliciesLoading,
+    error: planPoliciesError,
+  } = useAsync(async (): Promise<KuadrantList> => {
+    const response = await fetchApi.fetch(
+      `${backendUrl}/api/kuadrant/planpolicies`,
+    );
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
-  const loading = apiProductsLoading || planPoliciesLoading || createPermissionLoading || approvalQueuePermissionLoading || deletePermissionLoading || planPolicyPermissionLoading;
+  const loading =
+    apiProductsLoading ||
+    planPoliciesLoading ||
+    createPermissionLoading ||
+    deletePermissionLoading ||
+    planPolicyPermissionLoading;
   const error = apiProductsError || planPoliciesError;
-  const permissionError = createPermissionError || approvalQueuePermissionError || deletePermissionError || planPolicyPermissionError;
+  const permissionError =
+    createPermissionError || deletePermissionError || planPolicyPermissionError;
 
   const handleCreateSuccess = () => {
-    setRefreshTrigger(prev => prev + 1);
-    alertApi.post({ message: 'API Product created', severity: 'success', display: 'transient' });
+    setRefreshTrigger((prev) => prev + 1);
+    alertApi.post({
+      message: "API Product created",
+      severity: "success",
+      display: "transient",
+    });
   };
 
   const handleEditClick = (namespace: string, name: string) => {
@@ -136,8 +172,12 @@ export const ResourceList = () => {
   };
 
   const handleEditSuccess = () => {
-    setRefreshTrigger(prev => prev + 1);
-    alertApi.post({ message: 'API Product updated', severity: 'success', display: 'transient' });
+    setRefreshTrigger((prev) => prev + 1);
+    alertApi.post({
+      message: "API Product updated",
+      severity: "success",
+      display: "transient",
+    });
   };
 
   const handleDeleteClick = async (namespace: string, name: string) => {
@@ -145,17 +185,22 @@ export const ResourceList = () => {
     setDeleteStats(null);
 
     try {
-      const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/requests?namespace=${namespace}`);
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/requests?namespace=${namespace}`,
+      );
       if (response.ok) {
         const data = await response.json();
         const related = (data.items || []).filter(
-          (r: any) => r.spec.apiName === name && r.spec.apiNamespace === namespace
+          (r: any) =>
+            r.spec.apiName === name && r.spec.apiNamespace === namespace,
         );
-        const approved = related.filter((r: any) => r.status?.phase === 'Approved').length;
+        const approved = related.filter(
+          (r: any) => r.status?.phase === "Approved",
+        ).length;
         setDeleteStats({ requests: related.length, secrets: approved });
       }
     } catch (err) {
-      console.warn('Failed to fetch delete stats:', err);
+      console.warn("Failed to fetch delete stats:", err);
     }
 
     setDeleteDialogOpen(true);
@@ -168,18 +213,26 @@ export const ResourceList = () => {
     try {
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/apiproducts/${apiProductToDelete.namespace}/${apiProductToDelete.name}`,
-        { method: 'DELETE' }
+        { method: "DELETE" },
       );
 
       if (!response.ok) {
-        throw new Error('failed to delete apiproduct');
+        throw new Error("failed to delete apiproduct");
       }
 
-      setRefreshTrigger(prev => prev + 1);
-      alertApi.post({ message: 'API Product deleted', severity: 'success', display: 'transient' });
+      setRefreshTrigger((prev) => prev + 1);
+      alertApi.post({
+        message: "API Product deleted",
+        severity: "success",
+        display: "transient",
+      });
     } catch (err) {
-      console.error('error deleting apiproduct:', err);
-      alertApi.post({ message: 'Failed to delete API Product', severity: 'error', display: 'transient' });
+      console.error("error deleting apiproduct:", err);
+      alertApi.post({
+        message: "Failed to delete API Product",
+        severity: "error",
+        display: "transient",
+      });
     } finally {
       setDeleting(false);
       setDeleteDialogOpen(false);
@@ -194,20 +247,20 @@ export const ResourceList = () => {
 
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
+    return date.toLocaleDateString("en-GB", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
     });
   };
 
   const columns: TableColumn[] = [
     {
-      title: 'Name',
-      field: 'spec.displayName',
+      title: "Name",
+      field: "spec.displayName",
       render: (row: any) => {
         const publishStatus = row.spec?.publishStatus;
-        const isPublished = publishStatus === 'Published';
+        const isPublished = publishStatus === "Published";
         const displayName = row.spec?.displayName ?? row.metadata.name;
 
         if (isPublished) {
@@ -225,66 +278,73 @@ export const ResourceList = () => {
         );
       },
       customFilterAndSearch: (term, row: any) => {
-        const displayName = row.spec?.displayName || row.metadata.name || '';
+        const displayName = row.spec?.displayName || row.metadata.name || "";
         return displayName.toLowerCase().includes(term.toLowerCase());
       },
     },
     {
-      title: 'Resource Name',
-      field: 'metadata.name',
+      title: "Resource Name",
+      field: "metadata.name",
     },
     {
-      title: 'Version',
-      field: 'spec.version',
-      render: (row: any) => row.spec?.version || '-',
+      title: "Version",
+      field: "spec.version",
+      render: (row: any) => row.spec?.version || "-",
     },
     {
-      title: 'HTTPRoute',
-      field: 'spec.targetRef.name',
-      render: (row: any) => row.spec?.targetRef?.name || '-',
+      title: "HTTPRoute",
+      field: "spec.targetRef.name",
+      render: (row: any) => row.spec?.targetRef?.name || "-",
     },
     {
-      title: 'Publish Status',
-      field: 'spec.publishStatus',
+      title: "Publish Status",
+      field: "spec.publishStatus",
       render: (row: any) => {
-        const status = row.spec?.publishStatus || 'Draft';
+        const status = row.spec?.publishStatus || "Draft";
         return (
           <Chip
             label={status}
             size="small"
-            color={status === 'Published' ? 'primary' : 'default'}
+            color={status === "Published" ? "primary" : "default"}
           />
         );
       },
     },
     {
-      title: 'Approval Mode',
-      field: 'spec.approvalMode',
+      title: "Approval Mode",
+      field: "spec.approvalMode",
       render: (row: any) => {
-        const mode = row.spec?.approvalMode || 'manual';
+        const mode = row.spec?.approvalMode || "manual";
         return (
           <Chip
             label={mode}
             size="small"
-            color={mode === 'automatic' ? 'secondary' : 'default'}
+            color={mode === "automatic" ? "secondary" : "default"}
           />
         );
       },
     },
     {
-      title: 'Authentication',
-      field: 'status.discoveredAuthScheme',
+      title: "Authentication",
+      field: "status.discoveredAuthScheme",
       render: (row: any) => {
-        const authSchemes = row.status?.discoveredAuthScheme?.authentication || {};
+        const authSchemes =
+          row.status?.discoveredAuthScheme?.authentication || {};
         const schemeObjects = Object.values(authSchemes);
 
-        console.log(`[${row.metadata.name}] schemeObjects count:`, schemeObjects.length, 'data:', schemeObjects);
-
-        const hasApiKey = schemeObjects.some((scheme: any) => scheme.hasOwnProperty('apiKey'));
-        const hasJwt = schemeObjects.some((scheme: any) => scheme.hasOwnProperty('jwt'));
+        const hasApiKey = schemeObjects.some((scheme: any) =>
+          scheme.hasOwnProperty("apiKey"),
+        );
+        const hasJwt = schemeObjects.some((scheme: any) =>
+          scheme.hasOwnProperty("jwt"),
+        );
 
         if (!hasApiKey && !hasJwt) {
-          return <Typography variant="body2" style={{ fontStyle: 'italic' }}>unknown</Typography>;
+          return (
+            <Typography variant="body2" style={{ fontStyle: "italic" }}>
+              unknown
+            </Typography>
+          );
         }
 
         return (
@@ -310,23 +370,25 @@ export const ResourceList = () => {
       },
     },
     {
-      title: 'Namespace',
-      field: 'metadata.namespace',
+      title: "Namespace",
+      field: "metadata.namespace",
     },
     {
-      title: 'Created',
-      field: 'metadata.creationTimestamp',
+      title: "Created",
+      field: "metadata.creationTimestamp",
       render: (row: any) => formatDate(row.metadata.creationTimestamp),
     },
     {
-      title: 'Actions',
-      field: 'actions',
+      title: "Actions",
+      field: "actions",
       filtering: false,
       render: (row: any) => {
-        const owner = row.metadata?.annotations?.['backstage.io/owner'];
+        const owner = row.metadata?.annotations?.["backstage.io/owner"];
         const isOwner = owner === userEntityRef;
-        const canEdit = canUpdateAllApiProducts || (canUpdateOwnApiProduct && isOwner);
-        const canDelete = canDeleteAllApiProducts || (canDeleteOwnApiProduct && isOwner);
+        const canEdit =
+          canUpdateAllApiProducts || (canUpdateOwnApiProduct && isOwner);
+        const canDelete =
+          canDeleteAllApiProducts || (canDeleteOwnApiProduct && isOwner);
 
         if (!canEdit && !canDelete) return null;
 
@@ -335,7 +397,9 @@ export const ResourceList = () => {
             {canEdit && (
               <IconButton
                 size="small"
-                onClick={() => handleEditClick(row.metadata.namespace, row.metadata.name)}
+                onClick={() =>
+                  handleEditClick(row.metadata.namespace, row.metadata.name)
+                }
                 title="Edit API Product"
               >
                 <EditIcon fontSize="small" />
@@ -345,7 +409,9 @@ export const ResourceList = () => {
             {canDelete && (
               <IconButton
                 size="small"
-                onClick={() => handleDeleteClick(row.metadata.namespace, row.metadata.name)}
+                onClick={() =>
+                  handleDeleteClick(row.metadata.namespace, row.metadata.name)
+                }
                 title="Delete API Product"
               >
                 <DeleteIcon fontSize="small" />
@@ -359,23 +425,29 @@ export const ResourceList = () => {
 
   const planPolicyColumns: TableColumn[] = [
     {
-      title: 'Name',
-      field: 'metadata.name',
+      title: "Name",
+      field: "metadata.name",
       render: (row: any) => (
-        <Link to={`/kuadrant/planpolicy/${row.metadata.namespace}/${row.metadata.name}`}>
+        <Link
+          to={`/kuadrant/planpolicy/${row.metadata.namespace}/${row.metadata.name}`}
+        >
           <strong>{row.metadata.name}</strong>
         </Link>
       ),
     },
     {
-      title: 'Namespace',
-      field: 'metadata.namespace',
+      title: "Namespace",
+      field: "metadata.namespace",
     },
   ];
 
   const renderResources = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
-      return <Typography variant="body2" color="textSecondary">No API products found</Typography>;
+      return (
+        <Typography variant="body2" color="textSecondary">
+          No API products found
+        </Typography>
+      );
     }
     return (
       <Table
@@ -396,7 +468,11 @@ export const ResourceList = () => {
 
   const renderPlanPolicies = (resources: KuadrantResource[] | undefined) => {
     if (!resources || resources.length === 0) {
-      return <Typography variant="body2" color="textSecondary">No plan policies found</Typography>;
+      return (
+        <Typography variant="body2" color="textSecondary">
+          No plan policies found
+        </Typography>
+      );
     }
     return (
       <Table
@@ -409,8 +485,11 @@ export const ResourceList = () => {
 
   return (
     <Page themeId="tool">
-      <Header title="Kuadrant" subtitle="API management for Kubernetes">
-        <SupportButton>Manage API products and access requests</SupportButton>
+      <Header
+        title="API Products"
+        subtitle="Manage API products for Kubernetes"
+      >
+        <SupportButton>Manage API products and plan policies</SupportButton>
       </Header>
       <Content>
         {loading && <Progress />}
@@ -421,10 +500,14 @@ export const ResourceList = () => {
               unable to check permissions: {permissionError.message}
             </Typography>
             <Typography variant="body2" color="textSecondary">
-              permission: {createPermissionError ? 'kuadrant.apiproduct.create' :
-                deletePermissionError ? 'kuadrant.apiproduct.delete' :
-                  approvalQueuePermissionError ? 'kuadrant.apikey.read.all' :
-                    planPolicyPermissionError ? 'kuadrant.planpolicy.list' : 'unknown'}
+              permission:{" "}
+              {createPermissionError
+                ? "kuadrant.apiproduct.create"
+                : deletePermissionError
+                  ? "kuadrant.apiproduct.delete"
+                  : planPolicyPermissionError
+                    ? "kuadrant.planpolicy.list"
+                    : "unknown"}
             </Typography>
             <Typography variant="body2" color="textSecondary">
               please try again or contact your administrator
@@ -434,15 +517,16 @@ export const ResourceList = () => {
         {!loading && !error && !permissionError && (
           <Grid container spacing={3} direction="column">
             <Grid item>
-              <MyApiKeysCard />
-            </Grid>
-
-            <Grid item>
               <InfoCard
                 title="API Products"
                 action={
                   canCreateApiProduct ? (
-                    <Box display="flex" alignItems="center" height="100%" mt={1}>
+                    <Box
+                      display="flex"
+                      alignItems="center"
+                      height="100%"
+                      mt={1}
+                    >
                       <Button
                         variant="contained"
                         color="primary"
@@ -467,12 +551,6 @@ export const ResourceList = () => {
                 </InfoCard>
               </Grid>
             )}
-
-            {canViewApprovalQueue && (
-              <Grid item>
-                <ApprovalQueueCard />
-              </Grid>
-            )}
           </Grid>
         )}
         <CreateAPIProductDialog
@@ -484,8 +562,8 @@ export const ResourceList = () => {
           open={editDialogOpen}
           onClose={() => setEditDialogOpen(false)}
           onSuccess={handleEditSuccess}
-          namespace={apiProductToEdit?.namespace || ''}
-          name={apiProductToEdit?.name || ''}
+          namespace={apiProductToEdit?.namespace || ""}
+          name={apiProductToEdit?.name || ""}
         />
         <ConfirmDeleteDialog
           open={deleteDialogOpen}
@@ -494,11 +572,11 @@ export const ResourceList = () => {
             deleteStats
               ? `Deleting "${apiProductToDelete?.name}" will also remove:
 
-• ${deleteStats.requests} API Key Request(s)
+• ${deleteStats.requests} API Key(s)
 • ${deleteStats.secrets} API Key Secret(s)
 
 This action cannot be undone.`
-              : `Deleting "${apiProductToDelete?.name}" will also remove all associated API Key Requests and Secrets.
+              : `Deleting "${apiProductToDelete?.name}" will also remove all associated API Keys and Secrets.
 This action cannot be undone.`
           }
           confirmText={apiProductToDelete?.name}

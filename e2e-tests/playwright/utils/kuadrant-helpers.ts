@@ -3,10 +3,10 @@ import { Common } from "./common";
 
 // timeout constants for consistent test behaviour
 export const TIMEOUTS = {
-  QUICK: 3000,       // quick checks where element absence is expected
-  DEFAULT: 5000,     // standard element visibility
-  SLOW: 10000,       // api responses, catalog sync
-  VERY_SLOW: 30000,  // kubernetes propagation
+  QUICK: 3000, // quick checks where element absence is expected
+  DEFAULT: 5000, // standard element visibility
+  SLOW: 15000, // api responses, catalog sync, page loads
+  VERY_SLOW: 30000, // kubernetes propagation
 } as const;
 
 // test data generation
@@ -115,22 +115,32 @@ export async function expectElementPermission(
 }
 
 /**
- * Navigate to Kuadrant page via sidebar click.
- * More reliable than page.goto as it doesn't cause full page reload.
+ * Wait for API Products page to be ready.
+ * Uses toPass for robust polling - retries until both conditions are stable.
  */
-export async function navigateToKuadrant(page: Page): Promise<void> {
-  const kuadrantLink = page.locator('nav a:has-text("Kuadrant")').first();
-  await kuadrantLink.waitFor({ state: "visible", timeout: TIMEOUTS.DEFAULT });
-  await kuadrantLink.click();
-  await waitForKuadrantPageReady(page);
+export async function waitForKuadrantPageReady(page: Page): Promise<void> {
+  await expect(async () => {
+    const progress = page.locator('[role="progressbar"]');
+    await expect(progress).toHaveCount(0);
+    const content = page.getByText(/api products/i).first();
+    await expect(content).toBeVisible();
+  }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 }
 
 /**
- * Wait for Kuadrant page content to be ready.
+ * Wait for API Keys page to be ready.
+ * Uses toPass for robust polling - retries until both conditions are stable.
  */
-export async function waitForKuadrantPageReady(page: Page): Promise<void> {
-  const apiProductsSection = page.getByText(/api products/i).first();
-  await expect(apiProductsSection).toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
+export async function waitForApiKeysPageReady(page: Page): Promise<void> {
+  await page.waitForURL(/\/kuadrant\/api-keys/, { timeout: TIMEOUTS.VERY_SLOW });
+  await page.waitForLoadState("domcontentloaded");
+
+  await expect(async () => {
+    const progress = page.locator('[role="progressbar"]');
+    await expect(progress).toHaveCount(0);
+    const content = page.getByText(/api keys/i).first();
+    await expect(content).toBeVisible();
+  }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 }
 
 /**
@@ -144,7 +154,11 @@ export async function retryUntilSuccess<T>(
     errorMessage?: string;
   } = {},
 ): Promise<T> {
-  const { maxAttempts = 5, delayMs = 2000, errorMessage = "Operation failed after max attempts" } = options;
+  const {
+    maxAttempts = 5,
+    delayMs = 2000,
+    errorMessage = "Operation failed after max attempts",
+  } = options;
 
   let lastError: Error | undefined;
 
@@ -154,7 +168,7 @@ export async function retryUntilSuccess<T>(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
       if (i < maxAttempts - 1) {
-        await new Promise(resolve => setTimeout(resolve, delayMs));
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
       }
     }
   }
@@ -174,11 +188,13 @@ export class KuadrantTestDataBuilder {
   ): Promise<TestAPIProduct> {
     const common = new Common(this.page);
     await common.dexQuickLogin(ownerEmail);
-    await this.page.goto("/kuadrant");
+    await this.page.goto("/kuadrant/api-products");
     await waitForKuadrantPageReady(this.page);
 
     // click create button
-    const createButton = this.page.getByRole("button", { name: /create api product/i });
+    const createButton = this.page.getByRole("button", {
+      name: /create api product/i,
+    });
     await expect(createButton).toBeVisible({ timeout: TIMEOUTS.SLOW });
     await createButton.click();
 
@@ -189,15 +205,21 @@ export class KuadrantTestDataBuilder {
     // fill form
     await this.page.getByPlaceholder("my-api").fill(data.name);
     await this.page.getByPlaceholder("My API").fill(data.displayName);
-    await this.page.getByPlaceholder("API description").fill("E2E test - will be cleaned up");
+    await this.page
+      .getByPlaceholder("API description")
+      .fill("E2E test - will be cleaned up");
 
     // select httproute
-    const httprouteSelect = this.page.locator('[data-testid="httproute-select"]');
+    const httprouteSelect = this.page.locator(
+      '[data-testid="httproute-select"]',
+    );
     await httprouteSelect.scrollIntoViewIfNeeded();
     await httprouteSelect.click({ timeout: TIMEOUTS.DEFAULT });
 
     // wait for dropdown and select first option
-    const toystoreOption = this.page.getByRole("option", { name: /toystore/i }).first();
+    const toystoreOption = this.page
+      .getByRole("option", { name: /toystore/i })
+      .first();
     await expect(toystoreOption).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     await toystoreOption.click();
 
@@ -223,14 +245,21 @@ export class KuadrantTestDataBuilder {
     try {
       const common = new Common(this.page);
       await common.dexQuickLogin(ownerEmail);
-      await this.page.goto("/kuadrant");
+      await this.page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(this.page);
 
-      const apiProductRow = this.page.locator("tr").filter({ hasText: data.displayName });
-      const rowVisible = await isElementVisible(apiProductRow, TIMEOUTS.DEFAULT);
+      const apiProductRow = this.page
+        .locator("tr")
+        .filter({ hasText: data.displayName });
+      const rowVisible = await isElementVisible(
+        apiProductRow,
+        TIMEOUTS.DEFAULT,
+      );
 
       if (rowVisible) {
-        const deleteButton = apiProductRow.getByRole("button", { name: /delete api product/i });
+        const deleteButton = apiProductRow.getByRole("button", {
+          name: /delete api product/i,
+        });
         await deleteButton.click();
 
         const confirmDialog = this.page.getByRole("dialog");
@@ -239,7 +268,9 @@ export class KuadrantTestDataBuilder {
         const confirmInput = confirmDialog.getByRole("textbox");
         await confirmInput.fill(data.name);
 
-        const confirmButton = confirmDialog.getByRole("button", { name: /delete/i });
+        const confirmButton = confirmDialog.getByRole("button", {
+          name: /delete/i,
+        });
         await confirmButton.click();
         await expect(confirmDialog).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
       }
