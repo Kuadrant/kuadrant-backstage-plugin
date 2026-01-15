@@ -56,6 +56,7 @@ type KuadrantResource = {
     annotations?: Record<string, string>;
   };
   spec?: any;
+  status?: any;
 };
 
 type KuadrantList = {
@@ -106,6 +107,7 @@ export const ResourceList = () => {
     route: [],
     namespace: [],
     tags: [],
+    authentication: [],
   });
 
   const {
@@ -185,6 +187,24 @@ export const ResourceList = () => {
     return policy?.metadata.name || null;
   }, [planPolicies]);
 
+  // helper to get auth schemes for a product
+  const getAuthSchemes = useCallback((product: KuadrantResource): string[] => {
+    const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+    const schemeObjects = Object.values(authSchemes);
+    const schemes: string[] = [];
+
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("apiKey"))) {
+      schemes.push("API Key");
+    }
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("jwt"))) {
+      schemes.push("OIDC");
+    }
+    if (schemes.length === 0) {
+      schemes.push("Unknown");
+    }
+    return schemes;
+  }, []);
+
   const loading =
     apiProductsLoading ||
     planPoliciesLoading ||
@@ -205,6 +225,7 @@ export const ResourceList = () => {
     const routeCounts = new Map<string, number>();
     const namespaceCounts = new Map<string, number>();
     const tagCounts = new Map<string, number>();
+    const authCounts = new Map<string, number>();
 
     allProducts.forEach((p: KuadrantResource) => {
       const status = p.spec?.publishStatus || "Draft";
@@ -223,6 +244,11 @@ export const ResourceList = () => {
       tags.forEach((tag: string) => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
+
+      const authSchemes = getAuthSchemes(p);
+      authSchemes.forEach((scheme: string) => {
+        authCounts.set(scheme, (authCounts.get(scheme) || 0) + 1);
+      });
     });
 
     return [
@@ -233,6 +259,15 @@ export const ResourceList = () => {
           { value: "Draft", label: "Draft", count: statusCounts.Draft },
           { value: "Published", label: "Published", count: statusCounts.Published },
         ],
+      },
+      {
+        id: "authentication",
+        title: "Authentication",
+        options: Array.from(authCounts.entries()).map(([scheme, count]) => ({
+          value: scheme,
+          label: scheme,
+          count,
+        })),
       },
       {
         id: "policy",
@@ -275,13 +310,18 @@ export const ResourceList = () => {
         collapsed: tagCounts.size > 5,
       },
     ];
-  }, [allProducts, getPolicyForProduct]);
+  }, [allProducts, getPolicyForProduct, getAuthSchemes]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((p: KuadrantResource) => {
       if (filters.status.length > 0) {
         const status = p.spec?.publishStatus || "Draft";
         if (!filters.status.includes(status)) return false;
+      }
+
+      if (filters.authentication.length > 0) {
+        const authSchemes = getAuthSchemes(p);
+        if (!filters.authentication.some((a: string) => authSchemes.includes(a))) return false;
       }
 
       if (filters.policy.length > 0) {
@@ -305,7 +345,7 @@ export const ResourceList = () => {
 
       return true;
     });
-  }, [allProducts, filters, getPolicyForProduct]);
+  }, [allProducts, filters, getPolicyForProduct, getAuthSchemes]);
 
   const handleCreateSuccess = (productInfo: { namespace: string; name: string; displayName: string }) => {
     setRefreshTrigger((prev) => prev + 1);
