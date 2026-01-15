@@ -23,7 +23,6 @@ import {
   Link,
   Table,
   TableColumn,
-  EmptyState,
 } from "@backstage/core-components";
 import useAsync from "react-use/lib/useAsync";
 import {
@@ -47,6 +46,7 @@ import {
 import { useKuadrantPermission } from "../../utils/permissions";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
+import emptyStateIllustration from "../../assets/empty-state-illustration.png";
 
 type KuadrantResource = {
   metadata: {
@@ -56,13 +56,14 @@ type KuadrantResource = {
     annotations?: Record<string, string>;
   };
   spec?: any;
+  status?: any;
 };
 
 type KuadrantList = {
   items: KuadrantResource[];
 };
 
-const useStyles = makeStyles(() => ({
+const useStyles = makeStyles((theme) => ({
   container: {
     display: "flex",
     height: "100%",
@@ -72,6 +73,33 @@ const useStyles = makeStyles(() => ({
     flex: 1,
     overflow: "auto",
     padding: 10,
+  },
+  emptyState: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: theme.spacing(6),
+    minHeight: 400,
+  },
+  emptyStateContent: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(6),
+    maxWidth: 900,
+  },
+  emptyStateText: {
+    flex: 1,
+  },
+  emptyStateTitle: {
+    marginBottom: theme.spacing(2),
+  },
+  emptyStateDescription: {
+    marginBottom: theme.spacing(3),
+    color: theme.palette.text.secondary,
+  },
+  emptyStateImage: {
+    maxWidth: 400,
+    height: "auto",
   },
 }));
 
@@ -106,6 +134,7 @@ export const ResourceList = () => {
     route: [],
     namespace: [],
     tags: [],
+    authentication: [],
   });
 
   const {
@@ -185,6 +214,24 @@ export const ResourceList = () => {
     return policy?.metadata.name || null;
   }, [planPolicies]);
 
+  // helper to get auth schemes for a product
+  const getAuthSchemes = useCallback((product: KuadrantResource): string[] => {
+    const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+    const schemeObjects = Object.values(authSchemes);
+    const schemes: string[] = [];
+
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("apiKey"))) {
+      schemes.push("API Key");
+    }
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("jwt"))) {
+      schemes.push("OIDC");
+    }
+    if (schemes.length === 0) {
+      schemes.push("Unknown");
+    }
+    return schemes;
+  }, []);
+
   const loading =
     apiProductsLoading ||
     planPoliciesLoading ||
@@ -205,6 +252,7 @@ export const ResourceList = () => {
     const routeCounts = new Map<string, number>();
     const namespaceCounts = new Map<string, number>();
     const tagCounts = new Map<string, number>();
+    const authCounts = new Map<string, number>();
 
     allProducts.forEach((p: KuadrantResource) => {
       const status = p.spec?.publishStatus || "Draft";
@@ -223,6 +271,11 @@ export const ResourceList = () => {
       tags.forEach((tag: string) => {
         tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
       });
+
+      const authSchemes = getAuthSchemes(p);
+      authSchemes.forEach((scheme: string) => {
+        authCounts.set(scheme, (authCounts.get(scheme) || 0) + 1);
+      });
     });
 
     return [
@@ -233,6 +286,15 @@ export const ResourceList = () => {
           { value: "Draft", label: "Draft", count: statusCounts.Draft },
           { value: "Published", label: "Published", count: statusCounts.Published },
         ],
+      },
+      {
+        id: "authentication",
+        title: "Authentication",
+        options: Array.from(authCounts.entries()).map(([scheme, count]) => ({
+          value: scheme,
+          label: scheme,
+          count,
+        })),
       },
       {
         id: "policy",
@@ -275,13 +337,18 @@ export const ResourceList = () => {
         collapsed: tagCounts.size > 5,
       },
     ];
-  }, [allProducts, getPolicyForProduct]);
+  }, [allProducts, getPolicyForProduct, getAuthSchemes]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((p: KuadrantResource) => {
       if (filters.status.length > 0) {
         const status = p.spec?.publishStatus || "Draft";
         if (!filters.status.includes(status)) return false;
+      }
+
+      if (filters.authentication.length > 0) {
+        const authSchemes = getAuthSchemes(p);
+        if (!filters.authentication.some((a: string) => authSchemes.includes(a))) return false;
       }
 
       if (filters.policy.length > 0) {
@@ -305,7 +372,7 @@ export const ResourceList = () => {
 
       return true;
     });
-  }, [allProducts, filters, getPolicyForProduct]);
+  }, [allProducts, filters, getPolicyForProduct, getAuthSchemes]);
 
   const handleCreateSuccess = (productInfo: { namespace: string; name: string; displayName: string }) => {
     setRefreshTrigger((prev) => prev + 1);
@@ -646,7 +713,40 @@ export const ResourceList = () => {
             </Typography>
           </Box>
         )}
-        {!loading && !error && !permissionError && (
+        {!loading && !error && !permissionError && allProducts.length === 0 && (
+          <Box className={classes.emptyState}>
+            <Box className={classes.emptyStateContent}>
+              <Box className={classes.emptyStateText}>
+                <Typography variant="h4" className={classes.emptyStateTitle}>
+                  API Product
+                </Typography>
+                <Typography
+                  variant="body1"
+                  className={classes.emptyStateDescription}
+                >
+                  Create API product by registering existing API, associate
+                  route and policy
+                </Typography>
+                {canCreateApiProduct && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    Create API Product
+                  </Button>
+                )}
+              </Box>
+              <img
+                src={emptyStateIllustration}
+                alt="API Product illustration"
+                className={classes.emptyStateImage}
+              />
+            </Box>
+          </Box>
+        )}
+        {!loading && !error && !permissionError && allProducts.length > 0 && (
           <Box className={classes.container}>
             <FilterPanel
               sections={filterSections}
@@ -668,31 +768,11 @@ export const ResourceList = () => {
                 )}
               </Box>
               {filteredProducts.length === 0 ? (
-                allProducts.length === 0 ? (
-                  <EmptyState
-                    missing="data"
-                    title="API Product"
-                    description="Create API product by registering existing API, associate route and policy"
-                    action={
-                      canCreateApiProduct ? (
-                        <Button
-                          variant="contained"
-                          color="primary"
-                          startIcon={<AddIcon />}
-                          onClick={() => setCreateDialogOpen(true)}
-                        >
-                          Create API Product
-                        </Button>
-                      ) : undefined
-                    }
-                  />
-                ) : (
-                  <Box p={4} textAlign="center">
-                    <Typography variant="body1" color="textSecondary">
-                      No API products match the selected filters.
-                    </Typography>
-                  </Box>
-                )
+                <Box p={4} textAlign="center">
+                  <Typography variant="body1" color="textSecondary">
+                    No API products match the selected filters.
+                  </Typography>
+                </Box>
               ) : (
                 <Table
                   options={{

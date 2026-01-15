@@ -173,10 +173,10 @@ export const ApiProductDetails = ({
         </Box>
         <Box className={classes.infoItem}>
           <Typography variant="caption" className={classes.label}>
-            Policies
+            Plan Policy
           </Typography>
           <Typography variant="body2">
-            {planPolicy?.metadata?.name || "N/A"}
+            {planPolicy?.metadata?.name || "None"}
           </Typography>
         </Box>
       </Box>
@@ -184,7 +184,7 @@ export const ApiProductDetails = ({
       {tiers.length > 0 && (
         <Box mb={3}>
           <Typography variant="caption" className={classes.label}>
-            Available Plans
+            Available Tiers
           </Typography>
           <Table size="small">
             <TableHead>
