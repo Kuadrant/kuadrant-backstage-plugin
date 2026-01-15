@@ -159,6 +159,12 @@ export class APIProductEntityProvider implements EntityProvider {
         description: ${description}
     `;
 
+    // Check if entity has API Key auth scheme
+    const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+    const schemeObjects = Object.values(authSchemes);
+    const hasApiKey = schemeObjects.some((scheme: any) =>
+      scheme.hasOwnProperty("apiKey"),
+    );
     // create entity with proper backstage structure
     const entity: ApiEntity = {
       apiVersion: 'backstage.io/v1alpha1',
@@ -206,6 +212,7 @@ export class APIProductEntityProvider implements EntityProvider {
         lifecycle,
         owner,
         definition: definition,
+        hasApiKey: hasApiKey,
       },
     };
 
