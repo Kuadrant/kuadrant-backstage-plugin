@@ -89,6 +89,7 @@ kuadrant-install: $(HELM) $(KUSTOMIZE)
 demo-install:
 	@echo "installing toystore demo resources..."
 	@kubectl apply -f demo/toystore-demo.yaml
+	@kubectl apply -f demo/gamestore-demo.yaml
 	@kubectl apply -f demo/additional-demos.yaml
 	@echo ""
 	@echo "demo resources installed!"
