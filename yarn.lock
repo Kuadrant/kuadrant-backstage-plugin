@@ -4176,6 +4176,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@babel/runtime@npm:^7.28.4":
+  version: 7.28.6
+  resolution: "@babel/runtime@npm:7.28.6"
+  checksum: 42d8a868c2fc2e9a77927945a6daa7ec03c7ea49e611e0d15442933cdabb12f20e3a6849c729259076c10a4247adec229331d1f94c2d0073ea0979d7853e29fd
+  languageName: node
+  linkType: hard
+
 "@babel/template@npm:^7.24.7, @babel/template@npm:^7.25.9, @babel/template@npm:^7.3.3":
   version: 7.25.9
   resolution: "@babel/template@npm:7.25.9"
@@ -11602,6 +11609,22 @@ __metadata:
     "@types/react":
       optional: true
   checksum: 1ee4ee2817278c72095860c81e742270ee01fd320e48f865d371abfeacf83e43a7c6edbfd060ee66ef2a4f02c6cf79de0aca1e73a4d5f6320112bbfcac8176c3
+  languageName: node
+  linkType: hard
+
+"@mui/icons-material@npm:7.3.7":
+  version: 7.3.7
+  resolution: "@mui/icons-material@npm:7.3.7"
+  dependencies:
+    "@babel/runtime": ^7.28.4
+  peerDependencies:
+    "@mui/material": ^7.3.7
+    "@types/react": ^17.0.0 || ^18.0.0 || ^19.0.0
+    react: ^17.0.0 || ^18.0.0 || ^19.0.0
+  peerDependenciesMeta:
+    "@types/react":
+      optional: true
+  checksum: ddb55e26ad1444bce1aefe6ac3c25a67940679ad4fd1b3b3f198d0bdc4905aa14ae0afab6afe9fba806255956f6b064cf44f6e2b44df86d078447c6f76ee903d
   languageName: node
   linkType: hard
 
@@ -21547,7 +21570,7 @@ __metadata:
     "@janus-idp/cli": 3.6.1
     "@kuadrant/kuadrant-backstage-plugin-frontend": "workspace:*"
     "@material-ui/core": ^4.12.4
-    "@mui/icons-material": 5.18.0
+    "@mui/icons-material": 7.3.7
     "@mui/material": 5.18.0
     "@mui/styled-engine": 5.18.0
     "@red-hat-developer-hub/backstage-plugin-theme": 0.10.1
