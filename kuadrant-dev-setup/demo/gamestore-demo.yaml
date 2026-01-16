@@ -178,6 +178,23 @@ spec:
           authorizationHeader:
             prefix: APIKEY
 ---
+apiVersion: extensions.kuadrant.io/v1alpha1
+kind: PlanPolicy
+metadata:
+  name: gamestore-admin-tiers
+  namespace: gamestore
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: gamestore-admin
+  plans:
+    - tier: admin
+      predicate: |
+        has(auth.identity) && auth.identity.metadata.annotations["secret.kuadrant.io/plan-id"] == "admin"
+      limits:
+        daily: 1000000
+---
 apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
