@@ -48,6 +48,10 @@ interface APIProduct {
       raw?: string;
       lastSyncTime?: string;
     };
+    discoveredAuthScheme?: any;
+    oidcDiscovery?: {
+      tokenEndpoint: string;
+    };
   };
 }
 
