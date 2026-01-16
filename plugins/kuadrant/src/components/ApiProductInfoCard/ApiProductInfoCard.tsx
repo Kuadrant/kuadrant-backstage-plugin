@@ -112,8 +112,12 @@ export const ApiProductInfoCard = () => {
   const hasJwt = schemeObjects.some((scheme: any) =>
     scheme.hasOwnProperty("jwt"),
   );
-  const jwtIssuer = "something"
-  const jwtTokenEndpoint = "something"
+
+  // Extract JWT issuer from the first JWT scheme
+  const jwtScheme = schemeObjects.find((scheme: any) => scheme.hasOwnProperty("jwt"));
+  const jwtIssuer = (jwtScheme as any)?.jwt?.issuerUrl || "unknown";
+  const jwtTokenEndpoint = status?.oidcDiscovery?.tokenEndpoint || "unknown";
+
   const plans = status?.discoveredPlans || [];
 
   return (
