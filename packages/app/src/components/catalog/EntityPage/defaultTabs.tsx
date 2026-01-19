@@ -132,7 +132,7 @@ export const tabRules: Record<
       if (!isKind('api')(entity)) return false;
       if (!entity.metadata.annotations?.['kuadrant.io/apiproduct']) return false;
 
-      return entity.spec?.hasApiKey;
+      return entity.metadata.annotations?.['kuadrant.io/auth-apikey'] === "true";
     },
   },
   '/api-product-info': {

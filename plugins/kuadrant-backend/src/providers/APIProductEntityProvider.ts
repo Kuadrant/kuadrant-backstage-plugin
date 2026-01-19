@@ -180,6 +180,7 @@ export class APIProductEntityProvider implements EntityProvider {
           'backstage.io/orphan-strategy': 'keep',
           'kuadrant.io/namespace': namespace,
           'kuadrant.io/apiproduct': name,
+          'kuadrant.io/auth-apikey': hasApiKey.toString(),
           // add httproute annotation if we can infer it (usually same as apiproduct name without -api suffix)
           'kuadrant.io/httproute': name.endsWith('-api') ? name.slice(0, -4) : name,
           ...(product.spec.documentation?.openAPISpecURL && {
@@ -212,7 +213,6 @@ export class APIProductEntityProvider implements EntityProvider {
         lifecycle,
         owner,
         definition: definition,
-        hasApiKey: hasApiKey,
       },
     };
 
