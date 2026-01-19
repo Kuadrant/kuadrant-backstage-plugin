@@ -130,9 +130,12 @@ export const tabRules: Record<
   '/api-keys': {
     if: (entity: Entity) => {
       if (!isKind('api')(entity)) return false;
-      if (!entity.metadata.annotations?.['kuadrant.io/apiproduct']) return false;
+      if (!entity.metadata.annotations?.['kuadrant.io/apiproduct'])
+        return false;
 
-      return entity.metadata.annotations?.['kuadrant.io/auth-apikey'] === "true";
+      return (
+        entity.metadata.annotations?.['kuadrant.io/auth-apikey'] === 'true'
+      );
     },
   },
   '/api-product-info': {
