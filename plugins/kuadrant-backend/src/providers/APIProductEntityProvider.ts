@@ -48,6 +48,10 @@ interface APIProduct {
       raw?: string;
       lastSyncTime?: string;
     };
+    discoveredAuthScheme?: any;
+    oidcDiscovery?: {
+      tokenEndpoint: string;
+    };
   };
 }
 
@@ -159,6 +163,12 @@ export class APIProductEntityProvider implements EntityProvider {
         description: ${description}
     `;
 
+    // Check if entity has API Key auth scheme
+    const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+    const schemeObjects = Object.values(authSchemes);
+    const hasApiKey = schemeObjects.some((scheme: any) =>
+      scheme.hasOwnProperty("apiKey"),
+    );
     // create entity with proper backstage structure
     const entity: ApiEntity = {
       apiVersion: 'backstage.io/v1alpha1',
@@ -174,6 +184,7 @@ export class APIProductEntityProvider implements EntityProvider {
           'backstage.io/orphan-strategy': 'keep',
           'kuadrant.io/namespace': namespace,
           'kuadrant.io/apiproduct': name,
+          'kuadrant.io/auth-apikey': hasApiKey.toString(),
           // add httproute annotation if we can infer it (usually same as apiproduct name without -api suffix)
           'kuadrant.io/httproute': name.endsWith('-api') ? name.slice(0, -4) : name,
           ...(product.spec.documentation?.openAPISpecURL && {
