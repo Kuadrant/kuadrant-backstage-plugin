@@ -59,6 +59,7 @@ import {
 } from "../../utils/permissions";
 import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
+import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
 
 interface APIProduct {
   metadata: {
@@ -464,6 +465,10 @@ export const ApiKeyManagementTab = ({
     // use revealed key if available, otherwise show placeholder
     const displayApiKey = revealedApiKey || "<your-api-key>";
 
+    // Generate code snippets based on authScheme credentials
+    const credentials = request.status?.authScheme?.credentials;
+    const snippets = generateAuthCodeSnippets(credentials, hostname, displayApiKey);
+
     return (
       <Box
         p={3}
@@ -519,77 +524,28 @@ export const ApiKeyManagementTab = ({
         <Box mt={2}>
           {selectedLanguage === 0 && (
             <CodeSnippet
-              text={`curl -X GET https://${hostname}/api/v1/endpoint \\
-  -H "Authorization: Bearer ${displayApiKey}"`} // notsecret - template for user's own api key
+              text={snippets.curl}
               language="bash"
               showCopyCodeButton
             />
           )}
           {selectedLanguage === 1 && (
             <CodeSnippet
-              text={`const fetch = require('node-fetch');
-
-const apiKey = '${displayApiKey}';
-const endpoint = 'https://${hostname}/api/v1/endpoint';
-
-fetch(endpoint, {
-  method: 'GET',
-  headers: {
-    'Authorization': \`Bearer \${apiKey}\`
-  }
-})
-  .then(response => response.json())
-  .then(data => console.log(data))
-  .catch(error => console.error('Error:', error));`}
+              text={snippets.nodejs}
               language="javascript"
               showCopyCodeButton
             />
           )}
           {selectedLanguage === 2 && (
             <CodeSnippet
-              text={`import requests
-
-api_key = '${displayApiKey}'
-endpoint = 'https://${hostname}/api/v1/endpoint'
-
-headers = {
-    'Authorization': f'Bearer {api_key}'
-}
-
-response = requests.get(endpoint, headers=headers)
-print(response.json())`}
+              text={snippets.python}
               language="python"
               showCopyCodeButton
             />
           )}
           {selectedLanguage === 3 && (
             <CodeSnippet
-              text={`package main
-
-import (
-    "fmt"
-    "net/http"
-    "io"
-)
-
-func main() {
-    apiKey := "${displayApiKey}"
-    endpoint := "https://${hostname}/api/v1/endpoint"
-
-    client := &http.Client{}
-    req, _ := http.NewRequest("GET", endpoint, nil)
-    req.Header.Add("Authorization", "Bearer " + apiKey)
-
-    resp, err := client.Do(req)
-    if err != nil {
-        fmt.Println("Error:", err)
-        return
-    }
-    defer resp.Body.Close()
-
-    body, _ := io.ReadAll(resp.Body)
-    fmt.Println(string(body))
-}`}
+              text={snippets.go}
               language="go"
               showCopyCodeButton
             />
