@@ -1,7 +1,7 @@
 import React from 'react';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
-import { InfoCard, Link, Progress, ResponseErrorPanel } from '@backstage/core-components';
+import { InfoCard, Link, Progress, ResponseErrorPanel, CodeSnippet } from '@backstage/core-components';
 import { Grid, Chip, Typography, Box, Table, TableBody, TableCell, TableHead, TableRow } from '@material-ui/core';
 import useAsync from 'react-use/lib/useAsync';
 import { useKuadrantPermission } from '../../utils/permissions';
@@ -107,6 +107,17 @@ export const ApiProductInfoCard = () => {
   }
 
   const { spec, status } = apiProduct;
+  const authSchemes = status?.discoveredAuthScheme?.authentication || {};
+  const schemeObjects = Object.values(authSchemes);
+  const hasJwt = schemeObjects.some((scheme: any) =>
+    scheme.hasOwnProperty("jwt"),
+  );
+
+  // Extract JWT issuer from the first JWT scheme
+  const jwtScheme = schemeObjects.find((scheme: any) => scheme.hasOwnProperty("jwt"));
+  const jwtIssuer = (jwtScheme as any)?.jwt?.issuerUrl || "unknown";
+  const jwtTokenEndpoint = status?.oidcDiscovery?.tokenEndpoint || "unknown";
+
   const plans = status?.discoveredPlans || [];
 
   return (
@@ -267,6 +278,50 @@ export const ApiProductInfoCard = () => {
           )}
         </InfoCard>
       </Grid>
+      {hasJwt && (
+        <Grid item xs={12} md={6}>
+          <InfoCard title="OIDC Provider Discovery">
+            <Box p={2}>
+              <Grid container spacing={2}>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    This API uses OIDC authentication. Obtain a token from the identity provider below.
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Identity Provider: </strong>
+                    <Link to={jwtIssuer} target="_blank">
+                      {jwtIssuer}
+                    </Link>
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <Typography variant="body2">
+                    <strong>Token Endpoint: </strong>
+                    <Link to={jwtTokenEndpoint} target="_blank">
+                      {jwtTokenEndpoint}
+                    </Link>
+                  </Typography>
+                </Grid>
+                <Grid item xs={12}>
+                  <CodeSnippet
+                    text={`# Example (Client Credentials):
+curl -X POST \\
+   -d "grant_type=client_credentials" \\
+   -d "client_id=YOUR_CLIENT_ID" \\
+   -d "client_secret=YOUR_CLIENT_SECRET" \\
+   ${jwtTokenEndpoint}
+`} // notsecret - template for user's own api key
+                    language="bash"
+                    showCopyCodeButton
+                  />
+                </Grid>
+              </Grid>
+            </Box>
+          </InfoCard>
+        </Grid>
+      )}
     </Grid>
   );
 };
