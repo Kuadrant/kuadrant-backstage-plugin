@@ -290,7 +290,7 @@ export const ApiProductInfoCard = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2">
-                    <strong>Identity Provider:</strong>
+                    <strong>Identity Provider: </strong>
                     <Link to={jwtIssuer} target="_blank">
                       {jwtIssuer}
                     </Link>
@@ -298,7 +298,7 @@ export const ApiProductInfoCard = () => {
                 </Grid>
                 <Grid item xs={12}>
                   <Typography variant="body2">
-                    <strong>Token Endpoint:</strong>
+                    <strong>Token Endpoint: </strong>
                     <Link to={jwtTokenEndpoint} target="_blank">
                       {jwtTokenEndpoint}
                     </Link>
