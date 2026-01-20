@@ -66,8 +66,6 @@ kind: HTTPRoute
 metadata:
   name: gamestore
   namespace: gamestore
-  annotations:
-    backstage.io/expose: "true"
 spec:
   parentRefs:
     - name: external
@@ -134,8 +132,6 @@ kind: HTTPRoute
 metadata:
   name: gamestore-admin
   namespace: gamestore
-  annotations:
-    backstage.io/expose: "true"
 spec:
   parentRefs:
     - name: external

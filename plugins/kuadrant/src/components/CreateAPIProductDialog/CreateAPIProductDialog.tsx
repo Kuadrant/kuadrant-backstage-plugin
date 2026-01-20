@@ -87,10 +87,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
     const data = await response.json();
-    // filter to only show httproutes annotated for backstage exposure
-    return (data.items || []).filter((route: any) =>
-      route.metadata.annotations?.['backstage.io/expose'] === 'true'
-    );
+    return data.items || [];
   }, [backendUrl, fetchApi, open, httpRoutesRetry]);
 
   // load planpolicies with full details to show associated plans
@@ -470,7 +467,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               helperText={
                 httpRoutesError
                   ? "Unable to load HTTPRoutes. Please retry."
-                  : "Select an HTTPRoute. Eg.backstage.io/expose:true. API product will be created in the same namespace."
+                  : "Select an HTTPRoute. APIProduct will be created in the same namespace."
               }
               error={!!httpRoutesError}
               disabled={httpRoutesLoading || creating || !!httpRoutesError}
