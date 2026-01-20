@@ -1,3 +1,4 @@
+import { Entity } from '@backstage/catalog-model';
 import {
   EntityConsumingComponentsCard,
   EntityHasApisCard,
@@ -30,7 +31,6 @@ import { EntityKuadrantApiAccessCard } from '@kuadrant/kuadrant-backstage-plugin
 
 import Grid from '../Grid';
 import { hasLinks } from '../utils';
-import { Entity } from '@backstage/catalog-model';
 
 export const OverviewTabContent = () => (
   <>
