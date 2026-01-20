@@ -12,6 +12,24 @@ export interface PlanLimits {
   }>;
 }
 
+// Status condition types for Kubernetes resources
+export type OpenAPISpecConditionReason =
+  | 'SpecFetched'
+  | 'SpecSizeTooLarge'
+  | 'FetchFailed';
+
+export type StatusConditionType =
+  | 'OpenAPISpecReady'
+  | string; // Allow other condition types
+
+export interface StatusCondition {
+  type: StatusConditionType;
+  status: 'True' | 'False' | 'Unknown';
+  reason?: OpenAPISpecConditionReason | string;
+  message?: string;
+  lastTransitionTime?: string;
+}
+
 export interface APIKeySpec {
   apiProductRef: {
     name: string;
@@ -35,13 +53,7 @@ export interface APIKeyStatus {
     key: string;
   };
   canReadSecret?: boolean;
-  conditions?: Array<{
-    type: string;
-    status: 'True' | 'False' | 'Unknown';
-    reason?: string;
-    message?: string;
-    lastTransitionTime?: string;
-  }>;
+  conditions?: StatusCondition[];
 }
 
 export interface APIKey {
@@ -98,13 +110,7 @@ export interface APIProductStatus {
     raw: string;
     lastSyncTime: string;
   };
-  conditions?: Array<{
-    type: string;
-    status: 'True' | 'False' | 'Unknown';
-    reason?: string;
-    message?: string;
-    lastTransitionTime?: string;
-  }>;
+  conditions?: StatusCondition[];
 }
 
 export interface APIProduct {
@@ -147,12 +153,6 @@ export interface PlanPolicy {
     plans: PlanPolicyPlan[];
   };
   status?: {
-    conditions?: Array<{
-      type: string;
-      status: 'True' | 'False' | 'Unknown';
-      reason?: string;
-      message?: string;
-      lastTransitionTime?: string;
-    }>;
+    conditions?: StatusCondition[];
   };
 }

@@ -120,3 +120,13 @@ export const EntityKuadrantApiApprovalTab = kuadrantPlugin.provide(
     },
   }),
 );
+
+export const EntityKuadrantApiProductOpenApiAlert = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'EntityKuadrantApiProductOpenApiAlert',
+    component: {
+      lazy: () =>
+        import('./components/ApiProductOpenApiAlert').then(m => m.ApiProductOpenApiAlert),
+    },
+  }),
+);

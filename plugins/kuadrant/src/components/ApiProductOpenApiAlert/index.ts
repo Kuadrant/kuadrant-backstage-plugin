@@ -1,0 +1,1 @@
+export { ApiProductOpenApiAlert } from './ApiProductOpenApiAlert';

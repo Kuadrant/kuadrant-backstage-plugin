@@ -9,6 +9,7 @@ export {
   EntityKuadrantApiKeysContent,
   EntityKuadrantApiProductInfoContent,
   EntityKuadrantApiApprovalTab,
+  EntityKuadrantApiProductOpenApiAlert,
   KuadrantApprovalQueueCard,
   PlanPolicyDetailPage,
 } from './plugin';
