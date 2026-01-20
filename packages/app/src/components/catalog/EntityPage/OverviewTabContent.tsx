@@ -30,6 +30,7 @@ import { EntityKuadrantApiAccessCard } from '@kuadrant/kuadrant-backstage-plugin
 
 import Grid from '../Grid';
 import { hasLinks } from '../utils';
+import { Entity } from '@backstage/catalog-model';
 
 export const OverviewTabContent = () => (
   <>
@@ -189,7 +190,16 @@ export const OverviewTabContent = () => (
             },
           }}
         >
-          <EntityKuadrantApiAccessCard />
+          <EntitySwitch>
+            <EntitySwitch.Case
+              if={(entity: Entity) =>
+                entity.metadata.annotations?.['kuadrant.io/auth-apikey'] ===
+                'true'
+              }
+            >
+              <EntityKuadrantApiAccessCard />
+            </EntitySwitch.Case>
+          </EntitySwitch>
         </Grid>
         <Grid
           item
