@@ -26,7 +26,6 @@ import {
   ApiKeysPage,
   ApiProductDetailPage,
   ApiProductsPage,
-  PlanPolicyDetailPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
 
@@ -142,10 +141,6 @@ const AppBase = () => {
               </Route>
               <Route path="/catalog-graph" element={<CatalogGraphPage />} />
               <Route path="/learning-paths" element={<LearningPaths />} />
-              <Route
-                path="/kuadrant/planpolicy/:namespace/:name"
-                element={<PlanPolicyDetailPage />}
-              />
               <Route
                 path="/kuadrant"
                 element={<Navigate to="/kuadrant/api-products" />}
