@@ -25,7 +25,7 @@
     "@backstage-community/plugin-rbac-node": "1.14.0",
     "@backstage-community/plugin-scaffolder-backend-module-annotator": "2.11.0",
     "@backstage/backend-app-api": "1.2.6",
-    "@backstage/backend-defaults": "0.12.0",
+    "@backstage/backend-defaults": "0.12.2",
     "@backstage/backend-dynamic-feature-service": "0.7.3",
     "@backstage/backend-plugin-api": "1.4.2",
     "@backstage/catalog-client": "1.11.0",
