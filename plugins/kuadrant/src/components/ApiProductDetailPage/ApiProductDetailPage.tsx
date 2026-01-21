@@ -18,6 +18,7 @@ import {
   Breadcrumbs,
   CodeSnippet,
 } from "@backstage/core-components";
+import { OpenApiDefinitionWidget } from "@backstage/plugin-api-docs";
 import {
   Box,
   Typography,
@@ -206,7 +207,7 @@ export const ApiProductDetailPage = () => {
   const jwtTokenEndpoint = product.status?.oidcDiscovery?.tokenEndpoint || "unknown";
 
   // compute tab indices
-  const hasDefinitionTab = !!product.spec?.documentation?.openAPISpecURL;
+  const hasDefinitionTab = !!(product.status?.openapi?.raw || product.spec?.documentation?.openAPISpecURL);
   const hasPoliciesTab = !!(planPolicyCondition || authPolicyCondition || discoveredPlans.length > 0);
 
   let nextIndex = 1; // Overview is always at index 0
@@ -326,12 +327,22 @@ export const ApiProductDetailPage = () => {
 
         {selectedTab === definitionTabIndex && hasDefinitionTab && (
           <InfoCard title="API Definition">
-            <Typography variant="body2" color="textSecondary">
-              View the OpenAPI specification at:{" "}
-              <Link to={product.spec?.documentation?.openAPISpecURL || ""} target="_blank">
-                {product.spec?.documentation?.openAPISpecURL}
-              </Link>
-            </Typography>
+            {product.status?.openapi?.raw ? (
+              <OpenApiDefinitionWidget definition={product.status.openapi.raw} />
+            ) : (
+              <Typography variant="body2" color="textSecondary">
+                {product.spec?.documentation?.openAPISpecURL ? (
+                  <>
+                    OpenAPI specification not yet synced. View at:{" "}
+                    <Link to={product.spec.documentation.openAPISpecURL} target="_blank">
+                      {product.spec.documentation.openAPISpecURL}
+                    </Link>
+                  </>
+                ) : (
+                  "No OpenAPI specification available for this API product."
+                )}
+              </Typography>
+            )}
           </InfoCard>
         )}
 
