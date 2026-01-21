@@ -1,3 +1,4 @@
+import { Entity } from '@backstage/catalog-model';
 import {
   EntityConsumingComponentsCard,
   EntityHasApisCard,
@@ -200,7 +201,16 @@ export const OverviewTabContent = () => (
             },
           }}
         >
-          <EntityKuadrantApiAccessCard />
+          <EntitySwitch>
+            <EntitySwitch.Case
+              if={(entity: Entity) =>
+                entity.metadata.annotations?.['kuadrant.io/auth-apikey'] ===
+                'true'
+              }
+            >
+              <EntityKuadrantApiAccessCard />
+            </EntitySwitch.Case>
+          </EntitySwitch>
         </Grid>
         <Grid
           item
