@@ -100,11 +100,11 @@ export const ApiProductDetailPage = () => {
     }
     const product = await productResponse.json();
 
-    // find associated planpolicy
-    let planPolicy = null;
+    // find associated planpolicy from list (only has metadata + targetRef)
+    let planPolicyRef = null;
     if (policiesResponse.ok) {
       const policies = await policiesResponse.json();
-      planPolicy = (policies.items || []).find((pp: any) => {
+      planPolicyRef = (policies.items || []).find((pp: any) => {
         const ref = pp.targetRef;
         const targetRef = product.spec?.targetRef as any;
         return (
@@ -113,6 +113,17 @@ export const ApiProductDetailPage = () => {
           (!ref?.namespace || ref?.namespace === (targetRef?.namespace || namespace))
         );
       });
+    }
+
+    // fetch full planpolicy if we found a match (list doesn't include spec.plans)
+    let planPolicy = null;
+    if (planPolicyRef) {
+      const fullPolicyResponse = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/planpolicies/${planPolicyRef.metadata.namespace}/${planPolicyRef.metadata.name}`
+      );
+      if (fullPolicyResponse.ok) {
+        planPolicy = await fullPolicyResponse.json();
+      }
     }
 
     return { product: product as APIProduct, planPolicy };

@@ -2,13 +2,24 @@ import React from 'react';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
 import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-components';
-import { Typography, Box } from '@material-ui/core';
+import { Typography, Box, makeStyles } from '@material-ui/core';
 import useAsync from 'react-use/lib/useAsync';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiProductReadAllPermission } from '../../permissions';
 import { ApiProductDetails } from '../ApiProductDetails';
 
+const useStyles = makeStyles((theme) => ({
+  label: {
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(0.5),
+    fontSize: '0.75rem',
+    textTransform: 'uppercase',
+  },
+}));
+
 export const ApiProductInfoCard = () => {
+  const classes = useStyles();
   const { entity } = useEntity();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -27,43 +38,22 @@ export const ApiProductInfoCard = () => {
     return identity.userEntityRef.split('/')[1] || 'guest';
   }, [identityApi]);
 
-  const { value: data, loading, error } = useAsync(async () => {
+  const { value: apiProduct, loading, error } = useAsync(async () => {
     if (!namespace || !apiProductName) {
       return null;
     }
 
-    const [productResponse, policiesResponse] = await Promise.all([
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`),
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`),
-    ]);
+    const productResponse = await fetchApi.fetch(
+      `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`
+    );
 
     if (!productResponse.ok) {
       const errorData = await productResponse.json();
       throw new Error(errorData.error || `Failed to fetch API product: ${productResponse.status}`);
     }
 
-    const product = await productResponse.json();
-
-    // find associated planpolicy
-    let planPolicy = null;
-    if (policiesResponse.ok) {
-      const policies = await policiesResponse.json();
-      planPolicy = (policies.items || []).find((pp: any) => {
-        const ref = pp.targetRef;
-        const targetRef = product.spec?.targetRef;
-        return (
-          ref?.kind === 'HTTPRoute' &&
-          ref?.name === targetRef?.name &&
-          (!ref?.namespace || ref?.namespace === (targetRef?.namespace || namespace))
-        );
-      });
-    }
-
-    return { product, planPolicy };
+    return productResponse.json();
   }, [backendUrl, fetchApi, namespace, apiProductName]);
-
-  const apiProduct = data?.product;
-  const planPolicy = data?.planPolicy;
 
   // check if user has permission to view this api product
   const owner = apiProduct?.metadata?.annotations?.['backstage.io/owner'];
@@ -131,13 +121,15 @@ export const ApiProductInfoCard = () => {
   return (
     <InfoCard title="API Product Details">
       <Box mb={2}>
-        <Typography variant="h6" gutterBottom>
+        <Typography variant="caption" className={classes.label}>
+          Product Name
+        </Typography>
+        <Typography variant="h6">
           {apiProduct.spec?.displayName || apiProductName}
         </Typography>
       </Box>
       <ApiProductDetails
         product={apiProduct}
-        planPolicy={planPolicy}
         showStatus={false}
         showCatalogLink={false}
       />

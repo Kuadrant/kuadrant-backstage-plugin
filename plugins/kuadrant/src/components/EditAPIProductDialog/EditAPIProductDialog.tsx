@@ -105,7 +105,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           setContactEmail(data.spec.contact?.email || '');
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
-          setOpenAPISpec(data.spec.documentation?.openAPISpec || '');
+          setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -185,7 +185,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           ...(docsURL || openAPISpec ? {
             documentation: {
               ...(docsURL && { docsURL }),
-              ...(openAPISpec && { openAPISpec }),
+              ...(openAPISpec && { openAPISpecURL: openAPISpec }),
             },
           } : {}),
         },
@@ -357,12 +357,24 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
               <Grid item xs={12}>
                 <TextField
                   fullWidth
-                  label="Open API Spec URL"
+                  label="OpenAPI Spec URL"
                   value={openAPISpec}
                   onChange={e => handleOpenAPISpecChange(e.target.value)}
                   placeholder="https://api.example.com/openapi.json"
                   helperText={openAPISpecError || "Enter the full path to your API spec file"}
                   error={!!openAPISpecError}
+                  margin="normal"
+                  disabled={saving}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Documentation URL"
+                  value={docsURL}
+                  onChange={e => setDocsURL(e.target.value)}
+                  placeholder="https://docs.example.com/api"
+                  helperText="Link to external documentation for this API"
                   margin="normal"
                   disabled={saving}
                 />

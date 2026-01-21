@@ -213,7 +213,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           ...(docsURL || openAPISpec ? {
             documentation: {
               ...(docsURL && { docsURL }),
-              ...(openAPISpec && { openAPISpec }),
+              ...(openAPISpec && { openAPISpecURL: openAPISpec }),
             },
           } : {}),
         },
@@ -430,11 +430,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           <Grid item xs={12}>
             <TextField
               fullWidth
-              label="Open API Spec URL"
+              label="OpenAPI Spec URL"
               value={openAPISpec}
               onChange={e => handleOpenAPISpecChange(e.target.value)}
               placeholder="https://api.example.com/openapi.json"
-              helperText={openAPISpecError || "Enter the full path to your API spec file. Eg.https://github.com/backstage/"}
+              helperText={openAPISpecError || "Enter the full path to your API spec file"}
               error={!!openAPISpecError}
               margin="normal"
               required
@@ -444,6 +444,18 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                   asterisk: classes.asterisk,
                 },
               }}
+            />
+          </Grid>
+          <Grid item xs={12}>
+            <TextField
+              fullWidth
+              label="Documentation URL"
+              value={docsURL}
+              onChange={e => setDocsURL(e.target.value)}
+              placeholder="https://docs.example.com/api"
+              helperText="Link to external documentation for this API"
+              margin="normal"
+              disabled={creating}
             />
           </Grid>
           <Grid item xs={12}>
