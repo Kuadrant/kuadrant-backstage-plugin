@@ -268,5 +268,4 @@ After installation:
 ## Related Documentation
 
 - [RBAC Permissions](rbac-permissions.md) - Detailed permissions guide
-- [Kuadrant Resources](kuadrant-resources.md) - CRD reference
 - [Kuadrant Docs](https://docs.kuadrant.io/) - Kuadrant documentation
