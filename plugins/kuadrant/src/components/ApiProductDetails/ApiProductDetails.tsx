@@ -54,14 +54,12 @@ const useStyles = makeStyles((theme) => ({
 
 interface ApiProductDetailsProps {
   product: APIProduct;
-  planPolicy?: any;
   showStatus?: boolean;
   showCatalogLink?: boolean;
 }
 
 export const ApiProductDetails = ({
   product,
-  planPolicy,
   showStatus = true,
   showCatalogLink = true,
 }: ApiProductDetailsProps) => {
@@ -169,14 +167,6 @@ export const ApiProductDetails = ({
           </Typography>
           <Typography variant="body2">
             {product.spec?.targetRef?.name || "-"}
-          </Typography>
-        </Box>
-        <Box className={classes.infoItem}>
-          <Typography variant="caption" className={classes.label}>
-            Plan Policy
-          </Typography>
-          <Typography variant="body2">
-            {planPolicy?.metadata?.name || "None"}
           </Typography>
         </Box>
       </Box>

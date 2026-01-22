@@ -26,6 +26,13 @@ import {
   Tab,
   Button,
   makeStyles,
+  Grid,
+  Chip,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import EditIcon from "@material-ui/icons/Edit";
@@ -86,51 +93,20 @@ export const ApiProductDetailPage = () => {
   const canPublishApiProduct = canUpdateApiProduct;
 
   const {
-    value: data,
+    value: product,
     loading,
     error,
   } = useAsync(async () => {
-    const [productResponse, policiesResponse] = await Promise.all([
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`),
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`),
-    ]);
+    const response = await fetchApi.fetch(
+      `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`
+    );
 
-    if (!productResponse.ok) {
+    if (!response.ok) {
       throw new Error("Failed to fetch API product");
     }
-    const product = await productResponse.json();
 
-    // find associated planpolicy from list (only has metadata + targetRef)
-    let planPolicyRef = null;
-    if (policiesResponse.ok) {
-      const policies = await policiesResponse.json();
-      planPolicyRef = (policies.items || []).find((pp: any) => {
-        const ref = pp.targetRef;
-        const targetRef = product.spec?.targetRef as any;
-        return (
-          ref?.kind === "HTTPRoute" &&
-          ref?.name === targetRef?.name &&
-          (!ref?.namespace || ref?.namespace === (targetRef?.namespace || namespace))
-        );
-      });
-    }
-
-    // fetch full planpolicy if we found a match (list doesn't include spec.plans)
-    let planPolicy = null;
-    if (planPolicyRef) {
-      const fullPolicyResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/planpolicies/${planPolicyRef.metadata.namespace}/${planPolicyRef.metadata.name}`
-      );
-      if (fullPolicyResponse.ok) {
-        planPolicy = await fullPolicyResponse.json();
-      }
-    }
-
-    return { product: product as APIProduct, planPolicy };
+    return response.json() as Promise<APIProduct>;
   }, [namespace, name, backendUrl, fetchApi, refreshKey]);
-
-  const product = data?.product;
-  const planPolicy = data?.planPolicy;
 
   const handlePublishToggle = async () => {
     if (!product) return;
@@ -209,6 +185,31 @@ export const ApiProductDetailPage = () => {
 
   const isPublished = product.spec?.publishStatus === "Published";
 
+  // get policy conditions from status
+  const planPolicyCondition = product.status?.conditions?.find(
+    (c) => c.type === "PlanPolicyDiscovered"
+  );
+  const authPolicyCondition = product.status?.conditions?.find(
+    (c) => c.type === "AuthPolicyDiscovered"
+  );
+  const discoveredPlans = product.status?.discoveredPlans || [];
+
+  // compute tab indices
+  const hasDefinitionTab = !!product.spec?.documentation?.openAPISpecURL;
+  const hasPoliciesTab = !!(planPolicyCondition || authPolicyCondition || discoveredPlans.length > 0);
+  const definitionTabIndex = hasDefinitionTab ? 1 : -1;
+  const policiesTabIndex = hasPoliciesTab ? (hasDefinitionTab ? 2 : 1) : -1;
+
+  const formatLimits = (limits: any): string => {
+    if (!limits) return "No limits";
+    const parts: string[] = [];
+    if (limits.daily) parts.push(`${limits.daily}/day`);
+    if (limits.weekly) parts.push(`${limits.weekly}/week`);
+    if (limits.monthly) parts.push(`${limits.monthly}/month`);
+    if (limits.yearly) parts.push(`${limits.yearly}/year`);
+    return parts.length > 0 ? parts.join(", ") : "No limits";
+  };
+
   return (
     <Page themeId="tool">
       <Header
@@ -260,7 +261,8 @@ export const ApiProductDetailPage = () => {
             textColor="primary"
           >
             <Tab label="Overview" />
-            {product.spec?.documentation?.openAPISpecURL && <Tab label="Definition" />}
+            {hasDefinitionTab && <Tab label="Definition" />}
+            {hasPoliciesTab && <Tab label="Policies" />}
           </Tabs>
         </Box>
 
@@ -301,22 +303,106 @@ export const ApiProductDetailPage = () => {
 
             <ApiProductDetails
               product={product}
-              planPolicy={planPolicy}
               showStatus={true}
               showCatalogLink={true}
             />
           </InfoCard>
         )}
 
-        {selectedTab === 1 && product.spec?.documentation?.openAPISpecURL && (
+        {selectedTab === definitionTabIndex && hasDefinitionTab && (
           <InfoCard title="API Definition">
             <Typography variant="body2" color="textSecondary">
               View the OpenAPI specification at:{" "}
-              <Link to={product.spec.documentation.openAPISpecURL} target="_blank">
-                {product.spec.documentation.openAPISpecURL}
+              <Link to={product.spec?.documentation?.openAPISpecURL || ""} target="_blank">
+                {product.spec?.documentation?.openAPISpecURL}
               </Link>
             </Typography>
           </InfoCard>
+        )}
+
+        {selectedTab === policiesTabIndex && hasPoliciesTab && (
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <InfoCard title="Discovered Policies">
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      Plan Policy
+                    </Typography>
+                    {planPolicyCondition ? (
+                      <Box>
+                        <Chip
+                          label={planPolicyCondition.status === "True" ? "Found" : "Not Found"}
+                          size="small"
+                          style={{
+                            backgroundColor: planPolicyCondition.status === "True" ? "#4caf50" : "#ff9800",
+                            color: "#fff",
+                            marginBottom: 8,
+                          }}
+                        />
+                        <Typography variant="body2">
+                          {planPolicyCondition.message || "No details available"}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2">No plan policy information</Typography>
+                    )}
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="body2" color="textSecondary" gutterBottom>
+                      Auth Policy
+                    </Typography>
+                    {authPolicyCondition ? (
+                      <Box>
+                        <Chip
+                          label={authPolicyCondition.status === "True" ? "Found" : "Not Found"}
+                          size="small"
+                          style={{
+                            backgroundColor: authPolicyCondition.status === "True" ? "#4caf50" : "#ff9800",
+                            color: "#fff",
+                            marginBottom: 8,
+                          }}
+                        />
+                        <Typography variant="body2">
+                          {authPolicyCondition.message || "No details available"}
+                        </Typography>
+                      </Box>
+                    ) : (
+                      <Typography variant="body2">No auth policy information</Typography>
+                    )}
+                  </Grid>
+                </Grid>
+              </InfoCard>
+            </Grid>
+
+            {discoveredPlans.length > 0 && (
+              <Grid item xs={12}>
+                <InfoCard title="Effective Plan Tiers">
+                  <Typography variant="body2" color="textSecondary" paragraph>
+                    These tiers are computed from all attached PlanPolicies (including gateway-level policies).
+                  </Typography>
+                  <Table size="small">
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Tier</TableCell>
+                        <TableCell>Rate Limits</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {discoveredPlans.map((plan) => (
+                        <TableRow key={plan.tier}>
+                          <TableCell>
+                            <Chip label={plan.tier} size="small" color="primary" />
+                          </TableCell>
+                          <TableCell>{formatLimits(plan.limits)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </InfoCard>
+              </Grid>
+            )}
+          </Grid>
         )}
       </Content>
 
