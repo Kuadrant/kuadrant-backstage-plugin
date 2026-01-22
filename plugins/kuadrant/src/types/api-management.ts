@@ -148,9 +148,13 @@ export interface APIProductSpec {
 export interface APIProductStatus {
   observedGeneration?: number;
   discoveredPlans?: Plan[];
+  discoveredAuthScheme?: any;
   openapi?: {
     raw: string;
     lastSyncTime: string;
+  };
+  oidcDiscovery?: {
+    tokenEndpoint: string;
   };
   conditions?: StatusCondition[];
 }
