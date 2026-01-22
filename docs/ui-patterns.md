@@ -42,8 +42,6 @@ Reusable component at [`plugins/kuadrant/src/components/ConfirmDeleteDialog/Conf
 
 ### Usage Examples
 
-**Normal severity:** See [`plugins/kuadrant/src/components/MyApiKeysCard/MyApiKeysCard.tsx`](../plugins/kuadrant/src/components/MyApiKeysCard/MyApiKeysCard.tsx)
-
 **High severity:** See [`plugins/kuadrant/src/components/KuadrantPage/KuadrantPage.tsx`](../plugins/kuadrant/src/components/KuadrantPage/KuadrantPage.tsx) - API Products deletion
 
 ## Frontend Permission System
