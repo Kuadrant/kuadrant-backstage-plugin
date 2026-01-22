@@ -42,6 +42,47 @@ export interface APIKeySpec {
   };
 }
 
+// Authorino v1beta3 Credentials types
+export interface CredentialsAuthorizationHeader {
+  prefix?: string;
+}
+
+export interface CredentialsCustomHeader {
+  name: string;
+  prefix?: string;
+}
+
+export interface CredentialsNamed {
+  name: string;
+}
+
+export interface Credentials {
+  authorizationHeader?: CredentialsAuthorizationHeader;
+  customHeader?: CredentialsCustomHeader;
+  queryString?: CredentialsNamed;
+  cookie?: CredentialsNamed;
+}
+
+// Authorino v1beta3 AuthenticationSpec types
+export interface LabelSelector {
+  matchLabels?: Record<string, string>;
+  matchExpressions?: Array<{
+    key: string;
+    operator: 'In' | 'NotIn' | 'Exists' | 'DoesNotExist';
+    values?: string[];
+  }>;
+}
+
+export interface AuthenticationSpec {
+  selector?: LabelSelector;
+  allNamespaces?: boolean;
+}
+
+export interface APIKeyAuthScheme {
+  authenticationSpec?: AuthenticationSpec;
+  credentials?: Credentials;
+}
+
 export interface APIKeyStatus {
   phase?: RequestPhase;
   reviewedBy?: string;
@@ -53,6 +94,7 @@ export interface APIKeyStatus {
     key: string;
   };
   canReadSecret?: boolean;
+  authScheme?: APIKeyAuthScheme;
   conditions?: StatusCondition[];
 }
 
