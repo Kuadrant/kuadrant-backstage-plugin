@@ -294,7 +294,13 @@ export const ApiKeyManagementTab = ({
         });
       }
     } catch (err) {
-      console.error("failed to fetch api key:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to fetch api key: ${errorMessage}`,
+        severity: "error",
+        display: "transient",
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -930,23 +936,23 @@ export const ApiKeyManagementTab = ({
                   {!apiProduct
                     ? "API product not found"
                     : (() => {
-                        const readyCondition =
-                          apiProduct.status?.conditions?.find(
-                            (c: any) => c.type === "Ready",
-                          );
-                        const planCondition =
-                          apiProduct.status?.conditions?.find(
-                            (c: any) => c.type === "PlanPolicyDiscovered",
-                          );
+                      const readyCondition =
+                        apiProduct.status?.conditions?.find(
+                          (c: any) => c.type === "Ready",
+                        );
+                      const planCondition =
+                        apiProduct.status?.conditions?.find(
+                          (c: any) => c.type === "PlanPolicyDiscovered",
+                        );
 
-                        if (readyCondition?.status !== "True") {
-                          return `HTTPRoute not ready: ${readyCondition?.message || "unknown"}`;
-                        }
-                        if (planCondition?.status !== "True") {
-                          return `No plans discovered: ${planCondition?.message || "no PlanPolicy found"}`;
-                        }
-                        return "No plans available";
-                      })()}
+                      if (readyCondition?.status !== "True") {
+                        return `HTTPRoute not ready: ${readyCondition?.message || "unknown"}`;
+                      }
+                      if (planCondition?.status !== "True") {
+                        return `No plans discovered: ${planCondition?.message || "no PlanPolicy found"}`;
+                      }
+                      return "No plans available";
+                    })()}
                 </Typography>
               )}
             </Box>
