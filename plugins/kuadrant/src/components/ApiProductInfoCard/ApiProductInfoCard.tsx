@@ -7,6 +7,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiProductReadAllPermission } from '../../permissions';
 import { ApiProductDetails } from '../ApiProductDetails';
+import { OidcProviderCard } from '../OidcProviderCard';
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -118,21 +119,39 @@ export const ApiProductInfoCard = () => {
     );
   }
 
+  // check for OIDC auth scheme
+  const authSchemes = apiProduct.status?.discoveredAuthScheme?.authentication || {};
+  const schemeObjects = Object.values(authSchemes);
+  const jwtScheme = schemeObjects.find((scheme: any) => scheme.hasOwnProperty('jwt'));
+  const hasOidc = Boolean(jwtScheme);
+  const jwtIssuer = (jwtScheme as any)?.jwt?.issuerUrl;
+  const jwtTokenEndpoint = apiProduct.status?.oidcDiscovery?.tokenEndpoint;
+
   return (
-    <InfoCard title="API Product Details">
-      <Box mb={2}>
-        <Typography variant="caption" className={classes.label}>
-          Product Name
-        </Typography>
-        <Typography variant="h6">
-          {apiProduct.spec?.displayName || apiProductName}
-        </Typography>
-      </Box>
-      <ApiProductDetails
-        product={apiProduct}
-        showStatus={false}
-        showCatalogLink={false}
-      />
-    </InfoCard>
+    <>
+      <InfoCard title="API Product Details">
+        <Box mb={2}>
+          <Typography variant="caption" className={classes.label}>
+            Product Name
+          </Typography>
+          <Typography variant="h6">
+            {apiProduct.spec?.displayName || apiProductName}
+          </Typography>
+        </Box>
+        <ApiProductDetails
+          product={apiProduct}
+          showStatus={false}
+          showCatalogLink={false}
+        />
+      </InfoCard>
+      {hasOidc && jwtIssuer && (
+        <Box mt={2}>
+          <OidcProviderCard
+            issuerUrl={jwtIssuer}
+            tokenEndpoint={jwtTokenEndpoint}
+          />
+        </Box>
+      )}
+    </>
   );
 };

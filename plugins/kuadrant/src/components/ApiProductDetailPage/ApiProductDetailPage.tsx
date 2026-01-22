@@ -16,7 +16,6 @@ import {
   InfoCard,
   Link,
   Breadcrumbs,
-  CodeSnippet,
 } from "@backstage/core-components";
 import { OpenApiDefinitionWidget } from "@backstage/plugin-api-docs";
 import {
@@ -43,6 +42,7 @@ import { APIProduct } from "../../types/api-management";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { ApiProductDetails } from "../ApiProductDetails";
+import { OidcProviderCard } from "../OidcProviderCard";
 import { useKuadrantPermission } from "../../utils/permissions";
 import {
   kuadrantApiProductUpdateAllPermission,
@@ -432,48 +432,10 @@ export const ApiProductDetailPage = () => {
         )}
 
         {selectedTab === oidcTabIndex && hasOIDCTab && (
-          <Grid item xs={12} md={6}>
-            <InfoCard title="OIDC Provider Discovery">
-              <Box p={2}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      This API uses OIDC authentication. Obtain a token from the identity provider below.
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      <strong>Identity Provider: </strong>
-                      <Link to={jwtIssuer} target="_blank">
-                        {jwtIssuer}
-                      </Link>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      <strong>Token Endpoint: </strong>
-                      <Link to={jwtTokenEndpoint} target="_blank">
-                        {jwtTokenEndpoint}
-                      </Link>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <CodeSnippet
-                      text={`# Example (Client Credentials Flow):
-curl -X POST \\
-   -d "grant_type=client_credentials" \\
-   -d "client_id=YOUR_CLIENT_ID" \\
-   -d "client_secret=YOUR_CLIENT_SECRET" \\
-   ${jwtTokenEndpoint}
-`} // notsecret - template for user's own api key
-                      language="bash"
-                      showCopyCodeButton
-                    />
-                  </Grid>
-                </Grid>
-              </Box>
-            </InfoCard>
-          </Grid>
+          <OidcProviderCard
+            issuerUrl={jwtIssuer}
+            tokenEndpoint={jwtTokenEndpoint}
+          />
         )}
       </Content>
 

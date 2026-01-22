@@ -69,6 +69,13 @@ export const ApiProductDetails = ({
   const isPublished = publishStatus === "Published";
   const tiers = product.status?.discoveredPlans || [];
 
+  // check if product has API key auth
+  const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+  const schemeObjects = Object.values(authSchemes);
+  const hasApiKey = schemeObjects.some(
+    (scheme: any) => scheme.hasOwnProperty("apiKey"),
+  );
+
   return (
     <>
       {product.spec?.description && (
@@ -114,16 +121,18 @@ export const ApiProductDetails = ({
           </Typography>
           <Typography variant="body2">{product.metadata.namespace}</Typography>
         </Box>
-        <Box className={classes.infoItem}>
-          <Typography variant="caption" className={classes.label}>
-            API Key Approval
-          </Typography>
-          <Typography variant="body2">
-            {product.spec?.approvalMode === "automatic"
-              ? "Automatic"
-              : "Need manual approval"}
-          </Typography>
-        </Box>
+        {hasApiKey && (
+          <Box className={classes.infoItem}>
+            <Typography variant="caption" className={classes.label}>
+              API Key Approval
+            </Typography>
+            <Typography variant="body2">
+              {product.spec?.approvalMode === "automatic"
+                ? "Automatic"
+                : "Need manual approval"}
+            </Typography>
+          </Box>
+        )}
         {product.spec?.tags && product.spec.tags.length > 0 && (
           <Box className={classes.infoItem}>
             <Typography variant="caption" className={classes.label}>
