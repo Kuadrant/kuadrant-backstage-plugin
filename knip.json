@@ -1,0 +1,62 @@
+{
+  "$schema": "https://unpkg.com/knip@latest/schema.json",
+  "ignoreBinaries": ["playwright", "run"],
+  "ignoreWorkspaces": [
+    "packages/*",
+    "plugins/dynamic-plugins-info-backend",
+    "plugins/licensed-users-info-backend",
+    "plugins/scalprum-backend"
+  ],
+  "ignore": [
+    "scripts/**",
+    "dynamic-plugins/**",
+    "dynamic-plugins-root/**",
+    "e2e-tests/**",
+    "**/.eslintrc.js",
+    "*.config.{js,ts,mjs}"
+  ],
+  "ignoreDependencies": [
+    "@backstage/*",
+    "@ianvs/*",
+    "dotenv",
+    "jsdom",
+    "node-gyp"
+  ],
+  "workspaces": {
+    ".": {
+      "entry": [],
+      "project": []
+    },
+    "plugins/kuadrant": {
+      "ignore": [
+        "src/**/*.test.{ts,tsx}",
+        "src/setupTests.ts",
+        "src/dev/**",
+        "src/types/**",
+        "dev/**"
+      ],
+      "ignoreDependencies": [
+        "@backstage/*",
+        "@testing-library/*",
+        "msw"
+      ]
+    },
+    "plugins/kuadrant-backend": {
+      "ignore": [
+        "src/**/*.test.ts",
+        "src/setupTests.ts",
+        "src/auth-resolver.ts",
+        "dev/**",
+        "alpha/**",
+        "rbac/**"
+      ],
+      "ignoreDependencies": [
+        "@backstage/*",
+        "@types/*",
+        "supertest"
+      ]
+    }
+  },
+  "exclude": ["binaries", "duplicates"],
+  "ignoreExportsUsedInFile": true
+}
