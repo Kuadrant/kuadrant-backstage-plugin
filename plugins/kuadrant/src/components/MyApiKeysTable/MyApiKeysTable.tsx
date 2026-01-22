@@ -314,7 +314,13 @@ export const MyApiKeysTable = () => {
         });
       }
     } catch (err) {
-      console.error("failed to fetch api key:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to fetch api key: ${errorMessage}`,
+        severity: "error",
+        display: "transient",
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
