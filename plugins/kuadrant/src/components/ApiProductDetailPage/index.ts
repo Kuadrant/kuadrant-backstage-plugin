@@ -1,0 +1,1 @@
+export { ApiProductDetailPage } from './ApiProductDetailPage';

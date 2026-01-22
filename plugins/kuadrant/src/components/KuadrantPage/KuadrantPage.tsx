@@ -1,24 +1,24 @@
-import React, { useState } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   Typography,
-  Grid,
   Box,
   Chip,
   Button,
   IconButton,
+  CircularProgress,
+  makeStyles,
 } from "@material-ui/core";
 import AddIcon from "@material-ui/icons/Add";
 import DeleteIcon from "@material-ui/icons/Delete";
 import EditIcon from "@material-ui/icons/Edit";
 import VpnKeyIcon from "@material-ui/icons/VpnKey";
 import LockIcon from "@material-ui/icons/Lock";
+import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import {
-  InfoCard,
   Header,
   Page,
   Content,
   SupportButton,
-  Progress,
   ResponseErrorPanel,
   Link,
   Table,
@@ -46,6 +46,7 @@ import {
 import { useKuadrantPermission } from "../../utils/permissions";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
+import emptyStateIllustration from "../../assets/empty-state-illustration.png";
 
 type KuadrantResource = {
   metadata: {
@@ -55,13 +56,55 @@ type KuadrantResource = {
     annotations?: Record<string, string>;
   };
   spec?: any;
+  status?: any;
 };
 
 type KuadrantList = {
   items: KuadrantResource[];
 };
 
+const useStyles = makeStyles((theme) => ({
+  container: {
+    display: "flex",
+    height: "100%",
+    minHeight: 400,
+  },
+  tableContainer: {
+    flex: 1,
+    overflow: "auto",
+    padding: 10,
+  },
+  emptyState: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    padding: theme.spacing(6),
+    minHeight: 400,
+  },
+  emptyStateContent: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(6),
+    maxWidth: 900,
+  },
+  emptyStateText: {
+    flex: 1,
+  },
+  emptyStateTitle: {
+    marginBottom: theme.spacing(2),
+  },
+  emptyStateDescription: {
+    marginBottom: theme.spacing(3),
+    color: theme.palette.text.secondary,
+  },
+  emptyStateImage: {
+    maxWidth: 400,
+    height: "auto",
+  },
+}));
+
 export const ResourceList = () => {
+  const classes = useStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
@@ -85,6 +128,14 @@ export const ResourceList = () => {
     requests: number;
     secrets: number;
   } | null>(null);
+  const [filters, setFilters] = useState<FilterState>({
+    status: [],
+    policy: [],
+    route: [],
+    namespace: [],
+    tags: [],
+    authentication: [],
+  });
 
   const {
     allowed: canCreateApiProduct,
@@ -115,7 +166,6 @@ export const ResourceList = () => {
     deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
-    allowed: canListPlanPolicies,
     loading: planPolicyPermissionLoading,
     error: planPolicyPermissionError,
   } = useKuadrantPermission(kuadrantPlanPolicyListPermission);
@@ -147,6 +197,41 @@ export const ResourceList = () => {
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
+  // helper to find policy for a given route
+  const getPolicyForProduct = useCallback((product: KuadrantResource): string | null => {
+    if (!planPolicies?.items) return null;
+    const targetRef = product.spec?.targetRef;
+    if (!targetRef) return null;
+
+    const policy = planPolicies.items.find((pp: KuadrantResource) => {
+      const ref = (pp as any).targetRef;
+      return (
+        ref?.kind === "HTTPRoute" &&
+        ref?.name === targetRef.name &&
+        (!ref?.namespace || ref?.namespace === (targetRef.namespace || product.metadata.namespace))
+      );
+    });
+    return policy?.metadata.name || null;
+  }, [planPolicies]);
+
+  // helper to get auth schemes for a product
+  const getAuthSchemes = useCallback((product: KuadrantResource): string[] => {
+    const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+    const schemeObjects = Object.values(authSchemes);
+    const schemes: string[] = [];
+
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("apiKey"))) {
+      schemes.push("API Key");
+    }
+    if (schemeObjects.some((scheme: any) => scheme.hasOwnProperty("jwt"))) {
+      schemes.push("OIDC");
+    }
+    if (schemes.length === 0) {
+      schemes.push("Unknown");
+    }
+    return schemes;
+  }, []);
+
   const loading =
     apiProductsLoading ||
     planPoliciesLoading ||
@@ -157,10 +242,142 @@ export const ResourceList = () => {
   const permissionError =
     createPermissionError || deletePermissionError || planPolicyPermissionError;
 
-  const handleCreateSuccess = () => {
+  const allProducts = useMemo(() => {
+    return apiProducts?.items || [];
+  }, [apiProducts]);
+
+  const filterSections: FilterSection[] = useMemo(() => {
+    const statusCounts = { Draft: 0, Published: 0 };
+    const policyCounts = new Map<string, number>();
+    const routeCounts = new Map<string, number>();
+    const namespaceCounts = new Map<string, number>();
+    const tagCounts = new Map<string, number>();
+    const authCounts = new Map<string, number>();
+
+    allProducts.forEach((p: KuadrantResource) => {
+      const status = p.spec?.publishStatus || "Draft";
+      statusCounts[status as keyof typeof statusCounts]++;
+
+      const policy = getPolicyForProduct(p) || "N/A";
+      policyCounts.set(policy, (policyCounts.get(policy) || 0) + 1);
+
+      const route = p.spec?.targetRef?.name || "unknown";
+      routeCounts.set(route, (routeCounts.get(route) || 0) + 1);
+
+      const ns = p.metadata.namespace;
+      namespaceCounts.set(ns, (namespaceCounts.get(ns) || 0) + 1);
+
+      const tags = p.spec?.tags || [];
+      tags.forEach((tag: string) => {
+        tagCounts.set(tag, (tagCounts.get(tag) || 0) + 1);
+      });
+
+      const authSchemes = getAuthSchemes(p);
+      authSchemes.forEach((scheme: string) => {
+        authCounts.set(scheme, (authCounts.get(scheme) || 0) + 1);
+      });
+    });
+
+    return [
+      {
+        id: "status",
+        title: "Status",
+        options: [
+          { value: "Draft", label: "Draft", count: statusCounts.Draft },
+          { value: "Published", label: "Published", count: statusCounts.Published },
+        ],
+      },
+      {
+        id: "authentication",
+        title: "Authentication",
+        options: Array.from(authCounts.entries()).map(([scheme, count]) => ({
+          value: scheme,
+          label: scheme,
+          count,
+        })),
+      },
+      {
+        id: "policy",
+        title: "Policy",
+        options: Array.from(policyCounts.entries()).map(([name, count]) => ({
+          value: name,
+          label: name,
+          count,
+        })),
+        collapsed: policyCounts.size > 5,
+      },
+      {
+        id: "route",
+        title: "Route",
+        options: Array.from(routeCounts.entries()).map(([name, count]) => ({
+          value: name,
+          label: name,
+          count,
+        })),
+        collapsed: routeCounts.size > 5,
+      },
+      {
+        id: "namespace",
+        title: "Namespace",
+        options: Array.from(namespaceCounts.entries()).map(([ns, count]) => ({
+          value: ns,
+          label: ns,
+          count,
+        })),
+        collapsed: namespaceCounts.size > 5,
+      },
+      {
+        id: "tags",
+        title: "Tags",
+        options: Array.from(tagCounts.entries()).map(([tag, count]) => ({
+          value: tag,
+          label: tag,
+          count,
+        })),
+        collapsed: tagCounts.size > 5,
+      },
+    ];
+  }, [allProducts, getPolicyForProduct, getAuthSchemes]);
+
+  const filteredProducts = useMemo(() => {
+    return allProducts.filter((p: KuadrantResource) => {
+      if (filters.status.length > 0) {
+        const status = p.spec?.publishStatus || "Draft";
+        if (!filters.status.includes(status)) return false;
+      }
+
+      if (filters.authentication.length > 0) {
+        const authSchemes = getAuthSchemes(p);
+        if (!filters.authentication.some((a: string) => authSchemes.includes(a))) return false;
+      }
+
+      if (filters.policy.length > 0) {
+        const policy = getPolicyForProduct(p) || "N/A";
+        if (!filters.policy.includes(policy)) return false;
+      }
+
+      if (filters.route.length > 0) {
+        const route = p.spec?.targetRef?.name || "unknown";
+        if (!filters.route.includes(route)) return false;
+      }
+
+      if (filters.namespace.length > 0) {
+        if (!filters.namespace.includes(p.metadata.namespace)) return false;
+      }
+
+      if (filters.tags.length > 0) {
+        const tags = p.spec?.tags || [];
+        if (!filters.tags.some((t: string) => tags.includes(t))) return false;
+      }
+
+      return true;
+    });
+  }, [allProducts, filters, getPolicyForProduct, getAuthSchemes]);
+
+  const handleCreateSuccess = (productInfo: { namespace: string; name: string; displayName: string }) => {
     setRefreshTrigger((prev) => prev + 1);
     alertApi.post({
-      message: "API Product created",
+      message: `"${productInfo.displayName}" created successfully`,
       severity: "success",
       display: "transient",
     });
@@ -173,8 +390,9 @@ export const ResourceList = () => {
 
   const handleEditSuccess = () => {
     setRefreshTrigger((prev) => prev + 1);
+    const productName = apiProductToEdit?.name || "API Product";
     alertApi.post({
-      message: "API Product updated",
+      message: `"${productName}" updated successfully`,
       severity: "success",
       display: "transient",
     });
@@ -220,9 +438,10 @@ export const ResourceList = () => {
         throw new Error("failed to delete apiproduct");
       }
 
+      const deletedName = apiProductToDelete?.name || "API Product";
       setRefreshTrigger((prev) => prev + 1);
       alertApi.post({
-        message: "API Product deleted",
+        message: `"${deletedName}" deleted successfully`,
         severity: "success",
         display: "transient",
       });
@@ -245,13 +464,43 @@ export const ResourceList = () => {
     setApiProductToDelete(null);
   };
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString("en-GB", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-    });
+  const handlePublishToggle = async (row: any) => {
+    const namespace = row.metadata.namespace;
+    const name = row.metadata.name;
+    const displayName = row.spec?.displayName || name;
+    const currentStatus = row.spec?.publishStatus || "Draft";
+    const newStatus = currentStatus === "Published" ? "Draft" : "Published";
+
+    try {
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            spec: { publishStatus: newStatus },
+          }),
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error("failed to update publish status");
+      }
+
+      setRefreshTrigger((prev) => prev + 1);
+      alertApi.post({
+        message: `"${displayName}" ${newStatus === "Published" ? "published" : "unpublished"} successfully`,
+        severity: "success",
+        display: "transient",
+      });
+    } catch (err) {
+      console.error("error updating publish status:", err);
+      alertApi.post({
+        message: "Failed to update publish status",
+        severity: "error",
+        display: "transient",
+      });
+    }
   };
 
   const columns: TableColumn[] = [
@@ -259,22 +508,11 @@ export const ResourceList = () => {
       title: "Name",
       field: "spec.displayName",
       render: (row: any) => {
-        const publishStatus = row.spec?.publishStatus;
-        const isPublished = publishStatus === "Published";
         const displayName = row.spec?.displayName ?? row.metadata.name;
-
-        if (isPublished) {
-          return (
-            <Link to={`/catalog/default/api/${row.metadata.name}/api-product`}>
-              <strong>{displayName}</strong>
-            </Link>
-          );
-        }
-
         return (
-          <span className="text-muted">
+          <Link to={`/kuadrant/api-products/${row.metadata.namespace}/${row.metadata.name}`}>
             <strong>{displayName}</strong>
-          </span>
+          </Link>
         );
       },
       customFilterAndSearch: (term, row: any) => {
@@ -283,21 +521,37 @@ export const ResourceList = () => {
       },
     },
     {
-      title: "Resource Name",
-      field: "metadata.name",
-    },
-    {
       title: "Version",
       field: "spec.version",
       render: (row: any) => row.spec?.version || "-",
     },
     {
-      title: "HTTPRoute",
+      title: "Route",
       field: "spec.targetRef.name",
       render: (row: any) => row.spec?.targetRef?.name || "-",
     },
     {
-      title: "Publish Status",
+      title: "Policy",
+      field: "policy",
+      render: (row: any) => getPolicyForProduct(row) || "N/A",
+    },
+    {
+      title: "Tags",
+      field: "spec.tags",
+      render: (row: any) => {
+        const tags = row.spec?.tags || [];
+        if (tags.length === 0) return "-";
+        return (
+          <Box display="flex" style={{ gap: 4, flexWrap: "wrap" }}>
+            {tags.map((tag: string) => (
+              <Chip key={tag} label={tag} size="small" variant="outlined" />
+            ))}
+          </Box>
+        );
+      },
+    },
+    {
+      title: "Status",
       field: "spec.publishStatus",
       render: (row: any) => {
         const status = row.spec?.publishStatus || "Draft";
@@ -306,20 +560,6 @@ export const ResourceList = () => {
             label={status}
             size="small"
             color={status === "Published" ? "primary" : "default"}
-          />
-        );
-      },
-    },
-    {
-      title: "Approval Mode",
-      field: "spec.approvalMode",
-      render: (row: any) => {
-        const mode = row.spec?.approvalMode || "manual";
-        return (
-          <Chip
-            label={mode}
-            size="small"
-            color={mode === "automatic" ? "secondary" : "default"}
           />
         );
       },
@@ -374,11 +614,6 @@ export const ResourceList = () => {
       field: "metadata.namespace",
     },
     {
-      title: "Created",
-      field: "metadata.creationTimestamp",
-      render: (row: any) => formatDate(row.metadata.creationTimestamp),
-    },
-    {
       title: "Actions",
       field: "actions",
       filtering: false,
@@ -389,11 +624,20 @@ export const ResourceList = () => {
           canUpdateAllApiProducts || (canUpdateOwnApiProduct && isOwner);
         const canDelete =
           canDeleteAllApiProducts || (canDeleteOwnApiProduct && isOwner);
-
-        if (!canEdit && !canDelete) return null;
+        const isPublished = row.spec?.publishStatus === "Published";
 
         return (
-          <Box display="flex" style={{ gap: 4 }}>
+          <Box display="flex" alignItems="center" style={{ gap: 4 }}>
+            {canEdit && (
+              <Button
+                size="small"
+                color="primary"
+                onClick={() => handlePublishToggle(row)}
+                style={{ marginRight: 4, textTransform: "none" }}
+              >
+                {isPublished ? "Unpublish" : "Publish"}
+              </Button>
+            )}
             {canEdit && (
               <IconButton
                 size="small"
@@ -405,7 +649,6 @@ export const ResourceList = () => {
                 <EditIcon fontSize="small" />
               </IconButton>
             )}
-
             {canDelete && (
               <IconButton
                 size="small"
@@ -423,66 +666,6 @@ export const ResourceList = () => {
     },
   ];
 
-  const planPolicyColumns: TableColumn[] = [
-    {
-      title: "Name",
-      field: "metadata.name",
-      render: (row: any) => (
-        <Link
-          to={`/kuadrant/planpolicy/${row.metadata.namespace}/${row.metadata.name}`}
-        >
-          <strong>{row.metadata.name}</strong>
-        </Link>
-      ),
-    },
-    {
-      title: "Namespace",
-      field: "metadata.namespace",
-    },
-  ];
-
-  const renderResources = (resources: KuadrantResource[] | undefined) => {
-    if (!resources || resources.length === 0) {
-      return (
-        <Typography variant="body2" color="textSecondary">
-          No API products found
-        </Typography>
-      );
-    }
-    return (
-      <Table
-        options={{
-          paging: resources.length > 5,
-          pageSize: 20,
-          search: true,
-          filtering: true,
-          debounceInterval: 300,
-          toolbar: true,
-          emptyRowsWhenPaging: false,
-        }}
-        columns={columns}
-        data={resources}
-      />
-    );
-  };
-
-  const renderPlanPolicies = (resources: KuadrantResource[] | undefined) => {
-    if (!resources || resources.length === 0) {
-      return (
-        <Typography variant="body2" color="textSecondary">
-          No plan policies found
-        </Typography>
-      );
-    }
-    return (
-      <Table
-        options={{ paging: false, search: false, toolbar: false }}
-        columns={planPolicyColumns}
-        data={resources}
-      />
-    );
-  };
-
   return (
     <Page themeId="tool">
       <Header
@@ -492,7 +675,23 @@ export const ResourceList = () => {
         <SupportButton>Manage API products and plan policies</SupportButton>
       </Header>
       <Content>
-        {loading && <Progress />}
+        {loading && (
+          <Box
+            display="flex"
+            flexDirection="column"
+            alignItems="center"
+            justifyContent="center"
+            minHeight={300}
+          >
+            <CircularProgress />
+            <Typography variant="h6" style={{ marginTop: 16 }}>
+              Loading data...
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Preparing your data... This should only take a moment.
+            </Typography>
+          </Box>
+        )}
         {error && <ResponseErrorPanel error={error} />}
         {permissionError && (
           <Box p={2}>
@@ -514,44 +713,83 @@ export const ResourceList = () => {
             </Typography>
           </Box>
         )}
-        {!loading && !error && !permissionError && (
-          <Grid container spacing={3} direction="column">
-            <Grid item>
-              <InfoCard
-                title="API Products"
-                action={
-                  canCreateApiProduct ? (
-                    <Box
-                      display="flex"
-                      alignItems="center"
-                      height="100%"
-                      mt={1}
-                    >
-                      <Button
-                        variant="contained"
-                        color="primary"
-                        size="small"
-                        startIcon={<AddIcon />}
-                        onClick={() => setCreateDialogOpen(true)}
-                      >
-                        Create API Product
-                      </Button>
-                    </Box>
-                  ) : undefined
-                }
-              >
-                {renderResources(apiProducts?.items)}
-              </InfoCard>
-            </Grid>
-
-            {canListPlanPolicies && (
-              <Grid item>
-                <InfoCard title="Plan Policies">
-                  {renderPlanPolicies(planPolicies?.items)}
-                </InfoCard>
-              </Grid>
-            )}
-          </Grid>
+        {!loading && !error && !permissionError && allProducts.length === 0 && (
+          <Box className={classes.emptyState}>
+            <Box className={classes.emptyStateContent}>
+              <Box className={classes.emptyStateText}>
+                <Typography variant="h4" className={classes.emptyStateTitle}>
+                  API Product
+                </Typography>
+                <Typography
+                  variant="body1"
+                  className={classes.emptyStateDescription}
+                >
+                  Create API product by registering existing API, associate
+                  route and policy
+                </Typography>
+                {canCreateApiProduct && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<AddIcon />}
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    Create API Product
+                  </Button>
+                )}
+              </Box>
+              <img
+                src={emptyStateIllustration}
+                alt="API Product illustration"
+                className={classes.emptyStateImage}
+              />
+            </Box>
+          </Box>
+        )}
+        {!loading && !error && !permissionError && allProducts.length > 0 && (
+          <Box className={classes.container}>
+            <FilterPanel
+              sections={filterSections}
+              filters={filters}
+              onChange={setFilters}
+            />
+            <Box className={classes.tableContainer}>
+              <Box display="flex" justifyContent="flex-end" mb={2}>
+                {canCreateApiProduct && (
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    size="small"
+                    startIcon={<AddIcon />}
+                    onClick={() => setCreateDialogOpen(true)}
+                  >
+                    Create API Product
+                  </Button>
+                )}
+              </Box>
+              {filteredProducts.length === 0 ? (
+                <Box p={4} textAlign="center">
+                  <Typography variant="body1" color="textSecondary">
+                    No API products match the selected filters.
+                  </Typography>
+                </Box>
+              ) : (
+                <Table
+                  options={{
+                    paging: filteredProducts.length > 10,
+                    pageSize: 20,
+                    search: true,
+                    filtering: false,
+                    debounceInterval: 300,
+                    toolbar: true,
+                    emptyRowsWhenPaging: false,
+                  }}
+                  columns={columns}
+                  data={filteredProducts}
+                />
+              )}
+            </Box>
+          </Box>
         )}
         <CreateAPIProductDialog
           open={createDialogOpen}

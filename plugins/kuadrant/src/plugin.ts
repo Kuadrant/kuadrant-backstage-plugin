@@ -130,3 +130,12 @@ export const EntityKuadrantApiProductOpenApiAlert = kuadrantPlugin.provide(
     },
   }),
 );
+
+export const ApiProductDetailPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'ApiProductDetailPage',
+    component: () =>
+      import('./components/ApiProductDetailPage').then(m => m.ApiProductDetailPage),
+    mountPoint: rootRouteRef,
+  }),
+);

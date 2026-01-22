@@ -10,22 +10,45 @@ import {
   Typography,
   Chip,
   Grid,
-  MenuItem,
   CircularProgress,
   makeStyles,
+  FormControl,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  Tooltip,
+  IconButton,
+  InputAdornment,
 } from '@material-ui/core';
+import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
+import AddIcon from '@material-ui/icons/Add';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
-import { validateEmail, validateURL } from '../../utils/validation';
+import { validateURL } from '../../utils/validation';
 
-const useStyles = makeStyles({
+const useStyles = makeStyles((theme) => ({
   asterisk: {
     color: '#f44336',
   },
-});
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(0.5),
+    marginTop: theme.spacing(2),
+    marginBottom: theme.spacing(1),
+  },
+  infoIcon: {
+    fontSize: 18,
+    color: theme.palette.text.secondary,
+  },
+  tagChip: {
+    marginRight: theme.spacing(0.5),
+    marginBottom: theme.spacing(0.5),
+  },
+}));
 
 interface EditAPIProductDialogProps {
   open: boolean;
@@ -55,9 +78,6 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   const [openAPISpec, setOpenAPISpec] = useState('');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
-  // valid error states
-  const [contactEmailError, setContactEmailError] = useState<string | null>(null);
-  const [docsURLError, setDocsURLError] = useState<string | null>(null);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
 
   // Load APIProduct data when dialog opens
@@ -85,9 +105,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           setContactEmail(data.spec.contact?.email || '');
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
-          setOpenAPISpec(data.spec.documentation?.openAPISpec || '');
-          setContactEmailError(null);
-          setDocsURLError(null);
+          setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -122,25 +140,11 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
     });
   }, [planPolicies, targetRef, namespace]);
 
-  // val handlers
-
   useEffect(() => {
     if (open) {
-      setContactEmailError(null);
-      setDocsURLError(null);
       setOpenAPISpecError(null);
     }
   }, [open]);
-
-  const handleContactEmailChange = (value: string) => {
-    setContactEmail(value);
-    setContactEmailError(validateEmail(value));
-  };
-
-  const handleDocsURLChange = (value: string) => {
-    setDocsURL(value);
-    setDocsURLError(validateURL(value));
-  };
 
   const handleOpenAPISpecChange = (value: string) => {
     setOpenAPISpec(value);
@@ -181,7 +185,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           ...(docsURL || openAPISpec ? {
             documentation: {
               ...(docsURL && { docsURL }),
-              ...(openAPISpec && { openAPISpec }),
+              ...(openAPISpec && { openAPISpecURL: openAPISpec }),
             },
           } : {}),
         },
@@ -232,137 +236,150 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
         {loading ? (
           <Progress />
         ) : (
-          <Grid container spacing={2}>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Name"
-                value={name}
-                disabled
-                helperText="Kubernetes resource name (immutable)"
-                margin="normal"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Namespace"
-                value={namespace}
-                disabled
-                helperText="Derived from HTTPRoute (immutable)"
-                margin="normal"
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Display Name"
-                value={displayName}
-                onChange={e => setDisplayName(e.target.value)}
-                placeholder="My API"
-                margin="normal"
-                required
-                disabled={saving}
-                InputLabelProps={{
-                  classes: {
-                    asterisk: classes.asterisk,
-                  },
-                }}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Version"
-                value={version}
-                onChange={e => setVersion(e.target.value)}
-                placeholder="v1"
-                margin="normal"
-                disabled={saving}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                select
-                label="Publish Status"
-                value={publishStatus}
-                onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
-                margin="normal"
-                helperText="Draft: Hidden from catalog. Published: Visible in catalog."
-                disabled={saving}
-              >
-                <MenuItem value="Draft">Draft (Hidden)</MenuItem>
-                <MenuItem value="Published">Published (Visible)</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                select
-                label="Approval Mode"
-                value={approvalMode}
-                onChange={e => setApprovalMode(e.target.value as 'automatic' | 'manual')}
-                margin="normal"
-                helperText="Automatic: keys created immediately. Manual: requires approval."
-                disabled={saving}
-              >
-                <MenuItem value="manual">Manual</MenuItem>
-                <MenuItem value="automatic">Automatic</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Description"
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="API description"
-                margin="normal"
-                multiline
-                rows={2}
-                required
-                disabled={saving}
-                InputLabelProps={{
-                  classes: {
-                    asterisk: classes.asterisk,
-                  },
-                }}
-              />
-            </Grid>
-
-            <Grid item xs={12}>
-              <Typography variant="subtitle2" gutterBottom style={{ marginTop: 16 }}>
-                Tags
-              </Typography>
-              <Box display="flex" flexWrap="wrap" marginBottom={1} style={{ gap: 8 }}>
-                {tags.map(tag => (
-                  <Chip
-                    key={tag}
-                    label={tag}
-                    onDelete={saving ? undefined : () => handleDeleteTag(tag)}
-                    size="small"
-                    disabled={saving}
-                  />
-                ))}
-              </Box>
-              <Box display="flex" style={{ gap: 8 }}>
+          <>
+            {/* API product info section */}
+            <Box className={classes.sectionHeader}>
+              <Typography variant="subtitle1"><strong>API product info</strong></Typography>
+            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
                 <TextField
                   fullWidth
-                  size="small"
-                  value={tagInput}
-                  onChange={e => setTagInput(e.target.value)}
-                  onKeyPress={e => e.key === 'Enter' && handleAddTag()}
-                  placeholder="Add tag"
+                  label="API product name"
+                  value={displayName}
+                  onChange={e => setDisplayName(e.target.value)}
+                  placeholder="My API"
+                  helperText="Give a unique name for your API product"
+                  margin="normal"
+                  required
+                  disabled={saving}
+                  InputLabelProps={{
+                    classes: {
+                      asterisk: classes.asterisk,
+                    },
+                  }}
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Resource name"
+                  value={name}
+                  disabled
+                  helperText="Kubernetes resource name (immutable)"
+                  margin="normal"
+                />
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Version"
+                  value={version}
+                  onChange={e => setVersion(e.target.value)}
+                  placeholder="v1"
+                  helperText="Give a version to your API product"
+                  margin="normal"
                   disabled={saving}
                 />
-                <Button onClick={handleAddTag} variant="outlined" size="small" disabled={saving}>
-                  Add
-                </Button>
-              </Box>
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  label="Tag"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyPress={e => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleAddTag();
+                    }
+                  }}
+                  placeholder="Add tag"
+                  helperText="Add a tag to your API product"
+                  margin="normal"
+                  disabled={saving}
+                  InputProps={{
+                    endAdornment: tagInput ? (
+                      <InputAdornment position="end">
+                        <IconButton size="small" onClick={handleAddTag} disabled={saving}>
+                          <AddIcon fontSize="small" />
+                        </IconButton>
+                      </InputAdornment>
+                    ) : undefined,
+                  }}
+                />
+              </Grid>
+              {tags.length > 0 && (
+                <Grid item xs={12}>
+                  <Box display="flex" flexWrap="wrap">
+                    {tags.map(tag => (
+                      <Chip
+                        key={tag}
+                        label={tag}
+                        onDelete={saving ? undefined : () => handleDeleteTag(tag)}
+                        size="small"
+                        className={classes.tagChip}
+                        disabled={saving}
+                      />
+                    ))}
+                  </Box>
+                </Grid>
+              )}
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Description"
+                  value={description}
+                  onChange={e => setDescription(e.target.value)}
+                  placeholder="API description"
+                  margin="normal"
+                  multiline
+                  rows={2}
+                  required
+                  disabled={saving}
+                  InputLabelProps={{
+                    classes: {
+                      asterisk: classes.asterisk,
+                    },
+                  }}
+                />
+              </Grid>
             </Grid>
-            {targetRef && (
-              <>
+
+            {/* Associated route section */}
+            <Box className={classes.sectionHeader}>
+              <Typography variant="subtitle1"><strong>Associated route</strong></Typography>
+              <Tooltip title="The HTTPRoute this API product is associated with">
+                <InfoOutlinedIcon className={classes.infoIcon} />
+              </Tooltip>
+            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="OpenAPI Spec URL"
+                  value={openAPISpec}
+                  onChange={e => handleOpenAPISpecChange(e.target.value)}
+                  placeholder="https://api.example.com/openapi.json"
+                  helperText={openAPISpecError || "Enter the full path to your API spec file"}
+                  error={!!openAPISpecError}
+                  margin="normal"
+                  disabled={saving}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Documentation URL"
+                  value={docsURL}
+                  onChange={e => setDocsURL(e.target.value)}
+                  placeholder="https://docs.example.com/api"
+                  helperText="Link to external documentation for this API"
+                  margin="normal"
+                  disabled={saving}
+                />
+              </Grid>
+              {targetRef && (
                 <Grid item xs={12}>
                   <TextField
                     fullWidth
@@ -373,69 +390,67 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
                     margin="normal"
                   />
                 </Grid>
+              )}
+            </Grid>
 
-                <Grid item xs={12}>
-                  <PlanPolicyDetails
-                    selectedPolicy={selectedPolicy}
-                    alertSeverity="info"
-                    alertMessage="No PlanPolicy found for this HTTPRoute."
-                    includeTopMargin={false}
-                  />
-                </Grid>
+            {/* HTTPRoute policies section */}
+            {targetRef && (
+              <>
+                <Box className={classes.sectionHeader}>
+                  <Typography variant="subtitle1"><strong>HTTPRoute policies</strong></Typography>
+                  <Tooltip title="Shows the associated policies and rate limit tiers for the HTTPRoute">
+                    <InfoOutlinedIcon className={classes.infoIcon} />
+                  </Tooltip>
+                </Box>
+                <PlanPolicyDetails
+                  selectedPolicy={selectedPolicy}
+                  alertSeverity="info"
+                  alertMessage="No PlanPolicy found for this HTTPRoute."
+                  includeTopMargin={false}
+                />
               </>
             )}
 
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Contact Email"
-                value={contactEmail}
-                onChange={e => handleContactEmailChange(e.target.value)}
-                placeholder="api-team@example.com"
-                helperText={contactEmailError || "Contact email for API support"}
-                error={!!contactEmailError}
-                margin="normal"
-                disabled={saving}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Contact Team"
-                value={contactTeam}
-                onChange={e => setContactTeam(e.target.value)}
-                placeholder="platform-team"
-                margin="normal"
-                disabled={saving}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="Docs URL"
-                value={docsURL}
-                onChange={e => handleDocsURLChange(e.target.value)}
-                placeholder="https://api.example.com/docs"
-                helperText={docsURLError || "Link to API documentation"}
-                error={!!docsURLError}
-                margin="normal"
-                disabled={saving}
-              />
-            </Grid>
-            <Grid item xs={6}>
-              <TextField
-                fullWidth
-                label="OpenAPI Spec URL"
-                value={openAPISpec}
-                onChange={e => handleOpenAPISpecChange(e.target.value)}
-                placeholder="https://api.example.com/openapi.json"
-                helperText={openAPISpecError || "Link to OpenAPI specification"}
-                error={!!openAPISpecError}
-                margin="normal"
-                disabled={saving}
-              />
-            </Grid>
-          </Grid>
+            {/* API Key approval section */}
+            <Box className={classes.sectionHeader}>
+              <Typography variant="subtitle1"><strong>API Key approval</strong></Typography>
+              <Tooltip title="Choose how API key requests are handled for this product">
+                <InfoOutlinedIcon className={classes.infoIcon} />
+              </Tooltip>
+            </Box>
+            <FormControl component="fieldset" disabled={saving}>
+              <RadioGroup
+                row
+                value={approvalMode}
+                onChange={e => setApprovalMode(e.target.value as 'automatic' | 'manual')}
+              >
+                <FormControlLabel
+                  value="manual"
+                  control={<Radio color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2">Need manual approval</Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Requires approval for requesting this API
+                      </Typography>
+                    </Box>
+                  }
+                />
+                <FormControlLabel
+                  value="automatic"
+                  control={<Radio color="primary" />}
+                  label={
+                    <Box>
+                      <Typography variant="body2">Automatic</Typography>
+                      <Typography variant="caption" color="textSecondary">
+                        Keys are created without need to be approved
+                      </Typography>
+                    </Box>
+                  }
+                />
+              </RadioGroup>
+            </FormControl>
+          </>
         )}
       </DialogContent>
       <DialogActions>
@@ -444,7 +459,7 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           onClick={handleSave}
           color="primary"
           variant="contained"
-          disabled={saving || loading || !displayName || !description || !!contactEmailError || !!docsURLError || !!openAPISpecError}
+          disabled={saving || loading || !displayName || !description || !!openAPISpecError}
           startIcon={saving ? <CircularProgress size={16} color="inherit" /> : undefined}
         >
           {saving ? 'Saving...' : 'Save'}

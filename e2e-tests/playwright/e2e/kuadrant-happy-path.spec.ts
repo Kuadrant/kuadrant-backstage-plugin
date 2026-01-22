@@ -145,8 +145,9 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     });
     testCreated = true;
 
-    // verify API product appears in table
-    const apiProductRow = page.getByText(testData.displayName);
+    // verify API product appears in table (scope to table to avoid matching toast)
+    const table = page.locator("table");
+    const apiProductRow = table.getByRole("link", { name: testData.displayName });
     await expect(
       apiProductRow,
       "Created API should appear in table",

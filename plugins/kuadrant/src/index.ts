@@ -4,6 +4,7 @@ export {
   ApiProductsPage,
   ApiKeysPage,
   ApiKeyDetailPage,
+  ApiProductDetailPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,

@@ -1,0 +1,1 @@
+export { ApiProductDetails } from './ApiProductDetails';

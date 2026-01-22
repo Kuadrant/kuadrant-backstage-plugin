@@ -47,6 +47,7 @@ const useStyles = makeStyles((theme) => ({
   tableContainer: {
     flex: 1,
     overflow: "auto",
+    padding: 10,
   },
   useCasePanel: {
     padding: theme.spacing(2),
