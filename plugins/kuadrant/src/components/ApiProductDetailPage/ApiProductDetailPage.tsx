@@ -16,6 +16,7 @@ import {
   InfoCard,
   Link,
   Breadcrumbs,
+  CodeSnippet,
 } from "@backstage/core-components";
 import {
   Box,
@@ -194,11 +195,24 @@ export const ApiProductDetailPage = () => {
   );
   const discoveredPlans = product.status?.discoveredPlans || [];
 
+  const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
+  const schemeObjects = Object.values(authSchemes);
+  const hasOIDCTab = schemeObjects.some((scheme: any) =>
+    scheme.hasOwnProperty("jwt"),
+  );
+  // Extract JWT issuer from the first JWT scheme
+  const jwtScheme = schemeObjects.find((scheme: any) => scheme.hasOwnProperty("jwt"));
+  const jwtIssuer = (jwtScheme as any)?.jwt?.issuerUrl || "unknown";
+  const jwtTokenEndpoint = product.status?.oidcDiscovery?.tokenEndpoint || "unknown";
+
   // compute tab indices
   const hasDefinitionTab = !!product.spec?.documentation?.openAPISpecURL;
   const hasPoliciesTab = !!(planPolicyCondition || authPolicyCondition || discoveredPlans.length > 0);
-  const definitionTabIndex = hasDefinitionTab ? 1 : -1;
-  const policiesTabIndex = hasPoliciesTab ? (hasDefinitionTab ? 2 : 1) : -1;
+
+  let nextIndex = 1; // Overview is always at index 0
+  const definitionTabIndex = hasDefinitionTab ? nextIndex++ : -1;
+  const policiesTabIndex = hasPoliciesTab ? nextIndex++ : -1;
+  const oidcTabIndex = hasOIDCTab ? nextIndex++ : -1;
 
   const formatLimits = (limits: any): string => {
     if (!limits) return "No limits";
@@ -263,6 +277,7 @@ export const ApiProductDetailPage = () => {
             <Tab label="Overview" />
             {hasDefinitionTab && <Tab label="Definition" />}
             {hasPoliciesTab && <Tab label="Policies" />}
+            {hasOIDCTab && <Tab label="OIDC" />}
           </Tabs>
         </Box>
 
@@ -402,6 +417,51 @@ export const ApiProductDetailPage = () => {
                 </InfoCard>
               </Grid>
             )}
+          </Grid>
+        )}
+
+        {selectedTab === oidcTabIndex && hasOIDCTab && (
+          <Grid item xs={12} md={6}>
+            <InfoCard title="OIDC Provider Discovery">
+              <Box p={2}>
+                <Grid container spacing={2}>
+                  <Grid item xs={12}>
+                    <Typography variant="body2">
+                      This API uses OIDC authentication. Obtain a token from the identity provider below.
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="body2">
+                      <strong>Identity Provider: </strong>
+                      <Link to={jwtIssuer} target="_blank">
+                        {jwtIssuer}
+                      </Link>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <Typography variant="body2">
+                      <strong>Token Endpoint: </strong>
+                      <Link to={jwtTokenEndpoint} target="_blank">
+                        {jwtTokenEndpoint}
+                      </Link>
+                    </Typography>
+                  </Grid>
+                  <Grid item xs={12}>
+                    <CodeSnippet
+                      text={`# Example (Client Credentials Flow):
+curl -X POST \\
+   -d "grant_type=client_credentials" \\
+   -d "client_id=YOUR_CLIENT_ID" \\
+   -d "client_secret=YOUR_CLIENT_SECRET" \\
+   ${jwtTokenEndpoint}
+`} // notsecret - template for user's own api key
+                      language="bash"
+                      showCopyCodeButton
+                    />
+                  </Grid>
+                </Grid>
+              </Box>
+            </InfoCard>
           </Grid>
         )}
       </Content>
