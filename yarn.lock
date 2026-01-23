@@ -7848,6 +7848,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@backstage/plugin-scaffolder-common@npm:^1.7.1, @backstage/plugin-scaffolder-common@npm:^1.7.5":
+  version: 1.7.5
+  resolution: "@backstage/plugin-scaffolder-common@npm:1.7.5"
+  dependencies:
+    "@backstage/catalog-model": ^1.7.6
+    "@backstage/errors": ^1.2.7
+    "@backstage/integration": ^1.19.2
+    "@backstage/plugin-permission-common": ^0.9.4
+    "@backstage/types": ^1.2.2
+    "@microsoft/fetch-event-source": ^2.0.1
+    "@types/json-schema": ^7.0.9
+    cross-fetch: ^4.0.0
+    json-schema: ^0.4.0
+    uri-template: ^2.0.0
+    zen-observable: ^0.10.0
+  checksum: a951de5218047a79bcdddfd9e568498f129bb7de8dd6177cd8ef1859a66f1889b0016e601ce3b44701da129e285b760c4783b757ad446b4a9a861e58d61d162a
+  languageName: node
+  linkType: hard
+
 "@backstage/plugin-scaffolder-common@npm:^1.7.3":
   version: 1.7.3
   resolution: "@backstage/plugin-scaffolder-common@npm:1.7.3"
@@ -7867,36 +7886,17 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-scaffolder-common@npm:^1.7.5":
-  version: 1.7.5
-  resolution: "@backstage/plugin-scaffolder-common@npm:1.7.5"
-  dependencies:
-    "@backstage/catalog-model": ^1.7.6
-    "@backstage/errors": ^1.2.7
-    "@backstage/integration": ^1.19.2
-    "@backstage/plugin-permission-common": ^0.9.4
-    "@backstage/types": ^1.2.2
-    "@microsoft/fetch-event-source": ^2.0.1
-    "@types/json-schema": ^7.0.9
-    cross-fetch: ^4.0.0
-    json-schema: ^0.4.0
-    uri-template: ^2.0.0
-    zen-observable: ^0.10.0
-  checksum: a951de5218047a79bcdddfd9e568498f129bb7de8dd6177cd8ef1859a66f1889b0016e601ce3b44701da129e285b760c4783b757ad446b4a9a861e58d61d162a
-  languageName: node
-  linkType: hard
-
 "@backstage/plugin-scaffolder-node@npm:^0.11.0":
-  version: 0.11.0
-  resolution: "@backstage/plugin-scaffolder-node@npm:0.11.0"
+  version: 0.11.2
+  resolution: "@backstage/plugin-scaffolder-node@npm:0.11.2"
   dependencies:
-    "@backstage/backend-plugin-api": ^1.4.2
+    "@backstage/backend-plugin-api": ^1.4.3
     "@backstage/catalog-model": ^1.7.5
     "@backstage/errors": ^1.2.7
-    "@backstage/integration": ^1.17.1
+    "@backstage/integration": ^1.18.0
     "@backstage/plugin-permission-common": ^0.9.1
-    "@backstage/plugin-scaffolder-common": ^1.7.0
-    "@backstage/types": ^1.2.1
+    "@backstage/plugin-scaffolder-common": ^1.7.1
+    "@backstage/types": ^1.2.2
     "@isomorphic-git/pgp-plugin": ^0.0.7
     concat-stream: ^2.0.0
     fs-extra: ^11.2.0
@@ -7910,7 +7910,7 @@ __metadata:
     winston-transport: ^4.7.0
     zod: ^3.22.4
     zod-to-json-schema: ^3.20.4
-  checksum: 55b56f41d764e226b42fb2b069b4c211c82f82695614ec1a44241d274d70f3ec3b6c39c665ff45583e0c181a394644029e49a277d1b6d9bbed98841e114941b3
+  checksum: fbf3f003b7d20721da4e54a30e80230f3c48a4b8b0f7852f9d7711da4e0577d67e5cd6efc59c634d93e382020fe8fd8d53fcf6106a471e54c067e22fcd1d1264
   languageName: node
   linkType: hard
 
