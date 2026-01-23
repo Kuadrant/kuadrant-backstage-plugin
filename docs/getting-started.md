@@ -78,7 +78,7 @@ kubectl -n getting-started-tutorial wait --timeout=120s --for=condition=Availabl
 
 ### Step 2: Create the Gateway and HTTPRoute
 
-Create a Gateway and expose the API via an HTTPRoute. The `backstage.io/expose: "true"` annotation makes the route available for publishing in the developer portal.
+Create a Gateway and expose the API via an HTTPRoute.
 
 ```bash
 kubectl apply -f - <<EOF
@@ -102,8 +102,6 @@ kind: HTTPRoute
 metadata:
   name: getting-started-toystore
   namespace: getting-started-tutorial
-  annotations:
-    backstage.io/expose: "true"
 spec:
   parentRefs:
     - name: getting-started-gateway

@@ -16,9 +16,7 @@ The backend plugin exposes REST API endpoints at `/api/kuadrant/*`. All endpoint
 
 | Method | Endpoint | Description | Permission |
 |--------|----------|-------------|------------|
-| GET | `/api/kuadrant/httproutes` | List HTTPRoutes with `backstage.io/expose: "true"` annotation | `kuadrant.apiproduct.list` |
-
-HTTPRoutes must have the `backstage.io/expose: "true"` annotation to appear in the list. This is set by platform engineers when exposing routes for API publishing.
+| GET | `/api/kuadrant/httproutes` | List all HTTPRoutes | `kuadrant.apiproduct.list` |
 
 ## PlanPolicy Endpoints
 

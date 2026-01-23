@@ -199,7 +199,6 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 **Responsibilities**:
 - Manages cluster infrastructure (Gateways, HTTPRoutes, PlanPolicies)
 - Creates PlanPolicy resources with rate limit tiers
-- Annotates HTTPRoutes with `backstage.io/expose: "true"` to make them available for publishing
 - Coordinates with API Admins and API Owners when changing rate limits
 - Does not typically manage individual API Products (delegated to API Admins/Owners)
 
@@ -219,7 +218,7 @@ Comprehensive view of what each persona can and cannot do:
 
 | Persona | Can Do | Cannot Do |
 |---------|--------|-----------|
-| **Platform Engineer** | • Manage Kuadrant infrastructure (Gateways, HTTPRoutes)<br/>• Create/update/delete PlanPolicy resources<br/>• Annotate HTTPRoutes with `backstage.io/expose: "true"`<br/>• Manage RBAC policies and permissions<br/>• Configure platform-wide settings<br/>• Full cluster admin access for platform management | • Typically does not manage day-to-day API Products (delegates to API Admin/Owner)<br/>• Should coordinate with API Admins and API Owners before changing rate limits |
+| **Platform Engineer** | • Manage Kuadrant infrastructure (Gateways, HTTPRoutes)<br/>• Create/update/delete PlanPolicy resources<br/>• Manage RBAC policies and permissions<br/>• Configure platform-wide settings<br/>• Full cluster admin access for platform management | • Typically does not manage day-to-day API Products (delegates to API Admin/Owner)<br/>• Should coordinate with API Admins and API Owners before changing rate limits |
 | **API Admin** | • Read all APIProducts<br/>• Create/update/delete any APIProduct<br/>• Approve/reject any API key requests<br/>• Manage all API keys (read/delete)<br/>• View all APIKeys<br/>• Troubleshoot on behalf of API Owners<br/>• All `.all` scoped permissions | • Cannot create/update/delete PlanPolicy<br/>• Cannot modify platform infrastructure (HTTPRoutes, Gateways) |
 | **API Owner** | • Read/list HTTPRoutes (to publish APIs)<br/>• Create/update/delete own APIProducts<br/>• Read all APIProducts<br/>• Approve/reject API key requests for own APIs<br/>• Delete API key requests for own APIs<br/>• Manage own API documentation<br/>• View/manage API keys for own APIs | • Cannot create/update PlanPolicy<br/>• Cannot modify platform infrastructure<br/>• Cannot approve requests for other owners' APIs<br/>• Cannot update/delete other owners' APIProducts |
 | **API Consumer** | • Read/list APIProduct<br/>• Create APIKey<br/>• Read/update/delete own APIKeys<br/>• View own request status<br/>• Manage own API keys<br/>• Use APIs within rate limit quotas | • Cannot approve requests<br/>• Cannot view others' requests<br/>• Cannot create or publish APIs<br/>• Cannot modify rate limits |

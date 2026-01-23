@@ -37,9 +37,8 @@ See [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/r
 - Platform Engineers set up infrastructure on-cluster **first**:
   1. Create PlanPolicy with rate limit tiers
   2. Apply PlanPolicy to HTTPRoute via `targetRef`
-  3. Annotate HTTPRoute to expose in Backstage (`backstage.io/expose: "true"`)
 - API Owner workflow in Backstage:
-  1. Browse list of available HTTPRoutes (filtered by annotation)
+  1. Browse list of available HTTPRoutes
   2. Select existing HTTPRoute to publish
   3. Add catalog metadata (display name, description, docs, tags)
   4. APIProduct is created with `spec.targetRef` pointing to HTTPRoute
