@@ -44,6 +44,7 @@ import {
   kuadrantPlanPolicyListPermission,
 } from "../../permissions";
 import { useKuadrantPermission } from "../../utils/permissions";
+import { handleFetchError } from "../../utils/errors";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import emptyStateIllustration from "../../assets/empty-state-illustration.png";
@@ -183,6 +184,10 @@ export const ResourceList = () => {
     const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/apiproducts`,
     );
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(error);
+    }
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
@@ -194,6 +199,10 @@ export const ResourceList = () => {
     const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/planpolicies`,
     );
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(error);
+    }
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
 
@@ -406,22 +415,33 @@ export const ResourceList = () => {
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests?namespace=${namespace}`,
       );
-      if (response.ok) {
-        const data = await response.json();
-        const related = (data.items || []).filter(
-          (r: any) =>
-            r.spec.apiName === name && r.spec.apiNamespace === namespace,
-        );
-        const approved = related.filter(
-          (r: any) => r.status?.phase === "Approved",
-        ).length;
-        setDeleteStats({ requests: related.length, secrets: approved });
+
+      if (!response.ok) {
+        const error = await handleFetchError(response);
+        throw new Error(error);
       }
+
+      const data = await response.json();
+      const related = (data.items || []).filter(
+        (r: any) =>
+          r.spec.apiName === name && r.spec.apiNamespace === namespace,
+      );
+      const approved = related.filter(
+        (r: any) => r.status?.phase === "Approved",
+      ).length;
+      setDeleteStats({ requests: related.length, secrets: approved });
     } catch (err) {
-      console.warn("Failed to fetch delete stats:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to delete access request: ${errorMessage}`,
+        severity: "error",
+        display: "transient",
+      });
+    } finally {
+      setDeleteDialogOpen(true);
     }
 
-    setDeleteDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -435,7 +455,8 @@ export const ResourceList = () => {
       );
 
       if (!response.ok) {
-        throw new Error("failed to delete apiproduct");
+        const error = await handleFetchError(response);
+        throw new Error(error);
       }
 
       const deletedName = apiProductToDelete?.name || "API Product";
@@ -446,9 +467,10 @@ export const ResourceList = () => {
         display: "transient",
       });
     } catch (err) {
-      console.error("error deleting apiproduct:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to delete API Product",
+        message: `Failed to delete API Product: ${errorMessage}`,
         severity: "error",
         display: "transient",
       });
@@ -484,7 +506,8 @@ export const ResourceList = () => {
       );
 
       if (!response.ok) {
-        throw new Error("failed to update publish status");
+        const error = await handleFetchError(response);
+        throw new Error(error);
       }
 
       setRefreshTrigger((prev) => prev + 1);
@@ -494,9 +517,10 @@ export const ResourceList = () => {
         display: "transient",
       });
     } catch (err) {
-      console.error("error updating publish status:", err);
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to update publish status",
+        message: `Failed to update publish status: ${errorMessage}`,
         severity: "error",
         display: "transient",
       });
