@@ -28,6 +28,7 @@ import { Progress } from '@backstage/core-components';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateURL } from '../../utils/validation';
+import { handleFetchError } from "../../utils/errors";
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -58,7 +59,7 @@ interface EditAPIProductDialogProps {
   name: string;
 }
 
-export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}: EditAPIProductDialogProps) => {
+export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name }: EditAPIProductDialogProps) => {
   const classes = useStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -89,8 +90,8 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
       fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`)
         .then(async res => {
           if (!res.ok) {
-            const errorData = await res.json();
-            throw new Error(errorData.error || `Failed to fetch API product: ${res.status}`);
+            const error = await handleFetchError(res);
+            throw new Error(error);
           }
           return res.json();
         })
@@ -123,6 +124,12 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
   } = useAsync(async () => {
     if (!open) return null;
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(error);
+    }
+
     return await response.json();
   }, [backendUrl, fetchApi, open]);
 
@@ -172,11 +179,11 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
           displayName,
           description,
           version,
-        publishStatus,
-        approvalMode,
-        tags,
-        targetRef,
-        ...(contactEmail || contactTeam ? {
+          publishStatus,
+          approvalMode,
+          tags,
+          targetRef,
+          ...(contactEmail || contactTeam ? {
             contact: {
               ...(contactEmail && { email: contactEmail }),
               ...(contactTeam && { team: contactTeam }),
@@ -203,8 +210,8 @@ export const EditAPIProductDialog = ({open, onClose, onSuccess, namespace, name}
       );
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'failed to update apiproduct');
+        const error = await handleFetchError(response);
+        throw new Error(error);
       }
 
       onSuccess();
