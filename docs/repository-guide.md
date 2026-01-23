@@ -1,6 +1,16 @@
-# Architecture
+# Repository Guide
 
-This document describes the monorepo structure, dynamic plugin system, and build configuration.
+This document describes the monorepo structure, build system, configuration, and development setup for the Kuadrant Backstage plugin repository.
+
+## Table of Contents
+
+- [Monorepo Structure](#monorepo-structure)
+- [Dynamic Plugin System](#dynamic-plugin-system)
+- [Configuration Files](#configuration-files)
+- [Build System](#build-system)
+- [Kubernetes Configuration Pattern](#kubernetes-configuration-pattern)
+- [Extensions Catalog Workflow](#extensions-catalog-workflow)
+- [Telemetry](#telemetry)
 
 ## Monorepo Structure
 
@@ -21,6 +31,52 @@ Custom plugins:
 - `dynamic-plugins-info-backend` - Provides information about loaded dynamic plugins
 - `licensed-users-info-backend` - Tracks licensed user information
 - `scalprum-backend` - Frontend federation support for dynamic plugins
+
+#### Kuadrant Frontend Plugin Structure
+
+```
+plugins/kuadrant/
+├── src/
+│   ├── plugin.ts                    # Plugin definition, route bindings
+│   ├── permissions.ts               # Permission definitions
+│   ├── api/
+│   │   └── types.ts                 # TypeScript types for API responses
+│   ├── components/
+│   │   ├── ApiAccessCard/           # Shows approved API keys
+│   │   ├── ApiKeyManagementTab/     # Full API key lifecycle UI
+│   │   ├── ApprovalQueueCard/       # Approval interface for owners
+│   │   ├── CreateAPIProductDialog/  # API product creation form
+│   │   ├── ApiKeyDetailPage/        # Individual API key details
+│   │   └── PlanPolicyDetailPage/    # Plan policy details
+│   └── utils/
+│       └── permissions.ts           # useKuadrantPermission hook
+```
+
+**Key Frontend Patterns**:
+- **Permission-based rendering**: UI elements conditionally shown based on RBAC checks
+- **Optimistic updates**: Immediate UI feedback, followed by data refresh
+- **One-time secret reveal**: Eye icon shows API key once, then disabled
+- **Grouped approval queue**: Requests organized by API Product for easier review
+
+#### Kuadrant Backend Plugin Structure
+
+```
+plugins/kuadrant-backend/
+├── src/
+│   ├── module.ts                    # Backstage module registration
+│   ├── router.ts                    # REST API endpoints (1,479 lines)
+│   ├── k8s-client.ts                # Kubernetes client abstraction
+│   ├── permissions.ts               # Permission checks and definitions
+│   ├── provider/
+│   │   └── APIProductEntityProvider.ts  # Syncs APIProducts to catalog
+│   └── types.ts                     # TypeScript types
+```
+
+**Key Backend Patterns**:
+- **Zod validation**: All request bodies validated with schemas
+- **Tiered permission checks**: Try `.all` permission, fall back to `.own` with ownership verification
+- **Field whitelisting**: PATCH endpoints only allow specific fields
+- **Status subresource separation**: Backend writes `spec`, controller writes `status`
 
 ### dynamic-plugins/wrappers/
 
@@ -54,15 +110,15 @@ RHDH supports dynamic plugins that can be installed without rebuilding the appli
 
 ### Local development
 
-- [`app-config.yaml`](../app-config.yaml) - Base configuration
-- [`app-config.local.yaml`](../app-config.local.yaml) - Local overrides with RBAC enabled (checked in for team convenience)
-- [`app-config.dynamic-plugins.yaml`](../app-config.dynamic-plugins.yaml) - Dynamic plugin configuration
+- [app-config.yaml](../app-config.yaml) - Base configuration
+- [app-config.local.yaml](../app-config.local.yaml) - Local overrides with RBAC enabled (checked in for team convenience)
+- [app-config.dynamic-plugins.yaml](../app-config.dynamic-plugins.yaml) - Dynamic plugin configuration
 
 ## Build System
 
 Uses Turborepo for monorepo orchestration and Yarn 3 workspaces for package management.
 
-**Configuration:** [`turbo.json`](../turbo.json)
+**Configuration:** [turbo.json](../turbo.json)
 
 ## Kubernetes Configuration Pattern
 
@@ -90,7 +146,7 @@ kubernetes:
    - Default fallback - `loadFromDefault()` for in-cluster or local kubeconfig
 5. Create API clients: `CustomObjectsApi`, `CoreV1Api`, etc.
 
-**Reference implementation:** See [`plugins/kuadrant-backend/src/KubernetesClient.ts`](../plugins/kuadrant-backend/src/KubernetesClient.ts)
+**Reference implementation:** See [plugins/kuadrant-backend/src/k8s-client.ts](../plugins/kuadrant-backend/src/k8s-client.ts)
 
 This allows plugins to work in:
 - Production (explicit cluster config with service account token)
