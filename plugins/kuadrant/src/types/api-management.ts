@@ -145,10 +145,25 @@ export interface APIProductSpec {
   };
 }
 
+export interface DiscoveredAuthScheme {
+  authentication: Record<string, {
+    apiKey?: {
+      selector?: LabelSelector;
+      allNamespaces?: boolean;
+    };
+    jwt?: {
+      issuerUrl: string;
+    };
+    credentials?: Credentials;
+    metrics?: boolean;
+    priority?: number;
+  }>;
+}
+
 export interface APIProductStatus {
   observedGeneration?: number;
   discoveredPlans?: Plan[];
-  discoveredAuthScheme?: any;
+  discoveredAuthScheme?: DiscoveredAuthScheme;
   openapi?: {
     raw: string;
     lastSyncTime: string;

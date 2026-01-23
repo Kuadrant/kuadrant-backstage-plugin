@@ -66,7 +66,6 @@ export const OverviewTabContent = () => (
           md: '1 / span 6',
           xs: '1 / -1',
         },
-        gridRow: 'span 2',
       }}
     >
       <Grid container>
@@ -195,27 +194,6 @@ export const OverviewTabContent = () => (
           item
           sx={{
             gridColumn: {
-              lg: '5 / -1',
-              md: '7 / -1',
-              xs: '1 / -1',
-            },
-          }}
-        >
-          <EntitySwitch>
-            <EntitySwitch.Case
-              if={(entity: Entity) =>
-                entity.metadata.annotations?.['kuadrant.io/auth-apikey'] ===
-                'true'
-              }
-            >
-              <EntityKuadrantApiAccessCard />
-            </EntitySwitch.Case>
-          </EntitySwitch>
-        </Grid>
-        <Grid
-          item
-          sx={{
-            gridColumn: {
               lg: '1 / span 6',
               xs: '1 / -1',
             },
@@ -234,6 +212,26 @@ export const OverviewTabContent = () => (
         >
           <EntityConsumingComponentsCard />
         </Grid>
+        <EntitySwitch>
+          <EntitySwitch.Case
+            if={(entity: Entity) =>
+              entity.metadata.annotations?.['kuadrant.io/auth-apikey'] ===
+              'true'
+            }
+          >
+            <Grid
+              item
+              sx={{
+                gridColumn: {
+                  lg: '1 / span 6',
+                  xs: '1 / -1',
+                },
+              }}
+            >
+              <EntityKuadrantApiAccessCard />
+            </Grid>
+          </EntitySwitch.Case>
+        </EntitySwitch>
       </EntitySwitch.Case>
       <EntitySwitch.Case if={isKind('system')}>
         <Grid

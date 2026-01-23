@@ -18,14 +18,10 @@ import {
   DialogTitle,
   DialogContent,
   DialogActions,
-  TextField,
-  Select,
-  MenuItem,
-  FormControl,
-  InputLabel,
   Tabs,
   Tab,
   Menu,
+  MenuItem,
   Tooltip,
   CircularProgress,
 } from "@material-ui/core";
@@ -45,7 +41,6 @@ import AddIcon from "@material-ui/icons/Add";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
 import WarningIcon from "@material-ui/icons/Warning";
-import InfoIcon from "@material-ui/icons/Info";
 import { APIKey } from "../../types/api-management";
 import {
   kuadrantApiKeyCreatePermission,
@@ -60,6 +55,7 @@ import {
 import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
+import { RequestAccessDialog } from "../RequestAccessDialog";
 
 interface APIProduct {
   metadata: {
@@ -107,11 +103,7 @@ export const ApiKeyManagementTab = ({
   const [refresh, setRefresh] = useState(0);
   const [userId, setUserId] = useState<string>("");
   const [userEmail, setUserEmail] = useState<string>("");
-  const [open, setOpen] = useState(false);
-  const [selectedPlan, setSelectedPlan] = useState("");
-  const [useCase, setUseCase] = useState("");
-  const [creating, setCreating] = useState(false);
-  const [createError, setCreateError] = useState<string | null>(null);
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [requestToEdit, setRequestToEdit] = useState<APIKey | null>(null);
   const [menuAnchor, setMenuAnchor] = useState<{
@@ -373,60 +365,6 @@ export const ApiKeyManagementTab = ({
       }
       return newSet;
     });
-  };
-
-  const handleRequestAccess = async () => {
-    if (!selectedPlan) return;
-
-    setCreating(true);
-    setCreateError(null);
-    try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            apiProductName,
-            namespace,
-            planTier: selectedPlan,
-            useCase: useCase.trim() || "",
-            userEmail,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `failed to create request: ${response.status}`,
-        );
-      }
-
-      alertApi.post({
-        message: "API key requested successfully",
-        severity: "success",
-        display: "transient",
-      });
-
-      setOpen(false);
-      setSelectedPlan("");
-      setUseCase("");
-      setRefresh((r) => r + 1);
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "unknown error occurred";
-      alertApi.post({
-        message: `Failed to request API key: ${errorMessage}`,
-        severity: "error",
-        display: "transient",
-      });
-      setCreateError(errorMessage);
-    } finally {
-      setCreating(false);
-    }
   };
 
   const detailPanelConfig = useMemo(
@@ -919,7 +857,7 @@ export const ApiKeyManagementTab = ({
                 variant="contained"
                 color="primary"
                 startIcon={<AddIcon />}
-                onClick={() => setOpen(true)}
+                onClick={() => setRequestDialogOpen(true)}
                 disabled={plans.length === 0}
                 data-testid="request-api-access-button"
                 data-plans-count={plans.length}
@@ -1027,106 +965,18 @@ export const ApiKeyManagementTab = ({
         )}
       </Grid>
 
-      <Dialog
-        open={open}
-        onClose={() => setOpen(false)}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Request API Access</DialogTitle>
-        <DialogContent>
-          <Box
-            mb={2}
-            p={1.5}
-            bgcolor="info.light"
-            borderRadius={1}
-            display="flex"
-            alignItems="flex-start"
-            style={{ gap: 8 }}
-          >
-            <InfoIcon
-              color="primary"
-              fontSize="small"
-              style={{ marginTop: 2 }}
-            />
-            <Typography variant="body2">
-              Your request will be reviewed by an API owner before access is
-              granted.
-            </Typography>
-          </Box>
-          {createError && (
-            <Box
-              mb={2}
-              p={2}
-              bgcolor="error.main"
-              color="error.contrastText"
-              borderRadius={1}
-            >
-              <Typography variant="body2">{createError}</Typography>
-            </Box>
-          )}
-          <FormControl
-            fullWidth
-            margin="normal"
-            disabled={creating}
-            data-testid="tier-select-form"
-          >
-            <InputLabel id="tier-select-label">Select Tier</InputLabel>
-            <Select
-              labelId="tier-select-label"
-              data-testid="tier-select"
-              value={selectedPlan}
-              onChange={(e) => setSelectedPlan(e.target.value as string)}
-              disabled={creating}
-            >
-              {plans.map((plan: Plan) => {
-                const limitDesc = Object.entries(plan.limits || {})
-                  .map(([key, val]) => `${val} per ${key}`)
-                  .join(", ");
-                return (
-                  <MenuItem
-                    key={plan.tier}
-                    value={plan.tier}
-                    data-testid={`tier-option-${plan.tier}`}
-                  >
-                    {plan.tier} {limitDesc ? `(${limitDesc})` : ""}
-                  </MenuItem>
-                );
-              })}
-            </Select>
-          </FormControl>
-          <TextField
-            label="Use Case (optional)"
-            placeholder="Describe how you plan to use this API"
-            multiline
-            rows={3}
-            fullWidth
-            margin="normal"
-            value={useCase}
-            onChange={(e) => setUseCase(e.target.value)}
-            helperText="Explain your intended use of this API for admin review"
-            disabled={creating}
-          />
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpen(false)} disabled={creating}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleRequestAccess}
-            color="primary"
-            variant="contained"
-            disabled={!selectedPlan || creating}
-            startIcon={
-              creating ? (
-                <CircularProgress size={16} color="inherit" />
-              ) : undefined
-            }
-          >
-            {creating ? "Submitting..." : "Submit Request"}
-          </Button>
-        </DialogActions>
-      </Dialog>
+      <RequestAccessDialog
+        open={requestDialogOpen}
+        onClose={() => setRequestDialogOpen(false)}
+        onSuccess={() => {
+          setRequestDialogOpen(false);
+          setRefresh((r) => r + 1);
+        }}
+        apiProductName={apiProductName}
+        namespace={namespace}
+        userEmail={userEmail}
+        plans={plans}
+      />
 
       <Menu
         id="actions-menu"

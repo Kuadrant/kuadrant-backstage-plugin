@@ -16,21 +16,6 @@ export const validateKubernetesName = (value: string): string | null => {
   return null;
 };
 
-// email validation
-export const validateEmail = (value: string): string | null => {
-  if (!value) {
-    return null;
-  }
-
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-  if (!emailRegex.test(value)) {
-    return 'Must be a valid email address';
-  }
-
-  return null;
-};
-
 // URL validation
 export const validateURL = (value: string): string | null => {
   if (!value) {

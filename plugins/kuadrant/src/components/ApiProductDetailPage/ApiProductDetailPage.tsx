@@ -16,8 +16,8 @@ import {
   InfoCard,
   Link,
   Breadcrumbs,
-  CodeSnippet,
 } from "@backstage/core-components";
+import { OpenApiDefinitionWidget } from "@backstage/plugin-api-docs";
 import {
   Box,
   Typography,
@@ -42,6 +42,7 @@ import { APIProduct } from "../../types/api-management";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { ApiProductDetails } from "../ApiProductDetails";
+import { OidcProviderCard } from "../OidcProviderCard";
 import { useKuadrantPermission } from "../../utils/permissions";
 import {
   kuadrantApiProductUpdateAllPermission,
@@ -206,7 +207,7 @@ export const ApiProductDetailPage = () => {
   const jwtTokenEndpoint = product.status?.oidcDiscovery?.tokenEndpoint || "unknown";
 
   // compute tab indices
-  const hasDefinitionTab = !!product.spec?.documentation?.openAPISpecURL;
+  const hasDefinitionTab = !!(product.status?.openapi?.raw || product.spec?.documentation?.openAPISpecURL);
   const hasPoliciesTab = !!(planPolicyCondition || authPolicyCondition || discoveredPlans.length > 0);
 
   let nextIndex = 1; // Overview is always at index 0
@@ -326,12 +327,22 @@ export const ApiProductDetailPage = () => {
 
         {selectedTab === definitionTabIndex && hasDefinitionTab && (
           <InfoCard title="API Definition">
-            <Typography variant="body2" color="textSecondary">
-              View the OpenAPI specification at:{" "}
-              <Link to={product.spec?.documentation?.openAPISpecURL || ""} target="_blank">
-                {product.spec?.documentation?.openAPISpecURL}
-              </Link>
-            </Typography>
+            {product.status?.openapi?.raw ? (
+              <OpenApiDefinitionWidget definition={product.status.openapi.raw} />
+            ) : (
+              <Typography variant="body2" color="textSecondary">
+                {product.spec?.documentation?.openAPISpecURL ? (
+                  <>
+                    OpenAPI specification not yet synced. View at:{" "}
+                    <Link to={product.spec.documentation.openAPISpecURL} target="_blank">
+                      {product.spec.documentation.openAPISpecURL}
+                    </Link>
+                  </>
+                ) : (
+                  "No OpenAPI specification available for this API product."
+                )}
+              </Typography>
+            )}
           </InfoCard>
         )}
 
@@ -421,48 +432,10 @@ export const ApiProductDetailPage = () => {
         )}
 
         {selectedTab === oidcTabIndex && hasOIDCTab && (
-          <Grid item xs={12} md={6}>
-            <InfoCard title="OIDC Provider Discovery">
-              <Box p={2}>
-                <Grid container spacing={2}>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      This API uses OIDC authentication. Obtain a token from the identity provider below.
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      <strong>Identity Provider: </strong>
-                      <Link to={jwtIssuer} target="_blank">
-                        {jwtIssuer}
-                      </Link>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <Typography variant="body2">
-                      <strong>Token Endpoint: </strong>
-                      <Link to={jwtTokenEndpoint} target="_blank">
-                        {jwtTokenEndpoint}
-                      </Link>
-                    </Typography>
-                  </Grid>
-                  <Grid item xs={12}>
-                    <CodeSnippet
-                      text={`# Example (Client Credentials Flow):
-curl -X POST \\
-   -d "grant_type=client_credentials" \\
-   -d "client_id=YOUR_CLIENT_ID" \\
-   -d "client_secret=YOUR_CLIENT_SECRET" \\
-   ${jwtTokenEndpoint}
-`} // notsecret - template for user's own api key
-                      language="bash"
-                      showCopyCodeButton
-                    />
-                  </Grid>
-                </Grid>
-              </Box>
-            </InfoCard>
-          </Grid>
+          <OidcProviderCard
+            issuerUrl={jwtIssuer}
+            tokenEndpoint={jwtTokenEndpoint}
+          />
         )}
       </Content>
 
