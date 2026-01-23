@@ -40,9 +40,10 @@ For specific topics, refer to these focused guides:
 
 | Document | Topics Covered |
 |----------|---------------|
+| [docs/plugin-architecture.md](docs/plugin-architecture.md) | Plugin architecture, component diagrams, data flows, design decisions, security |
+| [docs/repository-guide.md](docs/repository-guide.md) | Monorepo structure, dynamic plugins, build system, Kubernetes config |
 | [docs/backend-security.md](docs/backend-security.md) | Backend security tenets, input validation, authentication, error handling |
 | [docs/rbac-permissions.md](docs/rbac-permissions.md) | RBAC permissions, role definitions, ownership model, permission checks |
-| [docs/architecture.md](docs/architecture.md) | Monorepo structure, dynamic plugins, build system, Kubernetes config |
 | [docs/plugin-integration.md](docs/plugin-integration.md) | Adding plugins, routes, entity pages, common pitfalls |
 | [docs/kuadrant-resources.md](docs/kuadrant-resources.md) | CRDs, namespace organisation, approval modes, catalog sync |
 | [docs/ui-patterns.md](docs/ui-patterns.md) | Table patterns, delete dialogs, frontend permissions, sidebar menu config |
