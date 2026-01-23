@@ -138,6 +138,89 @@ APIProduct controller automatically discovers plans from PlanPolicy:
 
 **Frontend integration:** See [`plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx`](../plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx) - reads from `apiProduct.status.discoveredPlans`.
 
+## Authentication Scheme Discovery
+
+The controller automatically discovers authentication requirements from AuthPolicy and surfaces them in the APIProduct status. This enables the Backstage UI to show appropriate authentication guidance to API consumers.
+
+### Discovery Process
+
+1. Controller finds AuthPolicy targeting the HTTPRoute referenced by the APIProduct
+2. Extracts authentication configuration from `spec.rules.authentication`
+3. Writes authentication details to `status.discoveredAuthScheme`
+4. For OIDC/JWT authentication, performs additional discovery:
+   - Fetches the OIDC discovery document from `{issuerUrl}/.well-known/openid-configuration`
+   - Extracts the token endpoint
+   - Writes it to `status.oidcDiscovery.tokenEndpoint`
+
+### API Key Authentication Scheme
+
+For API key authentication, the discovered scheme includes:
+
+```yaml
+status:
+  discoveredAuthScheme:
+    authentication:
+      api-key-users:
+        apiKey:
+          selector:
+            matchLabels:
+              app: my-api-product
+          allNamespaces: true
+        credentials:
+          authorizationHeader:
+            prefix: APIKEY
+```
+
+**Key fields:**
+- `apiKey.selector`: Label selector used by AuthPolicy to find valid API key Secrets
+- `credentials`: Where the API key should be sent (header, query param, cookie)
+- `credentials.authorizationHeader.prefix`: Prefix for the Authorization header (e.g., "APIKEY", "Bearer")
+
+### OIDC/JWT Authentication Scheme
+
+For OIDC authentication, the discovered scheme includes:
+
+```yaml
+status:
+  discoveredAuthScheme:
+    authentication:
+      oidc-users:
+        jwt:
+          issuerUrl: https://keycloak.example.com/realms/myrealm
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+  oidcDiscovery:
+    tokenEndpoint: https://keycloak.example.com/realms/myrealm/protocol/openid-connect/token
+```
+
+**Key fields:**
+- `jwt.issuerUrl`: The OIDC issuer URL that validates tokens
+- `credentials`: Where the JWT token should be sent (typically Authorization header with "Bearer" prefix)
+- `oidcDiscovery.tokenEndpoint`: The endpoint where consumers can obtain access tokens
+
+### Frontend Integration
+
+**Detecting OIDC authentication:**
+
+See [`plugins/kuadrant/src/components/ApiProductInfoCard/ApiProductInfoCard.tsx`](../plugins/kuadrant/src/components/ApiProductInfoCard/ApiProductInfoCard.tsx):
+
+```typescript
+const authSchemes = apiProduct.status?.discoveredAuthScheme?.authentication || {};
+const schemeObjects = Object.values(authSchemes);
+const jwtScheme = schemeObjects.find((scheme: any) => scheme.hasOwnProperty('jwt'));
+const hasOidc = Boolean(jwtScheme);
+```
+
+**Displaying OIDC provider card:**
+
+When OIDC is detected, the UI renders an `OidcProviderCard` component that shows:
+- Identity provider URL (clickable link)
+- Token endpoint (clickable link)
+- Example curl command for client credentials flow
+
+See [`plugins/kuadrant/src/components/OidcProviderCard/OidcProviderCard.tsx`](../plugins/kuadrant/src/components/OidcProviderCard/OidcProviderCard.tsx) for the card implementation.
+
 ## PublishStatus for APIProducts
 
 APIProducts have a Draft/Published workflow:
