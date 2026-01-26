@@ -56,6 +56,7 @@ import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
 import { RequestAccessDialog } from "../RequestAccessDialog";
+import {handleFetchError} from "../../utils/errors.ts";
 
 interface APIProduct {
   metadata: {
@@ -157,7 +158,8 @@ export const ApiKeyManagementTab = ({
       `${backendUrl}/api/kuadrant/requests/my?namespace=${namespace}`,
     );
     if (!response.ok) {
-      throw new Error("failed to fetch requests");
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch requests. ${error}`);
     }
     const data = await response.json();
     // filter by apiproduct name, not httproute name
@@ -177,7 +179,8 @@ export const ApiKeyManagementTab = ({
       `${backendUrl}/api/kuadrant/apiproducts`,
     );
     if (!response.ok) {
-      throw new Error("failed to fetch api products");
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch api products. ${error}`);
     }
     const data = await response.json();
 
@@ -229,7 +232,8 @@ export const ApiKeyManagementTab = ({
         { method: "DELETE" },
       );
       if (!response.ok) {
-        throw new Error("failed to delete request");
+        const error = await handleFetchError(response);
+        throw new Error(error);
       }
       alertApi.post({
         message: "API key deleted successfully",
