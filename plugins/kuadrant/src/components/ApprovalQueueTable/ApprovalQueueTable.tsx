@@ -37,6 +37,7 @@ import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey } from "../../types/api-management";
 import { getStatusChipStyle } from "../../utils/styles";
+import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -506,7 +507,8 @@ export const ApprovalQueueTable = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`failed to ${dialogState.action} request`);
+        const err = await handleFetchError(response);
+        throw new Error(err);
       }
 
       setDialogState({
@@ -533,8 +535,9 @@ export const ApprovalQueueTable = () => {
     } catch (err) {
       console.error(`error ${dialogState.action}ing request:`, err);
       setDialogState((prev) => ({ ...prev, processing: false }));
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: `Failed to ${dialogState.action} API key`,
+        message: `Failed to ${dialogState.action} API key. ${errorMessage}`,
         severity: "error",
         display: "transient",
       });
@@ -585,7 +588,8 @@ export const ApprovalQueueTable = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`failed to bulk ${bulkDialogState.action} requests`);
+        const err = await handleFetchError(response);
+        throw new Error(err);
       }
 
       const count = bulkDialogState.requests.length;
@@ -606,8 +610,9 @@ export const ApprovalQueueTable = () => {
     } catch (err) {
       console.error(`error bulk ${bulkDialogState.action}ing requests:`, err);
       setBulkDialogState((prev) => ({ ...prev, processing: false }));
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: `Failed to bulk ${bulkDialogState.action} API keys`,
+        message: `Failed to bulk ${bulkDialogState.action} API keys. ${errorMessage}`,
         severity: "error",
         display: "transient",
       });
