@@ -72,16 +72,6 @@ export const EntityKuadrantApiKeysContent = kuadrantPlugin.provide(
   }),
 );
 
-export const KuadrantApprovalQueueCard = kuadrantPlugin.provide(
-  createComponentExtension({
-    name: 'KuadrantApprovalQueueCard',
-    component: {
-      lazy: () =>
-        import('./components/ApprovalQueueCard').then(m => m.ApprovalQueueCard),
-    },
-  }),
-);
-
 export const EntityKuadrantApiProductInfoContent = kuadrantPlugin.provide(
   createComponentExtension({
     name: 'EntityKuadrantApiProductInfoContent',

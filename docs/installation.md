@@ -232,7 +232,6 @@ g, group:default/api-admins, role:default/api-admin
 | `EntityKuadrantApiKeyManagementTab` | Full API keys management tab |
 | `EntityKuadrantApiKeysContent` | API keys content component |
 | `EntityKuadrantApiProductInfoContent` | APIProduct details tab |
-| `KuadrantApprovalQueueCard` | Standalone approval queue card |
 
 ### Backend
 
