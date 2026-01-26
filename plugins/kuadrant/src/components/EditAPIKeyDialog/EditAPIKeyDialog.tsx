@@ -16,6 +16,7 @@ import {
 } from "@material-ui/core";
 import { useApi, configApiRef, fetchApiRef } from "@backstage/core-plugin-api";
 import { APIKey } from "../../types/api-management";
+import {handleFetchError} from "../../utils/errors.ts";
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -82,10 +83,8 @@ export const EditAPIKeyDialog = ({
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `Failed to update request: ${response.status}`,
-        );
+        const err = await handleFetchError(response);
+        throw new Error(`Failed to update request: ${response.status}. ${err}`);
       }
 
       onSuccess();
