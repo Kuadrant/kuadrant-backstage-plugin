@@ -29,8 +29,7 @@
       "EntityKuadrantApiAccessCard": "./src/plugin.ts",
       "EntityKuadrantApiKeyManagementTab": "./src/plugin.ts",
       "EntityKuadrantApiKeysContent": "./src/plugin.ts",
-      "EntityKuadrantApiProductInfoContent": "./src/plugin.ts",
-      "KuadrantApprovalQueueCard": "./src/plugin.ts"
+      "EntityKuadrantApiProductInfoContent": "./src/plugin.ts"
     }
   },
   "sideEffects": false,
