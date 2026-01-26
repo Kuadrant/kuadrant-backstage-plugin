@@ -576,5 +576,57 @@ test.describe("Kuadrant Permissions Matrix", () => {
         "Consumer should NOT see Reject button",
       ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
+
+    test("consumer CANNOT see Policy filter or column", async ({ page }) => {
+      const common = new Common(page);
+      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await page.goto("/kuadrant/api-products");
+      await waitForKuadrantPageReady(page);
+
+      const table = page.locator("table").first();
+      await expect(table, "Consumer should see products table").toBeVisible({
+        timeout: TIMEOUTS.DEFAULT,
+      });
+
+      // consumer should not see Policy filter in the filter panel
+      const policyFilter = page.locator("text=POLICY").first();
+      await expect(
+        policyFilter,
+        "Consumer should NOT see Policy filter",
+      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+
+      // consumer should not see Policy column header in the table
+      const policyColumnHeader = page.locator("th").filter({ hasText: /^Policy$/i });
+      await expect(
+        policyColumnHeader,
+        "Consumer should NOT see Policy column",
+      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+    });
+
+    test("admin CAN see Policy filter and column", async ({ page }) => {
+      const common = new Common(page);
+      await common.dexQuickLogin("admin@kuadrant.local");
+      await page.goto("/kuadrant/api-products");
+      await waitForKuadrantPageReady(page);
+
+      const table = page.locator("table").first();
+      await expect(table, "Admin should see products table").toBeVisible({
+        timeout: TIMEOUTS.DEFAULT,
+      });
+
+      // admin should see Policy filter in the filter panel
+      const policyFilter = page.locator("text=POLICY").first();
+      await expect(
+        policyFilter,
+        "Admin should see Policy filter",
+      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+
+      // admin should see Policy column header in the table
+      const policyColumnHeader = page.locator("th").filter({ hasText: /^Policy$/i });
+      await expect(
+        policyColumnHeader,
+        "Admin should see Policy column",
+      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+    });
   });
 });
