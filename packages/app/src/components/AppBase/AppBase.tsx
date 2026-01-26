@@ -142,10 +142,6 @@ const AppBase = () => {
               <Route path="/catalog-graph" element={<CatalogGraphPage />} />
               <Route path="/learning-paths" element={<LearningPaths />} />
               <Route
-                path="/kuadrant"
-                element={<Navigate to="/kuadrant/api-products" />}
-              />
-              <Route
                 path="/kuadrant/api-products"
                 element={<ApiProductsPage />}
               />
