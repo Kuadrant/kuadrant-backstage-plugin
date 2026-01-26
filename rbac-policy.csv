@@ -50,6 +50,8 @@ p, role:default/api-consumer, kuadrant.apikey.update.own, update, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow, api
+# can do: read all policies(for catalog browsing)
+p, role:default/api-consumer, kuadrant.planpolicy.list, read, allow
 
 # example: restrict specific apis to specific roles
 # p, role:default/partner, kuadrant.apikey.create, create, allow, apiproduct:toystore/toystore-api
