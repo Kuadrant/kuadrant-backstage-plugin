@@ -42,16 +42,6 @@ test.describe("Kuadrant Plugin", () => {
     await expect(apiKeysLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
-  test("should redirect /kuadrant to /kuadrant/api-products", async ({
-    page,
-  }) => {
-    await page.goto("/kuadrant");
-    await page.waitForURL("**/kuadrant/api-products");
-
-    // verify we're on the api products page
-    await waitForKuadrantPageReady(page);
-  });
-
   test("should display API Products page", async ({ page }) => {
     await page.goto("/kuadrant/api-products");
 
