@@ -27,6 +27,7 @@ import { useEntity } from '@backstage/plugin-catalog-react';
 import { RequestAccessDialog, Plan } from '../RequestAccessDialog';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiKeyCreatePermission } from '../../permissions';
+import {handleFetchError} from "../../utils/errors.ts";
 
 interface APIKey {
   metadata: {
@@ -103,7 +104,8 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
       : `${backendUrl}/api/kuadrant/requests/my`;
     const response = await fetchApi.fetch(url);
     if (!response.ok) {
-      throw new Error('failed to fetch api key requests');
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch api key requests ${error}`);
     }
     const data = await response.json();
     const allRequests = data.items || [];
@@ -160,6 +162,12 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
       }
     } catch (err) {
       console.error('failed to fetch api key:', err);
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to fetch APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
