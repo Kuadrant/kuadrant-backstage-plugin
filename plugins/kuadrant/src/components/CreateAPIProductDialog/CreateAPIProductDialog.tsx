@@ -90,7 +90,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
 
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(error);
+      throw new Error(`failed to fetch routes. ${error}`);
     }
 
     const data = await response.json();
@@ -106,7 +106,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
 
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(error);
+      throw new Error(`failed to fetch PlanPolicies. ${error}`);
     }
 
     return await response.json();
@@ -239,7 +239,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
 
       if (!response.ok) {
         const error = await handleFetchError(response);
-        throw new Error(error);
+        throw new Error(`failed to create APIProduct. ${error}`);
       }
 
       onSuccess({ namespace, name, displayName });

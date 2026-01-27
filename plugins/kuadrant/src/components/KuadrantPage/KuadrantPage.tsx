@@ -186,7 +186,7 @@ export const ResourceList = () => {
     );
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(error);
+      throw new Error(`failed to fetch APIProducts. ${error}`);
     }
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);
@@ -201,7 +201,7 @@ export const ResourceList = () => {
     );
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(error);
+      throw new Error(`failed to fetch PlanPolicies. ${error}`);
     }
     return await response.json();
   }, [backendUrl, fetchApi, refreshTrigger]);

@@ -91,7 +91,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         .then(async res => {
           if (!res.ok) {
             const error = await handleFetchError(res);
-            throw new Error(error);
+            throw new Error(`failed to load API product. ${error}`);
           }
           return res.json();
         })
@@ -127,7 +127,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
 
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(error);
+      throw new Error(`failed to load PlanPolicies. ${error}`);
     }
 
     return await response.json();
@@ -211,7 +211,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
 
       if (!response.ok) {
         const error = await handleFetchError(response);
-        throw new Error(error);
+        throw new Error(`failed to patch APIProduct. ${error}`);
       }
 
       onSuccess();
