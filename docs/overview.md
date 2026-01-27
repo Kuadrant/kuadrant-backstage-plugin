@@ -26,6 +26,38 @@ The Developer Portal introduces two Custom Resource Definitions (CRDs) that mode
 
 This model means that API access follows the same patterns as other Kubernetes resources: declarative, auditable, and managed through standard tooling.
 
+## Authentication Methods
+
+The Developer Portal supports two authentication methods for protecting APIs. The method is configured at the platform level via AuthPolicy and automatically discovered by the controller.
+
+### API Key Authentication
+
+API key authentication uses Kubernetes Secrets to store credentials. This method involves a request and approval workflow:
+
+1. API consumer creates an APIKey resource requesting access
+2. Depending on the APIProduct's `approvalMode`:
+   - **Manual**: Request enters `Pending` state, awaiting API owner approval
+   - **Automatic**: Request is immediately approved by the controller
+3. Upon approval, the controller generates a Secret containing the API key
+4. Consumer retrieves the key from Backstage and uses it in API requests
+5. AuthPolicy validates incoming requests against the generated Secrets
+
+This method is ideal for internal APIs, development environments, or scenarios where you want fine-grained control over who can access your API.
+
+### OIDC/JWT Authentication
+
+OIDC (OpenID Connect) authentication delegates credential management to an external identity provider. There is no request/approval workflow in the Developer Portal:
+
+1. Platform engineer configures AuthPolicy with JWT validation pointing to an OIDC issuer
+2. The controller discovers the JWT authentication scheme and performs OIDC discovery to find the token endpoint
+3. Discovered authentication details are surfaced in the APIProduct status
+4. API consumer views the identity provider URL and token endpoint in Backstage
+5. Consumer obtains a JWT token directly from the identity provider (e.g., using client credentials flow or any other available flow)
+6. Consumer uses the JWT token in API requests
+7. AuthPolicy validates the token's signature and claims against the OIDC issuer
+
+This method is ideal for APIs that integrate with existing identity providers (Keycloak, Auth0, Azure AD, etc.), need stronger authentication, or require integration with enterprise SSO systems. No APIKey resources are created—access control happens at the identity provider level.
+
 ## Developer Portal Personas
 
 The Developer Portal serves four distinct personas, each with different concerns and workflows.
@@ -36,22 +68,36 @@ API consumers are developers who need to integrate with services provided by oth
 
 - Browse a catalog of available APIs with descriptions, documentation links, and OpenAPI specifications
 - See what service tiers are available and their associated rate limits
-- View authentication requirements (API keys, JWT/OIDC) and token endpoints
-- Request access by creating an APIKey resource (either directly or through a Backstage UI)
-- Receive credentials once their request is approved (credentials are shown once and must be saved immediately)
+- View authentication requirements and obtain credentials
 
-From the consumer's perspective, the value is discoverability and self-service. Rather than searching through wikis or asking colleagues, they find what they need in a single catalog. Rather than waiting for someone to manually provision credentials, they follow a standardized workflow.
+The authentication experience depends on how the API is protected:
+
+**For API Key Authentication:**
+- Request access by creating an APIKey resource (either directly or through the Backstage UI)
+- Receive an API key once their request is approved (credentials are shown once and must be saved immediately)
+- Use the API key in the `Authorization` header when making requests
+
+**For OIDC/JWT Authentication:**
+- View the OIDC provider details and token endpoint
+- Obtain an access token from the identity provider using their client credentials
+- Use the JWT token in the `Authorization` header when making requests
+- No APIKey resource is needed, authentication is handled by the external identity provider
+
+From the consumer's perspective, the value is discoverability and self-service. Rather than searching through wikis or asking colleagues, they find what they need in a single catalog. The portal surfaces the authentication method and provides clear guidance on how to obtain credentials, whether through the API key request workflow or by interacting with an OIDC provider.
 
 ### 2. The API Owner
 
 API owners are the teams responsible for specific services. They control how their APIs are presented and accessed:
 
 - Define how the API appears in the catalog through APIProduct metadata
-- Choose between automatic and manual approval for access requests
-- Review pending access requests and approve or reject them
+- For API key authentication:
+  - Choose between automatic and manual approval for access requests
+  - Review pending access requests and approve or reject them
 - Set documentation links so consumers can self-serve
 
-The approval workflow deserves attention. Some APIs are low-risk and can grant automatic access, useful for development environments or internal tooling. Others require human review: verifying the requester's identity, understanding their use case, or ensuring they have appropriate authorization. The `approvalMode` field on APIProduct lets owners make this choice per-API.
+The authentication and approval workflow depends on the authentication requirements set by the platform engineering team. For **API key authentication**, owners can choose between automatic approval (useful for development environments or internal tooling) and manual approval (for production APIs requiring human review). The `approvalMode` field on APIProduct lets owners make this choice per-API.
+
+For **OIDC/JWT authentication**, there is no config required. Access control is managed entirely by the external identity provider.
 
 ### 3. The API Admin
 
@@ -70,11 +116,13 @@ Platform engineers install and configure the Developer Portal infrastructure. Th
 
 - Deploying the Developer Portal Controller and Backstage plugin
 - Creating HTTPRoutes and annotating them for exposure to API owners
-- Configuring AuthPolicy resources to enforce API key validation
+- Configuring AuthPolicy resources for authentication:
+  - API key validation using Kubernetes Secrets
+  - OIDC/JWT validation with external identity providers
 - Defining PlanPolicy resources that specify rate limit tiers
 - Setting up RBAC so appropriate users can create, approve, and manage resources
 
-The platform team doesn't need to be involved in individual API publications or access requests — those are handled by API owners and consumers. Instead, they establish the guardrails and infrastructure that make self-service possible.
+The platform team doesn't need to be involved in individual API publications or access requests — those are handled by API owners and consumers. Instead, they establish the guardrails and infrastructure that make self-service possible. When configuring OIDC authentication, platform engineers work with identity provider administrators to obtain issuer URLs and configure the AuthPolicy accordingly.
 
 ## Architecture
 
@@ -130,10 +178,12 @@ The flow works as follows:
 The Developer Portal is designed as part of the Kuadrant ecosystem. It builds on:
 
 - **Gateway API**: The standard Kubernetes API for traffic routing. APIProduct references HTTPRoute.
-- **Kuadrant AuthPolicy**: Enforces authentication at the gateway level. The controller discovers AuthPolicy configurations and surfaces them to consumers, including OIDC token endpoints for JWT-based authentication. For API key authentication, the controller creates Secrets with labels that AuthPolicy (via Authorino) uses for validation.
+- **Kuadrant AuthPolicy**: Enforces authentication at the gateway level. The controller discovers AuthPolicy configurations and surfaces authentication details to consumers:
+  - **For API key authentication**: The controller creates Secrets with labels that AuthPolicy (via Authorino) uses for validation
+  - **For OIDC/JWT authentication**: The controller discovers the JWT issuer URL from the AuthPolicy, performs OIDC discovery to find the token endpoint, and surfaces both to consumers in the Backstage UI
 - **PlanPolicy**: A Kuadrant extension for tiered rate limiting. The controller discovers plan definitions and surfaces them to consumers.
 
-This integration means the Developer Portal doesn't duplicate functionality, it adds the product catalog and access request workflow on top of existing traffic management and policy enforcement.
+This integration means the Developer Portal doesn't duplicate functionality, it adds the product catalog and credential discovery workflow on top of existing traffic management and policy enforcement. Whether using API keys or OIDC, authentication is always enforced by Kuadrant's AuthPolicy—the Developer Portal simply makes the authentication requirements discoverable and, for API keys, manages the credential lifecycle.
 
 ## Next Steps
 
