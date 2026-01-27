@@ -139,8 +139,13 @@ export class APIProductEntityProvider implements EntityProvider {
     const displayName = product.spec.displayName || name;
     const description = product.spec.description || `api product: ${displayName}`;
 
-    // determine lifecycle from labels or default to production
-    const lifecycle = product.metadata.labels?.lifecycle || 'production';
+    // determine lifecycle from labels with validation, default to production
+    // using Backstage standard lifecycle values: experimental, production, deprecated
+    const rawLifecycle = product.metadata.labels?.lifecycle;
+    const validLifecycles = ['experimental', 'production', 'deprecated'];
+    const lifecycle = rawLifecycle && validLifecycles.includes(rawLifecycle)
+      ? rawLifecycle
+      : 'production';
 
     // owner must be set via backstage ownership annotation
     // if missing, skip this apiproduct (created outside backstage or invalid)

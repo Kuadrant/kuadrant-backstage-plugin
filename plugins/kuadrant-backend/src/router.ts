@@ -379,6 +379,11 @@ export async function createRouter({
   router.patch('/apiproducts/:namespace/:name', async (req, res) => {
     // whitelist allowed fields for patching
     const patchSchema = z.object({
+      metadata: z.object({
+        labels: z.object({
+          lifecycle: z.enum(['experimental', 'production', 'deprecated']).optional(), 
+        }).partial().optional(),
+      }).partial().optional(),
       spec: z.object({
         displayName: z.string().optional(),
         description: z.string().optional(),

@@ -1,5 +1,6 @@
 export type PlanTier = string; // custom tier names defined by api owners
 export type RequestPhase = 'Pending' | 'Approved' | 'Rejected';
+export type Lifecycle = 'experimental' | 'production' | 'deprecated'; 
 
 export interface PlanLimits {
   daily?: number;

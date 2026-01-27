@@ -38,6 +38,7 @@ import {
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import EditIcon from "@material-ui/icons/Edit";
 import DeleteIcon from "@material-ui/icons/Delete";
+import { Alert } from '@material-ui/lab';
 import { APIProduct } from "../../types/api-management";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
@@ -277,6 +278,15 @@ export const ApiProductDetailPage = () => {
             <Typography>{product.spec?.displayName || product.metadata.name}</Typography>
           </Breadcrumbs>
         </Box>
+
+        
+        {product.metadata.labels?.lifecycle === 'deprecated' && (
+          <Box mb={2}>
+            <Alert severity="warning">
+              <strong>This API is deprecated.</strong> Please contact your administrator for more details.
+            </Alert>
+          </Box>
+        )}
 
         <Box mb={2}>
           <Tabs
