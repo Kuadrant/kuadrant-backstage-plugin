@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   Dialog,
   DialogTitle,
@@ -28,6 +28,7 @@ import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
+import { handleFetchError } from "../../utils/errors";
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -86,6 +87,12 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     error: httpRoutesError
   } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
+
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch routes. ${error}`);
+    }
+
     const data = await response.json();
     return data.items || [];
   }, [backendUrl, fetchApi, open, httpRoutesRetry]);
@@ -96,6 +103,12 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     error: planPoliciesError
   } = useAsync(async () => {
     const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
+
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch PlanPolicies. ${error}`);
+    }
+
     return await response.json();
   }, [backendUrl, fetchApi, open]);
 
@@ -225,8 +238,8 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'failed to create apiproduct');
+        const error = await handleFetchError(response);
+        throw new Error(`failed to create APIProduct. ${error}`);
       }
 
       onSuccess({ namespace, name, displayName });
