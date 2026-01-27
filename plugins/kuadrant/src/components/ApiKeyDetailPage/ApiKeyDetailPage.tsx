@@ -175,10 +175,11 @@ export const ApiKeyDetailPage = () => {
       }
     } catch (err) {
       console.error("Failed to fetch API key:", err);
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to fetch API key",
-        severity: "error",
-        display: "transient",
+        message: `Failed to fetch APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
       });
     } finally {
       setApiKeyLoading(false);
