@@ -284,6 +284,66 @@ const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
   );
 };
 
+interface BulkRequestResult {
+  name: string;
+  namespace: string;
+  success: boolean;
+  error: string | null;
+}
+
+interface AlertDialogProps {
+  open: boolean;
+  results: BulkRequestResult[];
+  isApprove: boolean;
+  onClose: () => void;
+}
+
+const BulkAlertDialog = ({
+  open,
+  results,
+  isApprove,
+  onClose,
+}: AlertDialogProps) => {
+  const successResults = results.filter((res: any) => res.success);
+  const failedResults = results.filter((res: any) => !res.success);
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle>
+        Bulk {isApprove ? "Approve" : "Reject"} operation completed for {results.length} API Keys
+      </DialogTitle>
+      <DialogContent>
+        <Typography variant="body2" paragraph>
+          Successful: {successResults.length}
+        </Typography>
+        <Typography variant="body2" paragraph>
+          Failed: {failedResults.length}
+        </Typography>
+        {failedResults.length > 0 && (
+          <details>
+            <summary>Failed requests</summary>
+            <ul>
+              {failedResults.map(result => (
+                <li key={result.name}>{result.name}: {result.error}</li>
+              ))}
+            </ul>
+          </details>
+        )}
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose}>
+          Ok
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 export const ApprovalQueueTable = () => {
   const classes = useStyles();
   const config = useApi(configApiRef);
@@ -314,6 +374,15 @@ export const ApprovalQueueTable = () => {
     requests: [],
     action: "approve",
     processing: false,
+  });
+  const [bulkAlertDialogState, setBulkAlertDialogStateState] = useState<{
+    open: boolean;
+    results: BulkRequestResult[];
+    isApprove: boolean;
+  }>({
+    open: false,
+    results: [],
+    isApprove: true,
   });
   const [filters, setFilters] = useState<FilterState>({
     status: [],
@@ -568,6 +637,7 @@ export const ApprovalQueueTable = () => {
     if (!value || bulkDialogState.requests.length === 0) return;
 
     setBulkDialogState((prev) => ({ ...prev, processing: true }));
+    setBulkAlertDialogStateState({ open: false, results: [], isApprove: true, });
 
     const isApprove = bulkDialogState.action === "approve";
     const endpoint = isApprove
@@ -592,15 +662,11 @@ export const ApprovalQueueTable = () => {
         throw new Error(err);
       }
       const bulkResponseRaw = await response.json();
-      const bulkResponse = bulkResponseRaw || [];
-      const responseItems = bulkResponse.length();
+      const bulkResponse = bulkResponseRaw.results || [];
+
       const successfulItems = bulkResponse.filter((res: any) => res.success);
       const failedItems = bulkResponse.filter((res: any) => !res.success);
-
-      // DEBUG
-      console.log("=====bulk response items:", responseItems);
-      console.log("=====bulk successfull response items:", successfulItems.length());
-      console.log("=====bulk failed response items:", failedItems.length());
+      const totalSuccess = failedItems.length == 0;
 
       const action = isApprove ? "approved" : "rejected";
 
@@ -610,20 +676,18 @@ export const ApprovalQueueTable = () => {
         action: "approve",
         processing: false,
       });
+      setBulkAlertDialogStateState({
+        open: !totalSuccess,
+        results: bulkResponse,
+        isApprove,
+      });
       setSelectedRequests([]);
       setRefresh((r) => r + 1);
 
-      if (successfulItems.length() > 0) {
+      if (totalSuccess) {
         alertApi.post({
-          message: `${successfulItems.length()} API keys ${action}`,
+          message: `${successfulItems.length} API keys ${action}`,
           severity: "success",
-          display: "transient",
-        });
-      }
-      if (failedItems.length() > 0) {
-        alertApi.post({
-          message: `${failedItems.length()} requests failed`,
-          severity: "error",
           display: "transient",
         });
       }
@@ -920,6 +984,18 @@ export const ApprovalQueueTable = () => {
           })
         }
         onConfirm={handleBulkConfirm}
+      />
+      <BulkAlertDialog
+        open={bulkAlertDialogState.open}
+        results={bulkAlertDialogState.results}
+        isApprove={bulkAlertDialogState.isApprove}
+        onClose={() =>
+          setBulkAlertDialogStateState({
+            open: false,
+            results: [],
+            isApprove: true,
+          })
+        }
       />
     </>
   );
