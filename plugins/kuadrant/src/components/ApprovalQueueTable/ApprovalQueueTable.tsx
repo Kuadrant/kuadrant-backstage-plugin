@@ -591,9 +591,19 @@ export const ApprovalQueueTable = () => {
         const err = await handleFetchError(response);
         throw new Error(err);
       }
+      const bulkResponseRaw = await response.json();
+      const bulkResponse = bulkResponseRaw || [];
+      const responseItems = bulkResponse.length();
+      const successfulItems = bulkResponse.filter((res: any) => res.success);
+      const failedItems = bulkResponse.filter((res: any) => !res.success);
 
-      const count = bulkDialogState.requests.length;
+      // DEBUG
+      console.log("=====bulk response items:", responseItems);
+      console.log("=====bulk successfull response items:", successfulItems.length());
+      console.log("=====bulk failed response items:", failedItems.length());
+
       const action = isApprove ? "approved" : "rejected";
+
       setBulkDialogState({
         open: false,
         requests: [],
@@ -602,11 +612,21 @@ export const ApprovalQueueTable = () => {
       });
       setSelectedRequests([]);
       setRefresh((r) => r + 1);
-      alertApi.post({
-        message: `${count} API keys ${action}`,
-        severity: "success",
-        display: "transient",
-      });
+
+      if (successfulItems.length() > 0) {
+        alertApi.post({
+          message: `${successfulItems.length()} API keys ${action}`,
+          severity: "success",
+          display: "transient",
+        });
+      }
+      if (failedItems.length() > 0) {
+        alertApi.post({
+          message: `${failedItems.length()} requests failed`,
+          severity: "error",
+          display: "transient",
+        });
+      }
     } catch (err) {
       console.error(`error bulk ${bulkDialogState.action}ing requests:`, err);
       setBulkDialogState((prev) => ({ ...prev, processing: false }));
