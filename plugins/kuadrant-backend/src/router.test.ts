@@ -429,8 +429,8 @@ describe('createRouter', () => {
 
       // Mock successful patch operations
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}) // request-1 succeeds
-        .mockResolvedValueOnce({}); // request-3 succeeds
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -482,7 +482,7 @@ describe('createRouter', () => {
         // request-2
         .mockResolvedValueOnce(invalidAPIKey); // fetch APIKey - no apiProductRef, stops here
 
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({});
+      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -533,8 +533,8 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -576,9 +576,9 @@ describe('createRouter', () => {
       ];
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}) // request-1 succeeds
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
         .mockRejectedValueOnce(new Error('Conflict: resource version mismatch')) // request-2 fails
-        .mockResolvedValueOnce({}); // request-3 succeeds
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -616,9 +616,9 @@ describe('createRouter', () => {
       ];
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}); // request-1 succeeds
+        .mockResolvedValueOnce({} as any); // request-1 succeeds
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}); // request-2 succeeds
+        .mockResolvedValueOnce({} as any); // request-2 succeeds
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -735,8 +735,8 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -787,7 +787,7 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(createMockAPIKey('request-2', 'missing-api')) // fetch APIKey
         .mockRejectedValueOnce(new Error('APIProduct not found')); // fetch APIProduct - fail
 
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({});
+      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -837,8 +837,8 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({})
-        .mockResolvedValueOnce({});
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -890,9 +890,9 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}) // request-1 succeeds
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
         .mockRejectedValueOnce(new Error('Network timeout')) // request-2 fails
-        .mockResolvedValueOnce({}); // request-3 succeeds
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -938,9 +938,9 @@ describe('createRouter', () => {
         .mockResolvedValueOnce(mockOtherAPIProduct); // fetch APIProduct
 
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}); // request-1 succeeds
+        .mockResolvedValueOnce({} as any); // request-1 succeeds
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}); // request-2 succeeds
+        .mockResolvedValueOnce({} as any); // request-2 succeeds
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -1011,8 +1011,8 @@ describe('createRouter', () => {
 
       // Patch results
       mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({}) // success-1
-        .mockResolvedValueOnce({}) // success-2
+        .mockResolvedValueOnce({} as any) // success-1
+        .mockResolvedValueOnce({} as any) // success-2
         .mockRejectedValueOnce(new Error('Patch failed')); // fail-patch-error
 
       const response = await request(app)
