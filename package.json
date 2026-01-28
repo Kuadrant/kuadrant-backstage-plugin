@@ -49,7 +49,7 @@
     "concurrently": "^9.2.1",
     "glob": "12.0.0",
     "husky": "8.0.3",
-    "jsdom": "^26.1.0",
+    "jsdom": "^27.4.0",
     "knip": "^5.82.1",
     "lint-staged": "15.5.2",
     "node-gyp": "10.3.1",
