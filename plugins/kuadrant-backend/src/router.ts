@@ -376,6 +376,33 @@ export async function createRouter({
     }
   });
 
+  router.get('/httproutes/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiProductListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+      const data = await k8sClient.getCustomResource('gateway.networking.k8s.io', 'v1', namespace, 'httproutes', name);
+
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching httproute:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch httproute' });
+      }
+    }
+  });
+
   router.patch('/apiproducts/:namespace/:name', async (req, res) => {
     // whitelist allowed fields for patching
     const patchSchema = z.object({

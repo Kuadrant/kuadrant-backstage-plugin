@@ -113,6 +113,32 @@ export const ApiProductDetailPage = () => {
     return response.json() as Promise<APIProduct>;
   }, [namespace, name, backendUrl, fetchApi, refreshKey]);
 
+  // fetch httproute to get hostnames
+  const {
+    value: httpRouteHostnames,
+  } = useAsync(async () => {
+    if (!product?.spec?.targetRef?.name) {
+      return null;
+    }
+
+    try {
+      const routeName = product.spec.targetRef.name;
+      const response = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/httproutes/${namespace}/${routeName}`
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const route = await response.json();
+      return route?.spec?.hostnames || null;
+    } catch (err) {
+      console.error('Failed to fetch HTTPRoute hostnames:', err);
+      return null;
+    }
+  }, [product, namespace, backendUrl, fetchApi]);
+
   const handlePublishToggle = async () => {
     if (!product) return;
     const newStatus = product.spec?.publishStatus === "Published" ? "Draft" : "Published";
@@ -341,6 +367,7 @@ export const ApiProductDetailPage = () => {
               product={product}
               showStatus={true}
               showCatalogLink={true}
+              httpRouteHostnames={httpRouteHostnames}
             />
           </InfoCard>
         )}
