@@ -40,6 +40,7 @@ import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey, APIProduct } from "../../types/api-management";
 import { getStatusChipStyle } from "../../utils/styles";
+import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -367,6 +368,12 @@ export const MyApiKeysTable = () => {
     } catch (err) {
       console.error("Error fetching plans:", err);
       setEditDialogState({ open: true, request, plans: [] });
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to fetch Plans. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
+      });
     }
   };
 
@@ -393,7 +400,8 @@ export const MyApiKeysTable = () => {
       );
 
       if (!response.ok) {
-        throw new Error("Failed to delete request");
+        const err = await handleFetchError(response);
+        throw new Error(`Failed to delete request. ${err}`);
       }
 
       setRefresh((r) => r + 1);
@@ -410,10 +418,11 @@ export const MyApiKeysTable = () => {
         next.delete(requestName);
         return next;
       });
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to delete API key",
-        severity: "error",
-        display: "transient",
+        message: `Failed to delete APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
       });
     } finally {
       setDeleting(null);

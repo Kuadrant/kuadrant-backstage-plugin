@@ -48,6 +48,7 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteAllPermission,
 } from "../../permissions";
+import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -104,7 +105,8 @@ export const ApiProductDetailPage = () => {
     );
 
     if (!response.ok) {
-      throw new Error("Failed to fetch API product");
+      const err = await handleFetchError(response);
+      throw new Error(`Failed to fetch API product. ${err}`);
     }
 
     return response.json() as Promise<APIProduct>;
@@ -122,7 +124,10 @@ export const ApiProductDetailPage = () => {
           body: JSON.stringify({ spec: { publishStatus: newStatus } }),
         }
       );
-      if (!response.ok) throw new Error("Failed to update publish status");
+      if (!response.ok) {
+        const err = await handleFetchError(response);
+        throw new Error(err);
+      }
       alertApi.post({
         message: `API Product ${newStatus === "Published" ? "published" : "unpublished"} successfully`,
         severity: "success",
@@ -130,8 +135,9 @@ export const ApiProductDetailPage = () => {
       });
       setRefreshKey((k) => k + 1);
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to update publish status",
+        message: `Failed to update publish status. ${errorMessage}`,
         severity: "error",
         display: "transient",
       });
@@ -156,7 +162,10 @@ export const ApiProductDetailPage = () => {
         `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
         { method: "DELETE" }
       );
-      if (!response.ok) throw new Error("Failed to delete API product");
+      if (!response.ok) {
+        const err = await handleFetchError(response);
+        throw new Error(err);
+      }
       setDeleteDialogOpen(false);
       alertApi.post({
         message: "API Product deleted successfully",
@@ -165,8 +174,9 @@ export const ApiProductDetailPage = () => {
       });
       navigate("/kuadrant/api-products");
     } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: "Failed to delete API product",
+        message: `Failed to delete API product. ${errorMessage}`,
         severity: "error",
         display: "transient",
       });

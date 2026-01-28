@@ -21,6 +21,7 @@ import {
   fetchApiRef,
   alertApiRef,
 } from '@backstage/core-plugin-api';
+import {handleFetchError} from "../../utils/errors.ts";
 
 export interface Plan {
   tier: string;
@@ -87,10 +88,8 @@ export const RequestAccessDialog = ({
       );
 
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(
-          errorData.error || `failed to create request: ${response.status}`,
-        );
+        const err = await handleFetchError(response);
+        throw new Error(`failed to create request: ${response.status}. ${err}`);
       }
 
       alertApi.post({

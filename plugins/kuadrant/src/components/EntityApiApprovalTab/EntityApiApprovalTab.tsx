@@ -35,6 +35,7 @@ import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { APIKey } from "../../types/api-management";
 import { getStatusChipStyle } from "../../utils/styles";
+import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   useCasePanel: {
@@ -214,7 +215,8 @@ export const EntityApiApprovalTab = () => {
       `${backendUrl}/api/kuadrant/requests`,
     );
     if (!response.ok) {
-      throw new Error("Failed to fetch requests");
+      const err = await handleFetchError(response);
+      throw new Error(`Failed to fetch requests. ${err}`);
     }
 
     const data = await response.json();
@@ -266,7 +268,8 @@ export const EntityApiApprovalTab = () => {
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to ${dialogState.action} request`);
+        const err = await handleFetchError(response);
+        throw new Error(err);
       }
 
       setDialogState({
@@ -284,10 +287,11 @@ export const EntityApiApprovalTab = () => {
     } catch (err) {
       console.error(`Error ${dialogState.action}ing request:`, err);
       setDialogState((prev) => ({ ...prev, processing: false }));
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: `Failed to ${dialogState.action} API key`,
-        severity: "error",
-        display: "transient",
+        message: `Failed to ${dialogState.action} APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
       });
     }
   };
