@@ -359,4 +359,698 @@ describe('createRouter', () => {
       expect(mockK8sClient.getSecret).not.toHaveBeenCalled();
     });
   });
+
+  describe('POST /requests/bulk-approve', () => {
+    const namespace = 'toystore';
+    const mockAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'toystore-api',
+        namespace,
+        annotations: {
+          'backstage.io/owner': mockUserEntityRef,
+        },
+      },
+      spec: {},
+    };
+
+    const mockOtherAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'other-api',
+        namespace,
+        annotations: {
+          'backstage.io/owner': mockOtherUserEntityRef,
+        },
+      },
+      spec: {},
+    };
+
+    const createMockAPIKey = (name: string, apiProductName: string) => ({
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKey',
+      metadata: { name, namespace },
+      spec: {
+        apiProductRef: { name: apiProductName },
+        planTier: 'gold',
+        requestedBy: { userId: 'user:default/consumer' },
+      },
+      status: { phase: 'Pending' },
+    });
+
+    it('handles partial success when some API products do not exist', async () => {
+      // Mock permission check - user has updateOwn permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      // Mock getCustomResource calls - interleaved APIKeys and APIProducts
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'missing-api')) // fetch APIKey
+        .mockRejectedValueOnce(new Error('APIProduct not found')) // fetch APIProduct - fail
+        // request-3
+        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - success
+
+      // Mock successful patch operations
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'APIProduct not found',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+    });
+
+    it('handles partial success when some API keys have no apiProductRef', async () => {
+      // Mock permission check - user has updateOwn permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+      ];
+
+      const invalidAPIKey = {
+        ...createMockAPIKey('request-2', ''),
+        spec: { planTier: 'gold', requestedBy: { userId: 'user:default/consumer' } },
+      };
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // request-2
+        .mockResolvedValueOnce(invalidAPIKey); // fetch APIKey - no apiProductRef, stops here
+
+      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(2);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'API key has no associated API product.',
+      });
+
+      // Verify only request-1 was patched
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles partial success when user owns some but not all API products', async () => {
+      // Mock permission check - user has updateOwn permission (not admin)
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - owned by current user
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockOtherAPIProduct) // fetch APIProduct - owned by other user
+        // request-3
+        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'You can only approve requests for your own API products.',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+
+      // Verify only owned products were patched
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles partial success when patch operations fail', async () => {
+      // Mock permission check - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateAll allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
+        .mockRejectedValueOnce(new Error('Conflict: resource version mismatch')) // request-2 fails
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'Conflict: resource version mismatch',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+    });
+
+    it('allows admin to approve all requests regardless of ownership', async () => {
+      // Mock permission check - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateAll allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+      ];
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any); // request-1 succeeds
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any); // request-2 succeeds
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(2);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: true,
+      });
+
+      // Verify ownership was never checked (admin bypass)
+      expect(mockK8sClient.getCustomResource).not.toHaveBeenCalled();
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns 403 when user has no update permissions', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateOwn denied
+      ]);
+
+      const response = await request(app)
+        .post('/requests/bulk-approve')
+        .send({ requests: [{ namespace: 'toystore', name: 'request-1' }] })
+        .expect(403);
+
+      expect(response.body).toEqual({ error: 'unauthorised' });
+      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when request body is invalid', async () => {
+      await request(app)
+        .post('/requests/bulk-approve')
+        .send({ invalid: 'data' })
+        .expect(500);
+
+      // Schema validation throws InputError which is caught and returns 500
+    });
+  });
+
+  describe('POST /requests/bulk-reject', () => {
+    const namespace = 'toystore';
+    const mockAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'toystore-api',
+        namespace,
+        annotations: {
+          'backstage.io/owner': mockUserEntityRef,
+        },
+      },
+      spec: {},
+    };
+
+    const mockOtherAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'other-api',
+        namespace,
+        annotations: {
+          'backstage.io/owner': mockOtherUserEntityRef,
+        },
+      },
+      spec: {},
+    };
+
+    const createMockAPIKey = (name: string, apiProductName: string) => ({
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKey',
+      metadata: { name, namespace },
+      spec: {
+        apiProductRef: { name: apiProductName },
+        planTier: 'gold',
+        requestedBy: { userId: 'user:default/consumer' },
+      },
+      status: { phase: 'Pending' },
+    });
+
+    it('handles partial success when some API keys do not exist', async () => {
+      // Mock permission check - user has updateOwn permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // request-2
+        .mockRejectedValueOnce(new Error('APIKey not found')) // fetch APIKey - fail, stops here
+        // request-3
+        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'APIKey not found',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+
+      // Verify only 2 patches happened
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles partial success when some API products do not exist', async () => {
+      // Mock permission check - user has updateOwn permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'missing-api')) // fetch APIKey
+        .mockRejectedValueOnce(new Error('APIProduct not found')); // fetch APIProduct - fail
+
+      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(2);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'APIProduct not found',
+      });
+
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(1);
+    });
+
+    it('handles partial success when user owns some but not all API products', async () => {
+      // Mock permission check - user has updateOwn permission (not admin)
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - owned by current user
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockOtherAPIProduct) // fetch APIProduct - owned by other user
+        // request-3
+        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'You can only reject requests for your own API products.',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('handles partial success when patch operations fail', async () => {
+      // Mock permission check - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateAll allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+        { namespace, name: 'request-3' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // request-3
+        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any) // request-1 succeeds
+        .mockRejectedValueOnce(new Error('Network timeout')) // request-2 fails
+        .mockResolvedValueOnce({} as any); // request-3 succeeds
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(3);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: false,
+        error: 'Network timeout',
+      });
+      expect(response.body.results[2]).toEqual({
+        namespace,
+        name: 'request-3',
+        success: true,
+      });
+    });
+
+    it('allows admin to reject all requests regardless of ownership', async () => {
+      // Mock permission check - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateAll allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'request-1' },
+        { namespace, name: 'request-2' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // request-1
+        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // request-2
+        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockOtherAPIProduct); // fetch APIProduct
+
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any); // request-1 succeeds
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any); // request-2 succeeds
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(2);
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'request-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toEqual({
+        namespace,
+        name: 'request-2',
+        success: true,
+      });
+
+      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+    });
+
+    it('returns 403 when user has no update permissions', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateOwn denied
+      ]);
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests: [{ namespace: 'toystore', name: 'request-1' }] })
+        .expect(403);
+
+      expect(response.body).toEqual({ error: 'unauthorised' });
+      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
+    });
+
+    it('returns proper response format with mixed results', async () => {
+      // Mock permission check - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateAll allowed
+      ]);
+
+      const requests = [
+        { namespace, name: 'success-1' },
+        { namespace, name: 'fail-apikey-missing' },
+        { namespace, name: 'fail-apiproduct-missing' },
+        { namespace, name: 'success-2' },
+        { namespace, name: 'fail-patch-error' },
+      ];
+
+      mockK8sClient.getCustomResource
+        // success-1
+        .mockResolvedValueOnce(createMockAPIKey('success-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
+        // fail-apikey-missing
+        .mockRejectedValueOnce(new Error('APIKey not found')) // fetch APIKey - fail, stops here
+        // fail-apiproduct-missing
+        .mockResolvedValueOnce(createMockAPIKey('fail-apiproduct-missing', 'missing-product')) // fetch APIKey
+        .mockRejectedValueOnce(new Error('APIProduct not found')) // fetch APIProduct - fail
+        // success-2
+        .mockResolvedValueOnce(createMockAPIKey('success-2', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
+        // fail-patch-error
+        .mockResolvedValueOnce(createMockAPIKey('fail-patch-error', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - success
+
+      // Patch results
+      mockK8sClient.patchCustomResourceStatus
+        .mockResolvedValueOnce({} as any) // success-1
+        .mockResolvedValueOnce({} as any) // success-2
+        .mockRejectedValueOnce(new Error('Patch failed')); // fail-patch-error
+
+      const response = await request(app)
+        .post('/requests/bulk-reject')
+        .send({ requests })
+        .expect(200);
+
+      expect(response.body.results).toHaveLength(5);
+
+      // Verify exact response structure
+      expect(response.body.results[0]).toEqual({
+        namespace,
+        name: 'success-1',
+        success: true,
+      });
+      expect(response.body.results[1]).toMatchObject({
+        namespace,
+        name: 'fail-apikey-missing',
+        success: false,
+        error: expect.any(String),
+      });
+      expect(response.body.results[2]).toMatchObject({
+        namespace,
+        name: 'fail-apiproduct-missing',
+        success: false,
+        error: expect.any(String),
+      });
+      expect(response.body.results[3]).toEqual({
+        namespace,
+        name: 'success-2',
+        success: true,
+      });
+      expect(response.body.results[4]).toMatchObject({
+        namespace,
+        name: 'fail-patch-error',
+        success: false,
+        error: expect.any(String),
+      });
+    });
+  });
 });
