@@ -298,14 +298,73 @@ interface AlertDialogProps {
   onClose: () => void;
 }
 
+const useBulkAlertStyles = makeStyles((theme) => ({
+  successSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.success.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.success.main}40`,
+  },
+  failureSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.error.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.error.main}40`,
+  },
+  warningSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.warning.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.warning.main}40`,
+  },
+  statRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  errorList: {
+    marginTop: theme.spacing(2),
+    padding: 0,
+    listStyle: 'none',
+  },
+  errorItem: {
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+  },
+  errorName: {
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    marginBottom: theme.spacing(0.5),
+  },
+  errorMessage: {
+    fontSize: '0.813rem',
+    color: theme.palette.error.main,
+    fontFamily: 'monospace',
+    wordBreak: 'break-word',
+  },
+  expandButton: {
+    marginTop: theme.spacing(1),
+    padding: theme.spacing(0.5),
+  },
+}));
+
 const BulkAlertDialog = ({
   open,
   results,
   isApprove,
   onClose,
 }: AlertDialogProps) => {
+  const classes = useBulkAlertStyles();
+  const [showErrors, setShowErrors] = useState(true);
   const successResults = results.filter((res: any) => res.success);
   const failedResults = results.filter((res: any) => !res.success);
+  const hasPartialSuccess = successResults.length > 0;
 
   return (
     <Dialog
@@ -315,29 +374,67 @@ const BulkAlertDialog = ({
       fullWidth
     >
       <DialogTitle>
-        Bulk {isApprove ? "Approve" : "Reject"} operation completed for {results.length} API Keys
+        <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+          {hasPartialSuccess ? (
+            <>
+              <CancelIcon style={{ color: '#ff9800' }} />
+              <span>Bulk {isApprove ? "Approve" : "Reject"} Completed with Issues</span>
+            </>
+          ) : (
+            <>
+              <CancelIcon color="error" />
+              <span>Bulk {isApprove ? "Approve" : "Reject"} Failed</span>
+            </>
+          )}
+        </Box>
       </DialogTitle>
       <DialogContent>
-        <Typography variant="body2" paragraph>
-          Successful: {successResults.length}
-        </Typography>
-        <Typography variant="body2" paragraph>
-          Failed: {failedResults.length}
-        </Typography>
-        {failedResults.length > 0 && (
-          <details>
-            <summary>Failed requests</summary>
-            <ul>
-              {failedResults.map(result => (
-                <li key={result.name}>{result.name}: {result.error}</li>
+        {hasPartialSuccess && (
+          <Box className={classes.successSection}>
+            <Box className={classes.statRow}>
+              <CheckCircleIcon style={{ color: '#4caf50' }} />
+              <Typography variant="body1">
+                <strong>{successResults.length}</strong> API key{successResults.length !== 1 ? 's' : ''} {isApprove ? 'approved' : 'rejected'} successfully
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        <Box className={hasPartialSuccess ? classes.warningSection : classes.failureSection}>
+          <Box className={classes.statRow}>
+            <CancelIcon color="error" />
+            <Typography variant="body1">
+              <strong>{failedResults.length}</strong> request{failedResults.length !== 1 ? 's' : ''} failed
+            </Typography>
+          </Box>
+
+          <Button
+            size="small"
+            className={classes.expandButton}
+            onClick={() => setShowErrors(!showErrors)}
+          >
+            {showErrors ? 'Hide' : 'Show'} Error Details
+          </Button>
+
+          {showErrors && (
+            <ul className={classes.errorList}>
+              {failedResults.map((result, index) => (
+                <li key={result.name || index} className={classes.errorItem}>
+                  <div className={classes.errorName}>
+                    {result.namespace}/{result.name}
+                  </div>
+                  <div className={classes.errorMessage}>
+                    {result.error || 'Unknown error'}
+                  </div>
+                </li>
               ))}
             </ul>
-          </details>
-        )}
+          )}
+        </Box>
       </DialogContent>
       <DialogActions>
-        <Button onClick={onClose}>
-          Ok
+        <Button onClick={onClose} color="primary" variant="contained">
+          Close
         </Button>
       </DialogActions>
     </Dialog>
