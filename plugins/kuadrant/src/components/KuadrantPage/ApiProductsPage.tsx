@@ -104,7 +104,7 @@ const useStyles = makeStyles((theme) => ({
   },
 }));
 
-export const ResourceList = () => {
+const ResourceList = () => {
   const classes = useStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
@@ -167,6 +167,7 @@ export const ResourceList = () => {
     deleteOwnPermissionLoading || deleteAllPermissionLoading;
 
   const {
+    allowed: canListPlanPolicies,
     loading: planPolicyPermissionLoading,
     error: planPolicyPermissionError,
   } = useKuadrantPermission(kuadrantPlanPolicyListPermission);
@@ -196,15 +197,19 @@ export const ResourceList = () => {
     loading: planPoliciesLoading,
     error: planPoliciesError,
   } = useAsync(async (): Promise<KuadrantList> => {
+    // skip fetch if user doesn't have permission
+    if (!canListPlanPolicies) {
+      return { items: [] };
+    }
     const response = await fetchApi.fetch(
       `${backendUrl}/api/kuadrant/planpolicies`,
     );
     if (!response.ok) {
       const error = await handleFetchError(response);
-      throw new Error(`failed to fetch PlanPolicies. ${error}`);
+      throw new Error(`failed to fetch PlanPolicies: ${error}`);
     }
     return await response.json();
-  }, [backendUrl, fetchApi, refreshTrigger]);
+  }, [backendUrl, fetchApi, refreshTrigger, canListPlanPolicies]);
 
   // helper to find policy for a given route
   const getPolicyForProduct = useCallback((product: KuadrantResource): string | null => {
@@ -287,7 +292,7 @@ export const ResourceList = () => {
       });
     });
 
-    return [
+    const sections: FilterSection[] = [
       {
         id: "status",
         title: "Status",
@@ -304,16 +309,6 @@ export const ResourceList = () => {
           label: scheme,
           count,
         })),
-      },
-      {
-        id: "policy",
-        title: "Policy",
-        options: Array.from(policyCounts.entries()).map(([name, count]) => ({
-          value: name,
-          label: name,
-          count,
-        })),
-        collapsed: policyCounts.size > 5,
       },
       {
         id: "route",
@@ -346,7 +341,23 @@ export const ResourceList = () => {
         collapsed: tagCounts.size > 5,
       },
     ];
-  }, [allProducts, getPolicyForProduct, getAuthSchemes]);
+
+    // only show policy filter if user can list planpolicies
+    if (canListPlanPolicies) {
+      sections.splice(2, 0, {
+        id: "policy",
+        title: "Policy",
+        options: Array.from(policyCounts.entries()).map(([name, count]) => ({
+          value: name,
+          label: name,
+          count,
+        })),
+        collapsed: policyCounts.size > 5,
+      });
+    }
+
+    return sections;
+  }, [allProducts, getPolicyForProduct, getAuthSchemes, canListPlanPolicies]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((p: KuadrantResource) => {
@@ -554,11 +565,16 @@ export const ResourceList = () => {
       field: "spec.targetRef.name",
       render: (row: any) => row.spec?.targetRef?.name || "-",
     },
-    {
-      title: "Policy",
-      field: "policy",
-      render: (row: any) => getPolicyForProduct(row) || "N/A",
-    },
+    // only show policy column if user can list planpolicies
+    ...(canListPlanPolicies
+      ? [
+          {
+            title: "Policy",
+            field: "policy",
+            render: (row: any) => getPolicyForProduct(row) || "N/A",
+          },
+        ]
+      : []),
     {
       title: "Tags",
       field: "spec.tags",
@@ -852,7 +868,7 @@ This action cannot be undone.`
   );
 };
 
-export const KuadrantPage = () => {
+export const ApiProductsPage = () => {
   return (
     <PermissionGate
       permission={kuadrantApiProductListPermission}

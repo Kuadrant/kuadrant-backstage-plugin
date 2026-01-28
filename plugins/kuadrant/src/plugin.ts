@@ -18,7 +18,7 @@ export const KuadrantPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'KuadrantPage',
     component: () =>
-      import('./components/KuadrantPage').then(m => m.KuadrantPage),
+      import('./components/KuadrantPage').then(m => m.ApiProductsPage),
     mountPoint: rootRouteRef,
   }),
 );

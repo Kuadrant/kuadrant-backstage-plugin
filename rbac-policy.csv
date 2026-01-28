@@ -40,7 +40,7 @@ p, role:default/api-owner, catalog.entity.read, read, allow, api
 
 # api consumer: browses apis, requests access
 # can do: read all apiproducts (for catalog browsing), create requests, manage own api keys, edit own pending requests
-# cannot do: approve requests, create apis, modify rate limits
+# cannot do: approve requests, create apis, modify rate limits, view planpolicies directly
 p, role:default/api-consumer, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
 # allow requesting access to any api (per-apiproduct access control can be added below)
@@ -50,8 +50,6 @@ p, role:default/api-consumer, kuadrant.apikey.update.own, update, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow, api
-# can do: read all policies(for catalog browsing)
-p, role:default/api-consumer, kuadrant.planpolicy.list, read, allow
 
 # example: restrict specific apis to specific roles
 # p, role:default/partner, kuadrant.apikey.create, create, allow, apiproduct:toystore/toystore-api

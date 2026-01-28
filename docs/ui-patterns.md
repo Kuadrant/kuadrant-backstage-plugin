@@ -42,7 +42,7 @@ Reusable component at [`plugins/kuadrant/src/components/ConfirmDeleteDialog/Conf
 
 ### Usage Examples
 
-**High severity:** See [`plugins/kuadrant/src/components/KuadrantPage/KuadrantPage.tsx`](../plugins/kuadrant/src/components/KuadrantPage/KuadrantPage.tsx) - API Products deletion
+**High severity:** See [`plugins/kuadrant/src/components/KuadrantPage/ApiProductsPage.tsx`](../plugins/kuadrant/src/components/KuadrantPage/ApiProductsPage.tsx) - API Products deletion
 
 ## Frontend Permission System
 
