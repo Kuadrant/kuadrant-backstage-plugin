@@ -37,7 +37,7 @@ import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey } from "../../types/api-management";
 import { getStatusChipStyle } from "../../utils/styles";
-import {handleFetchError} from "../../utils/errors.ts";
+import { handleFetchError } from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -472,7 +472,7 @@ export const ApprovalQueueTable = () => {
     action: "approve",
     processing: false,
   });
-  const [bulkAlertDialogState, setBulkAlertDialogStateState] = useState<{
+  const [bulkAlertDialogState, setBulkAlertDialogState] = useState<{
     open: boolean;
     results: BulkRequestResult[];
     isApprove: boolean;
@@ -734,7 +734,7 @@ export const ApprovalQueueTable = () => {
     if (!value || bulkDialogState.requests.length === 0) return;
 
     setBulkDialogState((prev) => ({ ...prev, processing: true }));
-    setBulkAlertDialogStateState({ open: false, results: [], isApprove: true, });
+    setBulkAlertDialogState({ open: false, results: [], isApprove: true, });
 
     const isApprove = bulkDialogState.action === "approve";
     const endpoint = isApprove
@@ -763,7 +763,7 @@ export const ApprovalQueueTable = () => {
 
       const successfulItems = bulkResponse.filter((res: any) => res.success);
       const failedItems = bulkResponse.filter((res: any) => !res.success);
-      const totalSuccess = failedItems.length == 0;
+      const totalSuccess = failedItems.length === 0;
 
       const action = isApprove ? "approved" : "rejected";
 
@@ -773,7 +773,7 @@ export const ApprovalQueueTable = () => {
         action: "approve",
         processing: false,
       });
-      setBulkAlertDialogStateState({
+      setBulkAlertDialogState({
         open: !totalSuccess,
         results: bulkResponse,
         isApprove,
@@ -1087,7 +1087,7 @@ export const ApprovalQueueTable = () => {
         results={bulkAlertDialogState.results}
         isApprove={bulkAlertDialogState.isApprove}
         onClose={() =>
-          setBulkAlertDialogStateState({
+          setBulkAlertDialogState({
             open: false,
             results: [],
             isApprove: true,
