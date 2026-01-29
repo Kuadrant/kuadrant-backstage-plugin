@@ -37,7 +37,7 @@ import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey } from "../../types/api-management";
 import { getStatusChipStyle } from "../../utils/styles";
-import {handleFetchError} from "../../utils/errors.ts";
+import { handleFetchError } from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -284,6 +284,163 @@ const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
   );
 };
 
+interface BulkRequestResult {
+  name: string;
+  namespace: string;
+  success: boolean;
+  error: string | null;
+}
+
+interface AlertDialogProps {
+  open: boolean;
+  results: BulkRequestResult[];
+  isApprove: boolean;
+  onClose: () => void;
+}
+
+const useBulkAlertStyles = makeStyles((theme) => ({
+  successSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.success.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.success.main}40`,
+  },
+  failureSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.error.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.error.main}40`,
+  },
+  warningSection: {
+    padding: theme.spacing(2),
+    backgroundColor: theme.palette.warning.main + '14',
+    borderRadius: theme.shape.borderRadius,
+    marginBottom: theme.spacing(2),
+    border: `1px solid ${theme.palette.warning.main}40`,
+  },
+  statRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.spacing(1),
+  },
+  errorList: {
+    marginTop: theme.spacing(2),
+    padding: 0,
+    listStyle: 'none',
+  },
+  errorItem: {
+    padding: theme.spacing(1.5),
+    marginBottom: theme.spacing(1),
+    backgroundColor: theme.palette.background.paper,
+    borderRadius: theme.shape.borderRadius,
+    border: `1px solid ${theme.palette.divider}`,
+  },
+  errorName: {
+    fontWeight: 600,
+    fontSize: '0.875rem',
+    marginBottom: theme.spacing(0.5),
+  },
+  errorMessage: {
+    fontSize: '0.813rem',
+    color: theme.palette.error.main,
+    fontFamily: 'monospace',
+    wordBreak: 'break-word',
+  },
+  expandButton: {
+    marginTop: theme.spacing(1),
+    padding: theme.spacing(0.5),
+  },
+}));
+
+const BulkAlertDialog = ({
+  open,
+  results,
+  isApprove,
+  onClose,
+}: AlertDialogProps) => {
+  const classes = useBulkAlertStyles();
+  const [showErrors, setShowErrors] = useState(true);
+  const successResults = results.filter((res: any) => res.success);
+  const failedResults = results.filter((res: any) => !res.success);
+  const hasPartialSuccess = successResults.length > 0;
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+    >
+      <DialogTitle>
+        <Box display="flex" alignItems="center" style={{ gap: 8 }}>
+          {hasPartialSuccess ? (
+            <>
+              <CancelIcon style={{ color: '#ff9800' }} />
+              <span>Bulk {isApprove ? "Approve" : "Reject"} Completed with Issues</span>
+            </>
+          ) : (
+            <>
+              <CancelIcon color="error" />
+              <span>Bulk {isApprove ? "Approve" : "Reject"} Failed</span>
+            </>
+          )}
+        </Box>
+      </DialogTitle>
+      <DialogContent>
+        {hasPartialSuccess && (
+          <Box className={classes.successSection}>
+            <Box className={classes.statRow}>
+              <CheckCircleIcon style={{ color: '#4caf50' }} />
+              <Typography variant="body1">
+                <strong>{successResults.length}</strong> API key{successResults.length !== 1 ? 's' : ''} {isApprove ? 'approved' : 'rejected'} successfully
+              </Typography>
+            </Box>
+          </Box>
+        )}
+
+        <Box className={hasPartialSuccess ? classes.warningSection : classes.failureSection}>
+          <Box className={classes.statRow}>
+            <CancelIcon color="error" />
+            <Typography variant="body1">
+              <strong>{failedResults.length}</strong> request{failedResults.length !== 1 ? 's' : ''} failed
+            </Typography>
+          </Box>
+
+          <Button
+            size="small"
+            className={classes.expandButton}
+            onClick={() => setShowErrors(!showErrors)}
+          >
+            {showErrors ? 'Hide' : 'Show'} Error Details
+          </Button>
+
+          {showErrors && (
+            <ul className={classes.errorList}>
+              {failedResults.map((result, index) => (
+                <li key={result.name || index} className={classes.errorItem}>
+                  <div className={classes.errorName}>
+                    {result.namespace}/{result.name}
+                  </div>
+                  <div className={classes.errorMessage}>
+                    {result.error || 'Unknown error'}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Box>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={onClose} color="primary" variant="contained">
+          Close
+        </Button>
+      </DialogActions>
+    </Dialog>
+  );
+};
+
 export const ApprovalQueueTable = () => {
   const classes = useStyles();
   const config = useApi(configApiRef);
@@ -314,6 +471,15 @@ export const ApprovalQueueTable = () => {
     requests: [],
     action: "approve",
     processing: false,
+  });
+  const [bulkAlertDialogState, setBulkAlertDialogState] = useState<{
+    open: boolean;
+    results: BulkRequestResult[];
+    isApprove: boolean;
+  }>({
+    open: false,
+    results: [],
+    isApprove: true,
   });
   const [filters, setFilters] = useState<FilterState>({
     status: [],
@@ -568,6 +734,7 @@ export const ApprovalQueueTable = () => {
     if (!value || bulkDialogState.requests.length === 0) return;
 
     setBulkDialogState((prev) => ({ ...prev, processing: true }));
+    setBulkAlertDialogState({ open: false, results: [], isApprove: true, });
 
     const isApprove = bulkDialogState.action === "approve";
     const endpoint = isApprove
@@ -591,22 +758,36 @@ export const ApprovalQueueTable = () => {
         const err = await handleFetchError(response);
         throw new Error(err);
       }
+      const bulkResponseRaw = await response.json();
+      const bulkResponse = bulkResponseRaw.results || [];
 
-      const count = bulkDialogState.requests.length;
+      const successfulItems = bulkResponse.filter((res: any) => res.success);
+      const failedItems = bulkResponse.filter((res: any) => !res.success);
+      const totalSuccess = failedItems.length === 0;
+
       const action = isApprove ? "approved" : "rejected";
+
       setBulkDialogState({
         open: false,
         requests: [],
         action: "approve",
         processing: false,
       });
+      setBulkAlertDialogState({
+        open: !totalSuccess,
+        results: bulkResponse,
+        isApprove,
+      });
       setSelectedRequests([]);
       setRefresh((r) => r + 1);
-      alertApi.post({
-        message: `${count} API keys ${action}`,
-        severity: "success",
-        display: "transient",
-      });
+
+      if (totalSuccess) {
+        alertApi.post({
+          message: `${successfulItems.length} API keys ${action}`,
+          severity: "success",
+          display: "transient",
+        });
+      }
     } catch (err) {
       console.error(`error bulk ${bulkDialogState.action}ing requests:`, err);
       setBulkDialogState((prev) => ({ ...prev, processing: false }));
@@ -900,6 +1081,18 @@ export const ApprovalQueueTable = () => {
           })
         }
         onConfirm={handleBulkConfirm}
+      />
+      <BulkAlertDialog
+        open={bulkAlertDialogState.open}
+        results={bulkAlertDialogState.results}
+        isApprove={bulkAlertDialogState.isApprove}
+        onClose={() =>
+          setBulkAlertDialogState({
+            open: false,
+            results: [],
+            isApprove: true,
+          })
+        }
       />
     </>
   );
