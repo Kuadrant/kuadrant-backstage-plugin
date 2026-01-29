@@ -525,7 +525,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
         </Grid>
 
         {/* HTTPRoute policies section */}
-        {selectedHTTPRoute && (
+        {selectedHTTPRoute && selectedPolicy && (
           <>
             <Box className={classes.sectionHeader}>
               <Typography variant="subtitle1"><strong>HTTPRoute policies</strong></Typography>
@@ -534,7 +534,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               </Tooltip>
             </Box>
             <PlanPolicyDetails
-              selectedPolicy={selectedPolicy}
+              discoveredPlans={selectedPolicy.plans}
               alertSeverity="warning"
               alertMessage="No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available."
               includeTopMargin={false}

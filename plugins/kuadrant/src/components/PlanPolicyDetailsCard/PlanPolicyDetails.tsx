@@ -3,27 +3,21 @@ import { Box, Typography, Chip, useTheme } from '@material-ui/core';
 import { Alert } from '@material-ui/lab';
 
 interface PlanPolicyDetailsProps {
-  selectedPolicy: {
-    metadata: {
-      name: string;
+  discoveredPlans?: Array<{
+    tier: string;
+    limits?: {
+      daily?: number;
+      monthly?: number;
+      yearly?: number;
     };
-    plans?: Array<{
-      tier: string;
-      description?: string;
-      limits?: {
-        daily?: number;
-        monthly?: number;
-        yearly?: number;
-      };
-    }>;
-  } | null;
+  }> | null;
   alertSeverity?: 'warning' | 'info';
   alertMessage?: string;
   includeTopMargin?: boolean;
 }
 
 export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
-  selectedPolicy,
+  discoveredPlans,
   alertSeverity = 'warning',
   alertMessage = 'No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available.',
   includeTopMargin = true,
@@ -37,13 +31,9 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
       borderRadius={1}
       border={`1px solid ${theme.palette.divider}`}
     >
-      {selectedPolicy ? (
+      {discoveredPlans ? (
         <>
-          <Typography variant="subtitle2" gutterBottom style={{ fontWeight: 600 }}>
-            Associated PlanPolicy: <strong>{selectedPolicy.metadata.name}</strong>
-          </Typography>
-
-          {selectedPolicy.plans && selectedPolicy.plans.length > 0 ? (
+          {discoveredPlans.length > 0 ? (
             <>
               <Typography
                 variant="caption"
@@ -52,10 +42,10 @@ export const PlanPolicyDetails: React.FC<PlanPolicyDetailsProps> = ({
                 color="textSecondary"
                 style={{ marginTop: 8 }}
               >
-                Available Tiers:
+                Available PlanPolicy Tiers:
               </Typography>
               <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
-                {selectedPolicy.plans.map((plan: any, idx: number) => {
+                {discoveredPlans.map((plan: any, idx: number) => {
                   const limitText = plan.limits?.daily
                     ? `${plan.limits.daily}/day`
                     : plan.limits?.monthly
