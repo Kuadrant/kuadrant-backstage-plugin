@@ -27,6 +27,7 @@ import { Settings as SidebarSettings } from '@backstage/plugin-user-settings';
 import { userSettingsTranslationRef } from '@backstage/plugin-user-settings/alpha';
 
 import { policyEntityCreatePermission } from '@backstage-community/plugin-rbac-common';
+import { kuadrantApiKeyApprovePermission } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import ExpandMore from '@mui/icons-material/ExpandMore';
@@ -312,6 +313,14 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
       permission: policyEntityCreatePermission,
       resourceRef: undefined,
     });
+
+  const {
+    loading: loadingApprovePermission,
+    allowed: canDisplayApiKeyApproval,
+  } = usePermission({
+    permission: kuadrantApiKeyApprovePermission,
+    resourceRef: undefined,
+  });
   useLanguagePreference();
   const { t } = useTranslation();
 
@@ -440,6 +449,25 @@ export const Root = ({ children }: PropsWithChildren<{}>) => {
           mi => mi.name !== 'rbac',
         );
       }
+    }
+
+    // Filter out API Key Approval menu item if user lacks approve permission
+    if (
+      !isBottomMenuSection &&
+      !canDisplayApiKeyApproval &&
+      !loadingApprovePermission
+    ) {
+      menuItemArray = menuItemArray.map(mi => {
+        if (mi.name === 'default.kuadrant' && mi.children) {
+          return {
+            ...mi,
+            children: mi.children.filter(
+              child => child.name !== 'default.kuadrant.api-key-approval',
+            ),
+          };
+        }
+        return mi;
+      });
     }
     return (
       <>

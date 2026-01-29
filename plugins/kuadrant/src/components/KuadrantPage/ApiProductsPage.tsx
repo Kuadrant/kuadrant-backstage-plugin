@@ -535,6 +535,17 @@ const ResourceList = () => {
     const displayName = row.spec?.displayName || name;
     const currentStatus = row.spec?.publishStatus || "Draft";
     const newStatus = currentStatus === "Published" ? "Draft" : "Published";
+    const lifecycle = row.metadata.labels?.lifecycle;
+
+    // prevent publishing retired APIs
+    if (newStatus === "Published" && lifecycle === "retired") {
+      alertApi.post({
+        message: `Cannot publish a retired API product. Please change the lifecycle status first.`,
+        severity: "error",
+        display: "transient",
+      });
+      return;
+    }
 
     try {
       const response = await fetchApi.fetch(

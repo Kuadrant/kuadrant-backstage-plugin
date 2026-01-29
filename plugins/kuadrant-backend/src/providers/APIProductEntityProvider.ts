@@ -104,7 +104,7 @@ export class APIProductEntityProvider implements EntityProvider {
       const apiProducts = (response.items || []) as APIProduct[];
       console.log(`apiproduct provider: found ${apiProducts.length} apiproducts`);
 
-      // filter out Draft API products - only include Published ones
+      // filter out Draft API products - only include Published ones 
       const publishedProducts = apiProducts.filter(product => {
         const publishStatus = product.spec.publishStatus || 'Draft';  // default to Draft if not specified
         return publishStatus === 'Published';
@@ -139,13 +139,8 @@ export class APIProductEntityProvider implements EntityProvider {
     const displayName = product.spec.displayName || name;
     const description = product.spec.description || `api product: ${displayName}`;
 
-    // determine lifecycle from labels with validation, default to production
-    // using Backstage standard lifecycle values: experimental, production, deprecated
-    const rawLifecycle = product.metadata.labels?.lifecycle;
-    const validLifecycles = ['experimental', 'production', 'deprecated'];
-    const lifecycle = rawLifecycle && validLifecycles.includes(rawLifecycle)
-      ? rawLifecycle
-      : 'production';
+    // determine lifecycle from labels or default to production
+    const lifecycle = product.metadata.labels?.lifecycle || 'production';
 
     // owner must be set via backstage ownership annotation
     // if missing, skip this apiproduct (created outside backstage or invalid)

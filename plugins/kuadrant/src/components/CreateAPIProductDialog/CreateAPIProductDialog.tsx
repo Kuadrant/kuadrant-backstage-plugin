@@ -648,6 +648,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               <MenuItem value="experimental">Experimental</MenuItem>
               <MenuItem value="production">Production</MenuItem>
               <MenuItem value="deprecated">Deprecated</MenuItem>
+              <MenuItem value="retired">Retired</MenuItem>
             </TextField>
           </Grid>
           <Grid item xs={6}>

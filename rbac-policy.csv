@@ -8,6 +8,7 @@ p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
 p, role:default/api-admin, kuadrant.apiproduct.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apiproduct.list, read, allow
+p, role:default/api-admin, kuadrant.httproute.list, read, allow
 p, role:default/api-admin, kuadrant.apikey.create, create, allow, apiproduct:*/*
 p, role:default/api-admin, kuadrant.apikey.read.all, read, allow
 p, role:default/api-admin, kuadrant.apikey.update.all, update, allow
@@ -30,6 +31,7 @@ p, role:default/api-owner, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.update.own, update, allow
 p, role:default/api-owner, kuadrant.apiproduct.delete.own, delete, allow
 p, role:default/api-owner, kuadrant.apiproduct.list, read, allow
+p, role:default/api-owner, kuadrant.httproute.list, read, allow
 p, role:default/api-owner, kuadrant.apikey.create, create, allow, apiproduct:*/*
 p, role:default/api-owner, kuadrant.apikey.read.own, read, allow
 p, role:default/api-owner, kuadrant.apikey.update.own, update, allow

@@ -148,6 +148,13 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     setError('');
     setSaving(true);
 
+    // validate retired APIs cannot be published
+    if (lifecycle === 'retired' && publishStatus === 'Published') {
+      setError('Cannot publish a retired API product. Please set publish status to Draft.');
+      setSaving(false);
+      return;
+    }
+
     try {
       const patch = {
         metadata: {
@@ -412,6 +419,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                   <MenuItem value="experimental">Experimental</MenuItem>
                   <MenuItem value="production">Production</MenuItem>
                   <MenuItem value="deprecated">Deprecated</MenuItem>
+                  <MenuItem value="retired">Retired</MenuItem>
                 </TextField>
               </Grid>
               <Grid item xs={6}>

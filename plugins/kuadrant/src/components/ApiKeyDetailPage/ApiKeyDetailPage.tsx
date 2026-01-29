@@ -41,7 +41,7 @@ import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import OpenInNewIcon from "@material-ui/icons/OpenInNew";
 import EmailIcon from "@material-ui/icons/Email";
 import { APIKey, APIProduct } from "../../types/api-management";
-import { getStatusChipStyle } from "../../utils/styles";
+import { getApprovalQueueStatusChipStyle } from "../../utils/styles";
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -270,14 +270,14 @@ func main() {
         title={apiKey.metadata.name}
         subtitle={`API Key for ${apiKey.spec.apiProductRef?.name || "unknown"}`}
       >
-        <Link to="/kuadrant/api-keys">
+        <Link to="/kuadrant/my-api-keys">
           <Button startIcon={<ArrowBackIcon />}>Back to API Keys</Button>
         </Link>
       </Header>
       <Content>
         <Box mb={2}>
           <Breadcrumbs aria-label="breadcrumb">
-            <Link to="/kuadrant/api-keys">API keys</Link>
+            <Link to="/kuadrant/my-api-keys">API keys</Link>
             <Typography>{apiKey.metadata.name}</Typography>
           </Breadcrumbs>
         </Box>
@@ -325,7 +325,7 @@ func main() {
                   <Chip
                     label={statusLabel}
                     size="small"
-                    style={getStatusChipStyle(phase)}
+                    style={getApprovalQueueStatusChipStyle(phase)}
                     data-testid="api-key-status-chip"
                   />
                 </Box>

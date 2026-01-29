@@ -101,6 +101,7 @@ demo-install:
 demo-uninstall:
 	@echo "uninstalling demo resources..."
 	@kubectl delete -f demo/toystore-demo.yaml --ignore-not-found
+	@kubectl delete -f demo/gamestore-demo.yaml --ignore-not-found
 	@kubectl delete -f demo/additional-demos.yaml --ignore-not-found
 	@echo "demo resources removed"
 

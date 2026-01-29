@@ -32,11 +32,20 @@ export const ApiProductsPage = kuadrantPlugin.provide(
   }),
 );
 
-export const ApiKeysPage = kuadrantPlugin.provide(
+export const MyApiKeysPage = kuadrantPlugin.provide(
   createRoutableExtension({
-    name: 'ApiKeysPage',
+    name: 'MyApiKeysPage',
     component: () =>
-      import('./components/ApiKeysPage').then(m => m.ApiKeysPage),
+      import('./components/MyApiKeysPage').then(m => m.MyApiKeysPage),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const ApiKeyApprovalPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'ApiKeyApprovalPage',
+    component: () =>
+      import('./components/ApiKeyApprovalPage').then(m => m.ApiKeyApprovalPage),
     mountPoint: rootRouteRef,
   }),
 );

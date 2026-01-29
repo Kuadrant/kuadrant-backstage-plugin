@@ -114,34 +114,40 @@ export const ApiProductDetailPage = () => {
   }, [namespace, name, backendUrl, fetchApi, refreshKey]);
 
   // fetch httproute to get hostnames
-  const {
-    value: httpRouteHostnames,
-  } = useAsync(async () => {
+  const { value: httpRouteHostnames } = useAsync(async () => {
     if (!product?.spec?.targetRef?.name) {
       return null;
     }
 
-    try {
-      const routeName = product.spec.targetRef.name;
-      const response = await fetchApi.fetch(
+    const routeName = product.spec.targetRef.name;
+    const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/httproutes/${namespace}/${routeName}`
-      );
+    );
 
-      if (!response.ok) {
-        return null;
-      }
-
-      const route = await response.json();
-      return route?.spec?.hostnames || null;
-    } catch (err) {
-      console.error('Failed to fetch HTTPRoute hostnames:', err);
-      return null;
+    if (!response.ok) {
+      const err = await handleFetchError(response);
+      throw new Error(`Failed to fetch HTTPRoute. ${err}`);
     }
+
+    const route = await response.json();
+    return route?.spec?.hostnames || null;
   }, [product, namespace, backendUrl, fetchApi]);
 
   const handlePublishToggle = async () => {
     if (!product) return;
     const newStatus = product.spec?.publishStatus === "Published" ? "Draft" : "Published";
+    const lifecycle = product.metadata.labels?.lifecycle;
+
+    // prevent publishing retired APIs
+    if (newStatus === "Published" && lifecycle === "retired") {
+      alertApi.post({
+        message: `Cannot publish a retired API product. Please change the lifecycle status first.`,
+        severity: "error",
+        display: "transient",
+      });
+      return;
+    }
+
     try {
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
@@ -305,11 +311,19 @@ export const ApiProductDetailPage = () => {
           </Breadcrumbs>
         </Box>
 
-        
+
         {product.metadata.labels?.lifecycle === 'deprecated' && (
           <Box mb={2}>
             <Alert severity="warning">
               <strong>This API is deprecated.</strong> Please contact your administrator for more details.
+            </Alert>
+          </Box>
+        )}
+
+        {product.metadata.labels?.lifecycle === 'retired' && (
+          <Box mb={2}>
+            <Alert severity="error">
+              <strong>This API has been retired and is no longer available.</strong> Please contact your administrator for alternatives.
             </Alert>
           </Box>
         )}

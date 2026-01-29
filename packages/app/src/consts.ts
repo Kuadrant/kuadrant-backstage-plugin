@@ -44,12 +44,19 @@ export const DefaultMainMenuItems = {
       icon: 'api',
       to: '/kuadrant/api-products',
       parent: 'default.kuadrant',
+      priority: 30,
+    },
+    'default.kuadrant.my-api-keys': {
+      title: 'My API Keys',
+      icon: 'key',
+      to: '/kuadrant/my-api-keys',
+      parent: 'default.kuadrant',
       priority: 20,
     },
-    'default.kuadrant.api-keys': {
-      title: 'API Keys',
-      icon: 'key',
-      to: '/kuadrant/api-keys',
+    'default.kuadrant.api-key-approval': {
+      title: 'API Key Approval',
+      icon: 'approval',
+      to: '/kuadrant/api-key-approval',
       parent: 'default.kuadrant',
       priority: 10,
     },

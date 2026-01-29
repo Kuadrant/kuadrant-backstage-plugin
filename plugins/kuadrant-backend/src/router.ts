@@ -21,6 +21,7 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteOwnPermission,
   kuadrantApiProductDeleteAllPermission,
+  kuadrantHttpRouteListPermission,
   kuadrantApiKeyCreatePermission,
   kuadrantApiKeyReadOwnPermission,
   kuadrantApiKeyReadAllPermission,
@@ -61,6 +62,65 @@ async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, 
     userEntityRef: info.userEntityRef,
     groups
   };
+}
+
+/**
+ * Verifies if the current user has permission to update (approve/reject) an API key.
+ * - Admins with update.all permission can update any API key (ownership check skipped)
+ * - Owners with update.own permission can only update API keys for their own API products
+ *
+ * This function is used by both PATCH /requests/:namespace/:name (approve/reject)
+ * and bulk operations to enforce consistent permission checks.
+ */
+async function verifyApiKeyUpdatePermission(
+  credentials: any,
+  userEntityRef: string,
+  namespace: string,
+  apiProductName: string,
+  k8sClient: KuadrantK8sClient,
+  permissions: PermissionsService,
+): Promise<void> {
+  // try update all permission first (admin)
+  const updateAllDecision = await permissions.authorize(
+    [{ permission: kuadrantApiKeyUpdateAllPermission }],
+    { credentials },
+  );
+
+  if (updateAllDecision[0].result === AuthorizeResult.ALLOW) {
+    // admin has update.all permission - skip ownership check
+    return;
+  }
+
+  // fallback to update own permission - requires ownership check
+  const updateOwnDecision = await permissions.authorize(
+    [{ permission: kuadrantApiKeyUpdateOwnPermission }],
+    { credentials },
+  );
+
+  if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+    throw new NotAllowedError('unauthorised');
+  }
+
+  // verify user owns the apiproduct this request is for
+  let apiProduct;
+  try {
+    apiProduct = await k8sClient.getCustomResource(
+      'devportal.kuadrant.io',
+      'v1alpha1',
+      namespace,
+      'apiproducts',
+      apiProductName,
+    );
+  } catch (error) {
+    throw new InputError(`APIProduct '${apiProductName}' not found in namespace '${namespace}' - cannot verify ownership`);
+  }
+
+  const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+
+  // verify ownership of the apiproduct
+  if (owner !== userEntityRef) {
+    throw new NotAllowedError('you can only update requests for your own api products');
+  }
 }
 
 export async function createRouter({
@@ -355,7 +415,7 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiProductListPermission }],
+        [{ permission: kuadrantHttpRouteListPermission }],
         { credentials }
       );
 
@@ -376,12 +436,14 @@ export async function createRouter({
     }
   });
 
+  // get a specific httproute by namespace and name
+  // used for viewing httproute details when creating/editing apiproducts
   router.get('/httproutes/:namespace/:name', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);
 
       const decision = await permissions.authorize(
-        [{ permission: kuadrantApiProductListPermission }],
+        [{ permission: kuadrantHttpRouteListPermission }],
         { credentials }
       );
 
@@ -408,7 +470,9 @@ export async function createRouter({
     const patchSchema = z.object({
       metadata: z.object({
         labels: z.object({
-          lifecycle: z.enum(['experimental', 'production', 'deprecated']).optional(), 
+          // allow updating lifecycle phase via edit apiproduct dialog
+          // synced to backstage catalog entity's lifecycle field
+          lifecycle: z.enum(['experimental', 'production', 'deprecated', 'retired']).optional(),
         }).partial().optional(),
       }).partial().optional(),
       spec: z.object({
@@ -474,6 +538,22 @@ export async function createRouter({
       // prevent modification of ownership annotation
       if (req.body.metadata?.annotations) {
         delete req.body.metadata.annotations['backstage.io/owner'];
+      }
+
+      // prevent publishing retired APIs
+      if (parsed.data.spec?.publishStatus === 'Published' && parsed.data.metadata?.labels?.lifecycle === 'retired') {
+        throw new InputError('cannot publish a retired API product');
+      }
+
+      // if changing lifecycle to retired, automatically set publishStatus to Draft
+      if (parsed.data.metadata?.labels?.lifecycle === 'retired') {
+        const existing = await k8sClient.getCustomResource('devportal.kuadrant.io', 'v1alpha1', namespace, 'apiproducts', name);
+        if (existing.spec?.publishStatus === 'Published') {
+          if (!parsed.data.spec) {
+            parsed.data.spec = {};
+          }
+          parsed.data.spec.publishStatus = 'Draft';
+        }
       }
 
       const updated = await k8sClient.patchCustomResource(
@@ -659,7 +739,10 @@ export async function createRouter({
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
       } else {
-        res.status(500).json({ error: 'failed to create api key request' });
+        // extract meaningful error message from kubernetes API errors
+        // this helps users understand validation failures (e.g., namespace not found, invalid tier)
+        const errorMessage = error instanceof Error ? error.message : 'failed to create api key request';
+        res.status(500).json({ error: errorMessage });
       }
     }
   });
@@ -808,39 +891,15 @@ export async function createRouter({
         throw new InputError('apiProductRef.name is required in APIKey spec');
       }
 
-      // verify user owns/admins the apiproduct this request is for
-      const apiProduct = await k8sClient.getCustomResource(
-        'devportal.kuadrant.io',
-        'v1alpha1',
+      // verify user has permission to approve this API key
+      await verifyApiKeyUpdatePermission(
+        credentials,
+        userEntityRef,
         namespace,
-        'apiproducts',
         apiProductName,
+        k8sClient,
+        permissions,
       );
-
-      const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-
-      // try update all permission first (admin)
-      const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyUpdateAllPermission }],
-        { credentials },
-      );
-
-      if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
-        // fallback to update own permission
-        const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
-          { credentials },
-        );
-
-        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-
-        // verify ownership of the apiproduct
-        if (owner !== userEntityRef) {
-          throw new NotAllowedError('you can only approve requests for your own api products');
-        }
-      }
 
       // backend sets phase, controller reconciles and creates Secret
       const status = {
@@ -898,40 +957,15 @@ export async function createRouter({
         throw new InputError('apiProductRef.name is required in APIKey spec');
       }
 
-      // verify user owns/admins the apiproduct this request is for
-      const apiProduct = await k8sClient.getCustomResource(
-        'devportal.kuadrant.io',
-        'v1alpha1',
+      // verify user has permission to reject this API key
+      await verifyApiKeyUpdatePermission(
+        credentials,
+        userEntityRef,
         namespace,
-        'apiproducts',
         apiProductName,
+        k8sClient,
+        permissions,
       );
-
-      const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-        // owner is already in entity ref format
-
-      // try update all permission first (admin)
-      const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyUpdateAllPermission }],
-        { credentials },
-      );
-
-      if (updateAllDecision[0].result !== AuthorizeResult.ALLOW) {
-        // fallback to update own permission
-        const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
-          { credentials },
-        );
-
-        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-
-        // verify ownership of the apiproduct
-        if (owner !== userEntityRef) {
-          throw new NotAllowedError('you can only reject requests for your own api products');
-        }
-      }
 
       const status = {
         phase: 'Rejected',

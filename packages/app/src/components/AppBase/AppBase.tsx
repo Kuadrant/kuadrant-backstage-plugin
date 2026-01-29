@@ -22,10 +22,12 @@ import { UserSettingsPage } from '@backstage/plugin-user-settings';
 
 import { RbacPage } from '@backstage-community/plugin-rbac';
 import {
+  ApiKeyApprovalPage,
   ApiKeyDetailPage,
-  ApiKeysPage,
   ApiProductDetailPage,
   ApiProductsPage,
+  kuadrantApiKeyApprovePermission,
+  MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
 
@@ -149,7 +151,17 @@ const AppBase = () => {
                 path="/kuadrant/api-products/:namespace/:name"
                 element={<ApiProductDetailPage />}
               />
-              <Route path="/kuadrant/api-keys" element={<ApiKeysPage />} />
+              <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
+              <Route
+                path="/kuadrant/api-key-approval"
+                element={
+                  <RequirePermission
+                    permission={kuadrantApiKeyApprovePermission}
+                  >
+                    <ApiKeyApprovalPage />
+                  </RequirePermission>
+                }
+              />
               <Route
                 path="/kuadrant/api-keys/:namespace/:name"
                 element={<ApiKeyDetailPage />}

@@ -30,6 +30,7 @@ import {
   Button,
   makeStyles,
 } from "@material-ui/core";
+import { SimpleRequestAccessDialog } from "../SimpleRequestAccessDialog";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
@@ -39,7 +40,7 @@ import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey, APIProduct } from "../../types/api-management";
-import { getStatusChipStyle } from "../../utils/styles";
+import { getMyApiKeysStatusChipStyle } from "../../utils/styles";
 import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
@@ -114,6 +115,7 @@ export const MyApiKeysTable = () => {
   const alertApi = useApi(alertApiRef);
   const backendUrl = config.getString("backend.baseUrl");
 
+  const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [menuAnchor, setMenuAnchor] = useState<{
     top: number;
@@ -464,7 +466,7 @@ export const MyApiKeysTable = () => {
         const phase = row.status?.phase || "Pending";
         const label = phase === "Approved" ? "Active" : phase;
         return (
-          <Chip label={label} size="small" style={getStatusChipStyle(phase)} />
+          <Chip label={label} size="small" style={getMyApiKeysStatusChipStyle(phase)} />
         );
       },
     },
@@ -666,6 +668,16 @@ export const MyApiKeysTable = () => {
 
   return (
     <>
+      <Box display="flex" justifyContent="flex-end" mb={2} px={2}>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={() => setRequestDialogOpen(true)}
+          data-testid="request-access-button"
+        >
+          Request Access
+        </Button>
+      </Box>
       <Box className={classes.container}>
         <FilterPanel
           sections={filterSections}
@@ -673,12 +685,16 @@ export const MyApiKeysTable = () => {
           onChange={setFilters}
         />
         <Box className={classes.tableContainer}>
-          {filteredRequests.length === 0 ? (
+          {allRequests.length === 0 ? (
+            <Box p={4} textAlign="center">
+              <Typography variant="body1" color="textSecondary" gutterBottom>
+                No API keys found. Request access to an API to get started.
+              </Typography>
+            </Box>
+          ) : filteredRequests.length === 0 ? (
             <Box p={4} textAlign="center">
               <Typography variant="body1" color="textSecondary">
-                {allRequests.length === 0
-                  ? "No API keys found. Request access to an API to get started."
-                  : "No API keys match the selected filters."}
+                No API keys match the selected filters.
               </Typography>
             </Box>
           ) : (
@@ -817,6 +833,15 @@ export const MyApiKeysTable = () => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SimpleRequestAccessDialog
+        open={requestDialogOpen}
+        onClose={() => setRequestDialogOpen(false)}
+        onSuccess={() => {
+          setRequestDialogOpen(false);
+          setRefresh((prev) => prev + 1);
+        }}
+      />
     </>
   );
 };

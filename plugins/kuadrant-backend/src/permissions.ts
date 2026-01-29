@@ -120,6 +120,12 @@ export const kuadrantApiKeyApprovePermission = createPermission({
   attributes: { action: 'update' },
 });
 
+// httproute permissions (Gateway API resources that APIProducts wrap)
+export const kuadrantHttpRouteListPermission = createPermission({
+  name: 'kuadrant.httproute.list',
+  attributes: { action: 'read' },
+});
+
 /**
  * All Kuadrant permissions as an array for easy iteration
  */
@@ -145,4 +151,5 @@ export const kuadrantPermissions = [
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
   kuadrantApiKeyApprovePermission,
+  kuadrantHttpRouteListPermission,
 ];
