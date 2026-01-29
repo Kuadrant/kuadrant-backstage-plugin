@@ -77,6 +77,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
   const [contactTeam, setContactTeam] = useState('');
   const [docsURL, setDocsURL] = useState('');
   const [openAPISpec, setOpenAPISpec] = useState('');
+  const [discoveredPlans, setdiscoveredPlans] = useState([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
@@ -107,6 +108,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
           setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
+          setdiscoveredPlans(data.status.discoveredPlans || null);
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -116,36 +118,6 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         });
     }
   }, [open, namespace, name, backendUrl, fetchApi]);
-
-  // load planpolicies with full details to show associated plans
-  const {
-    value: planPolicies,
-    error: planPoliciesError
-  } = useAsync(async () => {
-    if (!open) return null;
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
-
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to load PlanPolicies. ${error}`);
-    }
-
-    return await response.json();
-  }, [backendUrl, fetchApi, open]);
-
-  // find planpolicy associated with targetRef
-  const selectedPolicy = React.useMemo(() => {
-    if (!planPolicies?.items || !targetRef) return null;
-
-    return planPolicies.items.find((pp: any) => {
-      const ref = pp.targetRef;
-      return (
-        ref?.kind === 'HTTPRoute' &&
-        ref?.name === targetRef.name &&
-        (!ref?.namespace || ref?.namespace === (targetRef.namespace || namespace))
-      );
-    });
-  }, [planPolicies, targetRef, namespace]);
 
   useEffect(() => {
     if (open) {
@@ -230,14 +202,6 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         {error && (
           <Alert severity="error" style={{ marginBottom: 16 }}>
             {error}
-          </Alert>
-        )}
-        {planPoliciesError && (
-          <Alert severity="warning" style={{ marginBottom: 16 }}>
-            <strong>Failed to load PlanPolicies:</strong> {planPoliciesError.message}
-            <Typography variant="body2" style={{ marginTop: 8 }}>
-              Plan information may be incomplete.
-            </Typography>
           </Alert>
         )}
         {loading ? (
@@ -410,7 +374,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                   </Tooltip>
                 </Box>
                 <PlanPolicyDetails
-                  selectedPolicy={selectedPolicy}
+                  discoveredPlans={discoveredPlans}
                   alertSeverity="info"
                   alertMessage="No PlanPolicy found for this HTTPRoute."
                   includeTopMargin={false}
