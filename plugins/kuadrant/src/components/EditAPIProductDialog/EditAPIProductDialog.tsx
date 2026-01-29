@@ -25,7 +25,6 @@ import AddIcon from '@material-ui/icons/Add';
 import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
-import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateURL } from '../../utils/validation';
 import { handleFetchError } from "../../utils/errors";
