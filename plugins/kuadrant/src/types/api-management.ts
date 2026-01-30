@@ -113,6 +113,14 @@ export interface APIKey {
   status?: APIKeyStatus;
 }
 
+export interface APIKeyRequest {
+  apiProductName: string,
+  namespace: string,
+  planTier: PlanTier,
+  useCase: string,
+  userEmail: string
+}
+
 export interface Plan {
   tier: string;
   description?: string;
@@ -128,6 +136,7 @@ export interface APIProductSpec {
     group: string;
     kind: string;
     name: string;
+    namespace: string;
   };
   approvalMode: 'automatic' | 'manual';
   publishStatus: 'Draft' | 'Published';
@@ -217,4 +226,8 @@ export interface PlanPolicy {
   status?: {
     conditions?: StatusCondition[];
   };
+}
+
+export interface ExtractedSecret {
+  apiKey: string;
 }

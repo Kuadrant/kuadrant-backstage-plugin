@@ -22,6 +22,8 @@ import {
 } from '@backstage/integration-react';
 import { UserSettingsStorage } from '@backstage/plugin-user-settings';
 
+import { kuadrantApiFactory } from '@kuadrant/kuadrant-backstage-plugin-frontend';
+
 import {
   auth0AuthApiRef,
   oidcAuthApiRef,
