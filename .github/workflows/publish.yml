@@ -66,32 +66,77 @@ jobs:
       - name: Build packages
         run: yarn build
 
-      - name: Export dynamic plugins
-        run: |
-          cd plugins/kuadrant
-          yarn export-dynamic
-
-          cd ../kuadrant-backend
-          yarn export-dynamic
-
       - name: Update versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
+          # Frontend
           cd plugins/kuadrant
           npm pkg set version=$VERSION
 
+          # Backend
           cd ../kuadrant-backend
           npm pkg set version=$VERSION
 
-      - name: Publish frontend
+          # Backend catalog module
+          cd ../kuadrant-backend-module-catalog
+          npm pkg set version=$VERSION
+
+          # Backend RBAC module
+          cd ../kuadrant-backend-module-rbac
+          npm pkg set version=$VERSION
+
+      - name: Export dynamic plugins
+        run: |
+          # Frontend plugin (uses dist-scalprum)
+          cd plugins/kuadrant
+          yarn export-dynamic
+
+          # Backend plugin
+          cd ../kuadrant-backend
+          yarn export-dynamic
+
+          # Backend catalog module
+          cd ../kuadrant-backend-module-catalog
+          yarn export-dynamic
+
+          # Backend RBAC module
+          cd ../kuadrant-backend-module-rbac
+          yarn export-dynamic
+
+      - name: Publish frontend (static/dynamic)
         run: |
           cd plugins/kuadrant
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
 
-      - name: Publish backend
+      - name: Publish backend (static)
         run: |
           cd plugins/kuadrant-backend
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend-module-catalog (static)
+        run: |
+          cd plugins/kuadrant-backend-module-catalog
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend-module-rbac (static)
+        run: |
+          cd plugins/kuadrant-backend-module-rbac
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend (dynamic)
+        run: |
+          cd plugins/kuadrant-backend/dist-dynamic
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend-module-catalog (dynamic)
+        run: |
+          cd plugins/kuadrant-backend-module-catalog/dist-dynamic
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend-module-rbac (dynamic)
+        run: |
+          cd plugins/kuadrant-backend-module-rbac/dist-dynamic
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
 
       - name: Summary
@@ -104,5 +149,13 @@ jobs:
           echo "**Version:** $VERSION" >> $GITHUB_STEP_SUMMARY
           echo "**Tag:** $TAG" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Static Plugins" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-frontend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend)" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-backend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-module-catalog@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-module-catalog)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-module-rbac@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-module-rbac)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Dynamic Plugins (RHDH)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-dynamic@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-dynamic)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-module-catalog-dynamic@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-module-catalog-dynamic)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-module-rbac-dynamic@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-module-rbac-dynamic)" >> $GITHUB_STEP_SUMMARY
