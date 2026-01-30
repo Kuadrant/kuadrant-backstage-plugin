@@ -96,6 +96,8 @@ export const apis: AnyApiFactory[] = [
     factory: ({ discoveryApi, configApi, identityApi }) =>
       new LearningPathApiClient({ discoveryApi, configApi, identityApi }),
   }),
+  // Kuadrant API
+  kuadrantApiFactory,
   // OIDC
   createApiFactory({
     api: oidcAuthApiRef,
