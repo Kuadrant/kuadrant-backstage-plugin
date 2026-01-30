@@ -1,7 +1,7 @@
 import { ApiEntity } from '@backstage/catalog-model';
 import { EntityProvider, EntityProviderConnection } from '@backstage/plugin-catalog-node';
 import { RootConfigService } from '@backstage/backend-plugin-api';
-import { KuadrantK8sClient } from '../k8s-client';
+import { CatalogK8sClient } from '../k8s-client';
 
 interface APIProduct {
   apiVersion: string;
@@ -56,13 +56,13 @@ interface APIProduct {
 }
 
 export class APIProductEntityProvider implements EntityProvider {
-  private readonly k8sClient: KuadrantK8sClient;
+  private readonly k8sClient: CatalogK8sClient;
   private connection?: EntityProviderConnection;
   private readonly providerId = 'kuadrant-apiproduct-provider';
 
   constructor(config: RootConfigService) {
     console.log('apiproduct provider: constructor called');
-    this.k8sClient = new KuadrantK8sClient(config);
+    this.k8sClient = new CatalogK8sClient(config);
   }
 
   getProviderName(): string {

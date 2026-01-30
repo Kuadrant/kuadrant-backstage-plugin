@@ -9,7 +9,7 @@ import { APIProductEntityProvider } from './providers/APIProductEntityProvider';
 let apiProductProviderInstance: APIProductEntityProvider | null = null;
 
 /**
- * get the apiproduct entity provider instance
+ * Get the APIProduct entity provider instance.
  * @public
  */
 export function getAPIProductEntityProvider(): APIProductEntityProvider | null {
@@ -17,7 +17,10 @@ export function getAPIProductEntityProvider(): APIProductEntityProvider | null {
 }
 
 /**
- * backend module for apiproduct entity provider
+ * Backend module for APIProduct entity provider.
+ * This module registers an entity provider that syncs APIProduct CRDs from Kubernetes
+ * to the Backstage catalog as API entities.
+ *
  * @public
  */
 export const catalogModuleApiProductEntityProvider = createBackendModule({
@@ -43,3 +46,5 @@ export const catalogModuleApiProductEntityProvider = createBackendModule({
 
 export default catalogModuleApiProductEntityProvider;
 
+// Re-export the provider class for direct use if needed
+export { APIProductEntityProvider } from './providers/APIProductEntityProvider';

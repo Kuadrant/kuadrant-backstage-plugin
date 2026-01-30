@@ -8,7 +8,6 @@ import Router from 'express-promise-router';
 import cors from 'cors';
 import { randomBytes } from 'crypto';
 import { KuadrantK8sClient } from './k8s-client';
-import { getAPIProductEntityProvider } from './module';
 import {
   kuadrantPermissions,
   kuadrantPlanPolicyListPermission,
@@ -228,12 +227,6 @@ export async function createRouter({
         apiProduct,
       );
 
-      // trigger immediate catalog sync
-      const provider = getAPIProductEntityProvider();
-      if (provider) {
-        await provider.refresh();
-      }
-
       res.status(201).json(created);
     } catch (error) {
       console.error('error creating apiproduct:', error);
@@ -331,12 +324,6 @@ export async function createRouter({
         'apiproducts',
         name
       );
-
-      // trigger immediate catalog sync
-      const provider = getAPIProductEntityProvider();
-      if (provider) {
-        await provider.refresh();
-      }
 
       res.status(204).send();
     } catch (error) {
@@ -452,12 +439,6 @@ export async function createRouter({
         name,
         parsed.data,
       );
-
-      // trigger immediate catalog sync
-      const provider = getAPIProductEntityProvider();
-      if (provider) {
-        await provider.refresh();
-      }
 
       return res.json(updated);
     } catch (error) {

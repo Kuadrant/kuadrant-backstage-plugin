@@ -2,8 +2,8 @@ import { createBackendModule } from '@backstage/backend-plugin-api';
 import { pluginIdProviderExtensionPoint } from '@backstage-community/plugin-rbac-node';
 
 /**
- * backend module that registers kuadrant plugin id with rbac
- * this makes kuadrant permissions discoverable in the rbac ui
+ * Backend module that registers kuadrant plugin id with RBAC.
+ * This makes kuadrant permissions discoverable in the RBAC UI.
  *
  * @public
  */

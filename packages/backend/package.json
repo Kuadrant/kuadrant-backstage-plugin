@@ -70,6 +70,8 @@
     "@internal/plugin-scalprum-backend": "*",
     "@janus-idp/backstage-plugin-audit-log-node": "1.7.2",
     "@kuadrant/kuadrant-backstage-plugin-backend": "workspace:^",
+    "@kuadrant/kuadrant-backstage-plugin-backend-module-catalog": "workspace:^",
+    "@kuadrant/kuadrant-backstage-plugin-backend-module-rbac": "workspace:^",
     "@opentelemetry/api": "1.9.0",
     "@opentelemetry/auto-instrumentations-node": "0.58.1",
     "@opentelemetry/exporter-prometheus": "0.57.2",
