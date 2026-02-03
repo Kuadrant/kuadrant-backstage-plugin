@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import { useParams } from "react-router-dom";
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { useAsync } from "react-use";
 import {
   Header,
@@ -104,10 +103,8 @@ const CodeExample = ({
 export const ApiKeyDetailPage = () => {
   const classes = useStyles();
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [showApiKey, setShowApiKey] = useState(false);
@@ -121,15 +118,10 @@ export const ApiKeyDetailPage = () => {
     loading,
     error,
   } = useAsync(async () => {
-    const [apiKeyResponse, productsResponse] = await Promise.all([
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apikeys/${namespace}/${name}`),
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`),
+    const [apiKeyData, productsData] = await Promise.all([
+      kuadrantApi.getApiKey(namespace!, name!),
+      kuadrantApi.getApiProducts(),
     ]);
-
-    if (!apiKeyResponse.ok) {
-      throw new Error("Failed to fetch API key");
-    }
-    const apiKeyData = await apiKeyResponse.json();
 
     // check if key has already been read
     if (apiKeyData.status?.canReadSecret === false) {
@@ -137,18 +129,14 @@ export const ApiKeyDetailPage = () => {
     }
 
     // find matching api product to get contact info
-    let apiProduct: APIProduct | undefined;
-    if (productsResponse.ok) {
-      const productsData = await productsResponse.json();
-      apiProduct = (productsData.items || []).find(
-        (p: APIProduct) =>
-          p.metadata.name === apiKeyData.spec.apiProductRef?.name &&
-          p.metadata.namespace === apiKeyData.metadata.namespace,
-      );
-    }
+    const apiProduct = (productsData.items || []).find(
+      (p: APIProduct) =>
+        p.metadata.name === apiKeyData.spec.apiProductRef?.name &&
+        p.metadata.namespace === apiKeyData.metadata.namespace,
+    );
 
     return { apiKey: apiKeyData as APIKey, apiProduct };
-  }, [namespace, name, backendUrl, fetchApi]);
+  }, [namespace, name, kuadrantApi]);
 
   const apiKey = data?.apiKey;
   const apiProduct = data?.apiProduct;
@@ -156,15 +144,14 @@ export const ApiKeyDetailPage = () => {
   const fetchApiKeySecret = async () => {
     setApiKeyLoading(true);
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apikeys/${namespace}/${name}/secret`,
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setApiKeyValue(data.apiKey);
-        setAlreadyRead(true);
-        setShowApiKey(true);
-      } else if (response.status === 403) {
+      const extractedSecret = await kuadrantApi.getApiKeySecret(namespace!, name!);
+      setApiKeyValue(extractedSecret.apiKey);
+      setAlreadyRead(true);
+      setShowApiKey(true);
+    } catch (err) {
+      console.error("Failed to fetch API key:", err);
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
+      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
         setAlreadyRead(true);
         alertApi.post({
           message:
@@ -172,15 +159,13 @@ export const ApiKeyDetailPage = () => {
           severity: "warning",
           display: "transient",
         });
+      } else {
+        alertApi.post({
+          message: `Failed to fetch APIKey. ${errorMessage}`,
+          severity: 'error',
+          display: 'transient',
+        });
       }
-    } catch (err) {
-      console.error("Failed to fetch API key:", err);
-      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
-      alertApi.post({
-        message: `Failed to fetch APIKey. ${errorMessage}`,
-        severity: 'error',
-        display: 'transient',
-      });
     } finally {
       setApiKeyLoading(false);
     }
