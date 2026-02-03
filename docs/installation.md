@@ -1,61 +1,23 @@
 # Kuadrant Plugin Installation Guide
 
-This guide covers installing the Kuadrant plugins into an existing Red Hat Developer Hub (RHDH) or Backstage instance.
+This guide covers installing the Kuadrant plugins:
+
+1. **[Red Hat Developer Hub (RHDH)](#red-hat-developer-hub-rhdh)** - Dynamic plugin installation
+2. **[Standard Backstage](#standard-backstage)** - Static plugin installation
 
 **For plugin development**, see the [main README](../README.md).
 
 ## Prerequisites
 
-- Red Hat Developer Hub 1.4+ or Backstage 1.30+
-- Kubernetes cluster with:
-  - [Kuadrant operator](https://docs.kuadrant.io/latest/getting-started/) installed
-  - Gateway API CRDs
-  - APIProduct and APIKey CRDs (from this repo's `kuadrant-dev-setup/crds/`)
-- Existing RHDH deployment with:
-  - Backstage CR configured
-  - ConfigMap for dynamic plugins
+### Kubernetes Cluster
 
-For RHDH setup, see the [official documentation](https://docs.redhat.com/en/documentation/red_hat_developer_hub/).
+You need a Kubernetes cluster with:
 
-## Packages
+- [Kuadrant operator](https://docs.kuadrant.io/latest/getting-started/) installed
+- Gateway API CRDs
+- APIProduct and APIKey CRDs (from this repo's `kuadrant-dev-setup/crds/`)
 
-| Plugin | Package | Type |
-|--------|---------|------|
-| Frontend | [@kuadrant/kuadrant-backstage-plugin-frontend](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend) | Frontend |
-| Backend | [@kuadrant/kuadrant-backstage-plugin-backend](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend) | Backend |
-
-## Installation
-
-### 1. Add Dynamic Plugins
-
-Add the plugins to your RHDH dynamic plugins ConfigMap:
-
-```yaml
-# dynamic-plugins.yaml
-plugins:
-  - package: '@kuadrant/kuadrant-backstage-plugin-frontend'
-    disabled: false
-  - package: '@kuadrant/kuadrant-backstage-plugin-backend'
-    disabled: false
-```
-
-### 2. Configure Kubernetes Access
-
-The backend plugin needs access to Kubernetes to manage APIProducts and APIKeys.
-
-Add to your `app-config.yaml`:
-
-```yaml
-kubernetes:
-  clusterLocatorMethods:
-    - type: config
-      clusters:
-        - name: production
-          url: ${K8S_URL}
-          authProvider: serviceAccount
-          serviceAccountToken: ${K8S_CLUSTER_TOKEN}
-          skipTLSVerify: false
-```
+### Service Account
 
 Create a service account with the required permissions:
 
@@ -74,12 +36,18 @@ rules:
   - apiGroups: ["devportal.kuadrant.io"]
     resources: ["apiproducts", "apikeys"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["kuadrant.io"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources: ["apiproducts/status", "apikeys/status"]
+    verbs: ["patch", "update"]
+  - apiGroups: ["extensions.kuadrant.io"]
     resources: ["planpolicies"]
     verbs: ["get", "list", "watch"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources: ["httproutes"]
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "create", "delete"]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -95,176 +63,251 @@ subjects:
     namespace: rhdh
 ```
 
-Generate a token:
+Generate a long-lived token:
 
 ```bash
 kubectl create token rhdh-kuadrant -n rhdh --duration=8760h
 ```
 
-### 3. Configure Frontend Plugin
+### App Configuration
 
-Add to `app-config.yaml`:
-
-```yaml
-dynamicPlugins:
-  frontend:
-    internal.plugin-kuadrant:
-      appIcons:
-        - name: kuadrant
-          importName: ExtensionIcon
-
-      dynamicRoutes:
-        - path: /kuadrant
-          importName: KuadrantPage
-          menuItem:
-            icon: kuadrant
-            text: Kuadrant
-
-      mountPoints:
-        - mountPoint: entity.page.api-keys/cards
-          importName: EntityKuadrantApiKeysContent
-          config:
-            layout:
-              gridColumn: "1 / -1"
-            if:
-              allOf:
-                - isKind: api
-
-        - mountPoint: entity.page.overview/cards
-          importName: EntityKuadrantApiAccessCard
-          config:
-            layout:
-              gridColumnEnd: "span 6"
-            if:
-              allOf:
-                - isKind: api
-                - hasAnnotation: kuadrant.io/httproute
-
-        - mountPoint: entity.page.api-product-info/cards
-          importName: EntityKuadrantApiProductInfoContent
-          config:
-            layout:
-              gridColumn: "1 / -1"
-            if:
-              allOf:
-                - isKind: API
-                - hasLabel: kuadrant.io/synced
-```
-
-### 4. Configure Catalog
-
-Allow APIProduct entities in the catalog:
+Add to your `app-config.yaml`:
 
 ```yaml
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: production
+          url: https://<cluster-url>:<port>
+          authProvider: serviceAccount
+          serviceAccountToken: <your-token>
+          skipTLSVerify: true  # For local kind clusters
+
 catalog:
   rules:
-    - allow: [Component, System, API, APIProduct, Group, User, Resource, Location, Template]
+    - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource]
 ```
 
-### 5. Configure RBAC (Optional)
+**Cluster URL:**
+- **RHDH (runs in Docker):** `https://host.docker.internal:<port>`
+- **Standard Backstage (runs on host):** `https://127.0.0.1:<port>` or your cluster URL
 
-Enable RBAC with Kuadrant permissions:
+---
+
+## Packages
+
+The Kuadrant plugin is split into four npm packages:
+
+| Package | Description |
+|---------|-------------|
+| `@kuadrant/kuadrant-backstage-plugin-frontend` | UI components, pages, and entity cards |
+| `@kuadrant/kuadrant-backstage-plugin-backend` | HTTP router serving `/api/kuadrant` endpoints |
+| `@kuadrant/kuadrant-backstage-plugin-backend-module-catalog` | Catalog entity provider for APIProduct sync |
+| `@kuadrant/kuadrant-backstage-plugin-backend-module-rbac` | RBAC integration (optional) |
+
+**Note on RBAC:** The RBAC module requires `@backstage-community/plugin-rbac-backend`. RHDH includes this by default. Standard Backstage uses `allow-all-policy` instead, so you must either skip the RBAC module or install the RBAC backend first.
+
+---
+
+## RHDH vs Standard Backstage
+
+| Feature | RHDH | Standard Backstage |
+|---------|------|-------------------|
+| Plugin loading | Dynamic via YAML config | Static via `backend.add()` in code |
+| Sidebar menu | Auto-configured via `dynamicRoutes` | Manual edit of `Root.tsx` |
+| Route registration | Declarative in YAML | Explicit in `App.tsx` |
+| RBAC backend | Built-in | Must install separately |
+
+---
+
+## Red Hat Developer Hub (RHDH)
+
+RHDH supports dynamic plugin loading without modifying source code. This example uses [RHDH-Local](https://github.com/redhat-developer/rhdh-local).
+
+### 1. Configure Dynamic Plugins
+
+Add to `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
+
+```yaml
+plugins:
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic"
+    disabled: false
+
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-module-catalog-dynamic"
+    disabled: false
+
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-module-rbac-dynamic"
+    disabled: false
+
+  - package: "@kuadrant/kuadrant-backstage-plugin-frontend"
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          internal.plugin-kuadrant:
+            appIcons:
+              - name: kuadrantIcon
+                importName: KuadrantIcon
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: Kuadrant
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+            mountPoints:
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiKeyManagementTab
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiProductInfoContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+```
+
+**Important:** The `pluginConfig` block must be on the **frontend** plugin entry. The key `internal.plugin-kuadrant` must match `scalprum.name` in the plugin's `package.json`.
+
+### 2. Configure App
+
+Add to `configs/app-config/app-config.local.yaml` the Kubernetes and catalog configuration from [App Configuration](#app-configuration) above.
+
+### 3. Configure RBAC (Optional)
+
+See [RBAC Permissions](rbac-permissions.md) for the complete policy configuration.
 
 ```yaml
 permission:
   enabled: true
   rbac:
-    policies-csv-file: ./rbac-policy.csv
+    policies-csv-file: /opt/app-root/src/configs/rbac-policy.csv
     policyFileReload: true
 ```
 
-Example `rbac-policy.csv`:
+### 4. Start RHDH
 
-```csv
-# api consumer: browses apis, requests access
-p, role:default/api-consumer, kuadrant.apiproduct.read.all, read, allow
-p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
-p, role:default/api-consumer, kuadrant.apikey.create, create, allow, apiproduct:*/*
-p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
-p, role:default/api-consumer, kuadrant.apikey.update.own, update, allow
-p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
-p, role:default/api-consumer, catalog.entity.read, read, allow
-
-# api owner: publishes apis they own, approves requests for their apis
-p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
-p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
-p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
-p, role:default/api-owner, kuadrant.apiproduct.read.all, read, allow
-p, role:default/api-owner, kuadrant.apiproduct.update.own, update, allow
-p, role:default/api-owner, kuadrant.apiproduct.delete.own, delete, allow
-p, role:default/api-owner, kuadrant.apiproduct.list, read, allow
-p, role:default/api-owner, kuadrant.apikey.create, create, allow, apiproduct:*/*
-p, role:default/api-owner, kuadrant.apikey.read.own, read, allow
-p, role:default/api-owner, kuadrant.apikey.update.own, update, allow
-p, role:default/api-owner, kuadrant.apikey.delete.own, delete, allow
-p, role:default/api-owner, kuadrant.apikey.approve, update, allow
-p, role:default/api-owner, catalog.entity.read, read, allow
-
-# api admin: platform engineers who manage all api products
-p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
-p, role:default/api-admin, kuadrant.planpolicy.list, read, allow
-p, role:default/api-admin, kuadrant.apiproduct.create, create, allow
-p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
-p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
-p, role:default/api-admin, kuadrant.apiproduct.delete.all, delete, allow
-p, role:default/api-admin, kuadrant.apiproduct.list, read, allow
-p, role:default/api-admin, kuadrant.apikey.create, create, allow, apiproduct:*/*
-p, role:default/api-admin, kuadrant.apikey.read.all, read, allow
-p, role:default/api-admin, kuadrant.apikey.update.all, update, allow
-p, role:default/api-admin, kuadrant.apikey.delete.all, delete, allow
-p, role:default/api-admin, kuadrant.apikey.approve, update, allow
-p, role:default/api-admin, catalog.entity.read, read, allow
-
-# assign groups to roles
-g, group:default/api-consumers, role:default/api-consumer
-g, group:default/api-owners, role:default/api-owner
-g, group:default/api-admins, role:default/api-admin
+```bash
+docker compose up
 ```
 
-## Exposed Modules
+---
 
-### Frontend
+## Standard Backstage
 
-| Import Name | Description |
-|-------------|-------------|
-| `KuadrantPage` | Main page with API products and approval queue |
-| `EntityKuadrantApiAccessCard` | API key request card for entity overview |
-| `EntityKuadrantApiKeyManagementTab` | Full API keys management tab |
-| `EntityKuadrantApiKeysContent` | API keys content component |
-| `EntityKuadrantApiProductInfoContent` | APIProduct details tab |
+For standard Backstage, plugins are installed statically by adding them to your code.
 
-### Backend
+### 1. Install Dependencies
 
-| Export Path | Description |
-|-------------|-------------|
-| Default | Main backend plugin with HTTP router |
-| `/alpha` | Catalog entity provider for APIProduct sync |
-| `/rbac` | RBAC module for permission integration |
+```bash
+# Backend
+cd packages/backend
+yarn add @kuadrant/kuadrant-backstage-plugin-backend
+yarn add @kuadrant/kuadrant-backstage-plugin-backend-module-catalog
+
+# Frontend
+cd ../app
+yarn add @kuadrant/kuadrant-backstage-plugin-frontend
+```
+
+### 2. Register Backend Plugins
+
+Edit `packages/backend/src/index.ts`:
+
+```typescript
+backend.add(import('@kuadrant/kuadrant-backstage-plugin-backend'));
+backend.add(import('@kuadrant/kuadrant-backstage-plugin-backend-module-catalog'));
+```
+
+### 3. Add Frontend Route and Sidebar
+
+Edit `packages/app/src/App.tsx`:
+
+```typescript
+import { KuadrantPage } from '@kuadrant/kuadrant-backstage-plugin-frontend';
+
+// In FlatRoutes:
+<Route path="/kuadrant" element={<KuadrantPage />} />
+```
+
+Edit `packages/app/src/components/Root/Root.tsx`:
+
+```typescript
+import SecurityIcon from '@material-ui/icons/Security';
+
+// In SidebarGroup:
+<SidebarItem icon={SecurityIcon} to="kuadrant" text="Kuadrant" />
+```
+
+### 4. Entity Page Integration (Optional)
+
+Edit `packages/app/src/components/catalog/EntityPage.tsx`:
+
+```typescript
+import { EntityKuadrantApiKeyManagementTab } from '@kuadrant/kuadrant-backstage-plugin-frontend';
+
+// Add to apiPage:
+<EntityLayout.Route path="/kuadrant" title="Kuadrant">
+  <EntityKuadrantApiKeyManagementTab />
+</EntityLayout.Route>
+```
+
+### 5. Configure App
+
+Add the Kubernetes and catalog configuration from [App Configuration](#app-configuration) to your `app-config.yaml`.
+
+### Adding RBAC Support (Optional)
+
+To enable RBAC in standard Backstage, first install the RBAC backend:
+
+```bash
+cd packages/backend
+yarn add @backstage-community/plugin-rbac-backend
+yarn add @kuadrant/kuadrant-backstage-plugin-backend-module-rbac
+```
+
+Edit `packages/backend/src/index.ts`:
+
+```typescript
+// Remove: backend.add(import('@backstage/plugin-permission-backend-module-allow-all-policy'));
+
+// Add RBAC backend first:
+backend.add(import('@backstage-community/plugin-rbac-backend'));
+
+// Then Kuadrant plugins:
+backend.add(import('@kuadrant/kuadrant-backstage-plugin-backend'));
+backend.add(import('@kuadrant/kuadrant-backstage-plugin-backend-module-catalog'));
+backend.add(import('@kuadrant/kuadrant-backstage-plugin-backend-module-rbac'));
+```
+
+---
 
 ## Verification
 
 After installation:
 
-1. Navigate to `/kuadrant` in RHDH - you should see the main Kuadrant page
+1. Navigate to `/kuadrant` - the main Kuadrant page should load
 2. Check the catalog for APIProduct entities synced from Kubernetes
-3. Navigate to an API entity and verify the "API Keys" tab appears
+3. Navigate to an API entity and verify the Kuadrant tabs appear
 
-## Troubleshooting
-
-### APIProduct entities not appearing
-
-1. Check backend logs for entity provider sync messages
-2. Verify Kubernetes connectivity
-3. Ensure APIProduct CRDs exist in your cluster
-4. Check catalog rules allow APIProduct kind
-
-### API key requests failing
-
-1. Verify Kubernetes write permissions for the service account
-2. Check backend logs for detailed error messages
-3. Ensure the target namespace exists and is accessible
+---
 
 ## Related Documentation
 
-- [RBAC Permissions](rbac-permissions.md) - Detailed permissions guide
+- [RBAC Permissions](rbac-permissions.md) - Role definitions and policy configuration
+- [Kuadrant Resources](kuadrant-resources.md) - CRDs and namespace organisation
 - [Kuadrant Docs](https://docs.kuadrant.io/) - Kuadrant documentation
+- [RHDH-Local](https://github.com/redhat-developer/rhdh-local) - Local RHDH development environment
