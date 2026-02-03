@@ -27,11 +27,10 @@ import {
 } from "@material-ui/core";
 import {
   useApi,
-  configApiRef,
   identityApiRef,
-  fetchApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { useEntity } from "@backstage/plugin-catalog-react";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
@@ -41,7 +40,7 @@ import AddIcon from "@material-ui/icons/Add";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
 import WarningIcon from "@material-ui/icons/Warning";
-import { APIKey } from "../../types/api-management";
+import {APIKey, APIProduct, PlanPolicyPlan} from "../../types/api-management";
 import {
   kuadrantApiKeyCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
@@ -56,36 +55,6 @@ import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
 import { RequestAccessDialog } from "../RequestAccessDialog";
-import {handleFetchError} from "../../utils/errors.ts";
-
-interface APIProduct {
-  metadata: {
-    name: string;
-    namespace: string;
-  };
-  spec: {
-    displayName?: string;
-  };
-  status?: {
-    discoveredPlans?: Array<{
-      tier: string;
-      description?: string;
-      limits?: any;
-    }>;
-    conditions?: Array<{
-      type: string;
-      status: "True" | "False" | "Unknown";
-      reason?: string;
-      message?: string;
-      lastTransitionTime?: string;
-    }>;
-  };
-}
-
-interface Plan {
-  tier: string;
-  limits: any;
-}
 
 export interface ApiKeyManagementTabProps {
   namespace?: string;
@@ -95,11 +64,9 @@ export const ApiKeyManagementTab = ({
   namespace: propNamespace,
 }: ApiKeyManagementTabProps) => {
   const { entity } = useEntity();
-  const config = useApi(configApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const identityApi = useApi(identityApiRef);
-  const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [refresh, setRefresh] = useState(0);
   const [userId, setUserId] = useState<string>("");
@@ -154,35 +121,21 @@ export const ApiKeyManagementTab = ({
     loading: requestsLoading,
     error: requestsError,
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests/my?namespace=${namespace}`,
-    );
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch requests. ${error}`);
-    }
-    const data = await response.json();
+    const data = await kuadrantApi.getRequestsByNamespace(namespace);
     // filter by apiproduct name, not httproute name
     return (data.items || []).filter(
       (r: APIKey) =>
         r.spec.apiProductRef.name === apiProductName &&
         r.metadata.namespace === namespace, // APIProducts and APIKeys (and its Secret) will be in the same NS
     );
-  }, [apiProductName, namespace, refresh, fetchApi, backendUrl]);
+  }, [apiProductName, namespace, refresh, kuadrantApi]);
 
   const {
     value: apiProduct,
     loading: plansLoading,
     error: plansError,
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apiproducts`,
-    );
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch api products. ${error}`);
-    }
-    const data = await response.json();
+    const data = await kuadrantApi.getApiProducts();
 
     const product = data.items?.find(
       (p: APIProduct) =>
@@ -191,7 +144,7 @@ export const ApiKeyManagementTab = ({
     );
 
     return product;
-  }, [namespace, apiProductName, fetchApi]);
+  }, [namespace, apiProductName, kuadrantApi]);
 
   // check permissions with resource reference once we have the apiproduct
   const resourceRef = apiProduct
@@ -227,14 +180,7 @@ export const ApiKeyManagementTab = ({
     setOptimisticallyDeleted((prev) => new Set(prev).add(name));
     setDeleting(name);
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${namespace}/${name}`,
-        { method: "DELETE" },
-      );
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(error);
-      }
+      await kuadrantApi.deleteRequest(namespace, name);
       alertApi.post({
         message: "API key deleted successfully",
         severity: "success",
@@ -271,15 +217,14 @@ export const ApiKeyManagementTab = ({
 
     setApiKeyLoading((prev) => new Set(prev).add(key));
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apikeys/${requestNamespace}/${requestName}/secret`,
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setApiKeyValues((prev) => new Map(prev).set(key, data.apiKey));
-        // after successful read, mark as already read (show-once behaviour)
-        setAlreadyReadKeys((prev) => new Set(prev).add(key));
-      } else if (response.status === 403) {
+      const data = await kuadrantApi.getApiKeySecret(requestNamespace, requestName);
+      setApiKeyValues((prev) => new Map(prev).set(key, data.apiKey));
+      // after successful read, mark as already read (show-once behaviour)
+      setAlreadyReadKeys((prev) => new Set(prev).add(key));
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
+      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
         // secret has already been read
         setAlreadyReadKeys((prev) => new Set(prev).add(key));
         alertApi.post({
@@ -288,15 +233,13 @@ export const ApiKeyManagementTab = ({
           severity: "warning",
           display: "transient",
         });
+      } else {
+        alertApi.post({
+          message: `Failed to fetch api key: ${errorMessage}`,
+          severity: "error",
+          display: "transient",
+        });
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "unknown error occurred";
-      alertApi.post({
-        message: `Failed to fetch api key: ${errorMessage}`,
-        severity: "error",
-        display: "transient",
-      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -553,7 +496,7 @@ export const ApiKeyManagementTab = ({
   const myRequests = ((requests || []) as APIKey[]).filter(
     (r) => !optimisticallyDeleted.has(r.metadata.name),
   );
-  const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
+  const plans = (apiProduct?.status?.discoveredPlans || []) as PlanPolicyPlan[];
 
   const pendingRequests = myRequests.filter(
     (r) => !r.status?.phase || r.status.phase === "Pending",

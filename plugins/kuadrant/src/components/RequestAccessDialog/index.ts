@@ -1,2 +1,2 @@
 export { RequestAccessDialog } from './RequestAccessDialog';
-export type { RequestAccessDialogProps, Plan } from './RequestAccessDialog';
+export type { RequestAccessDialogProps } from './RequestAccessDialog';

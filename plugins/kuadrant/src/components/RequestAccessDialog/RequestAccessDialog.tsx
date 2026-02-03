@@ -17,16 +17,10 @@ import {
 import InfoIcon from '@material-ui/icons/Info';
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   alertApiRef,
 } from '@backstage/core-plugin-api';
-import {handleFetchError} from "../../utils/errors.ts";
-
-export interface Plan {
-  tier: string;
-  limits?: Record<string, number>;
-}
+import { kuadrantApiRef } from '../../api';
+import {PlanPolicyPlan} from "../../types/api-management.ts";
 
 export interface RequestAccessDialogProps {
   open: boolean;
@@ -35,7 +29,7 @@ export interface RequestAccessDialogProps {
   apiProductName: string;
   namespace: string;
   userEmail: string;
-  plans: Plan[];
+  plans: PlanPolicyPlan[];
 }
 
 export const RequestAccessDialog = ({
@@ -47,10 +41,8 @@ export const RequestAccessDialog = ({
   userEmail,
   plans,
 }: RequestAccessDialogProps) => {
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
 
   const [selectedPlan, setSelectedPlan] = useState('');
   const [useCase, setUseCase] = useState('');
@@ -70,27 +62,13 @@ export const RequestAccessDialog = ({
     setCreating(true);
     setCreateError(null);
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            apiProductName,
-            namespace,
-            planTier: selectedPlan,
-            useCase: useCase.trim() || '',
-            userEmail,
-          }),
-        },
-      );
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(`failed to create request: ${response.status}. ${err}`);
-      }
+      await kuadrantApi.createRequest({
+        apiProductName,
+        namespace,
+        planTier: selectedPlan,
+        useCase: useCase.trim() || '',
+        userEmail,
+      });
 
       alertApi.post({
         message: 'API key requested successfully',
@@ -163,7 +141,7 @@ export const RequestAccessDialog = ({
             onChange={(e) => setSelectedPlan(e.target.value as string)}
             disabled={creating}
           >
-            {plans.map((plan: Plan) => {
+            {plans.map((plan: PlanPolicyPlan) => {
               const limitDesc = Object.entries(plan.limits || {})
                 .map(([key, val]) => `${val} per ${key}`)
                 .join(', ');
