@@ -4314,6 +4314,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@backstage-community/plugin-rbac-node@npm:^1.5.1":
+  version: 1.16.0
+  resolution: "@backstage-community/plugin-rbac-node@npm:1.16.0"
+  dependencies:
+    "@backstage/backend-plugin-api": ^1.5.0
+  checksum: 5beb6619f62e2d3a6865d45fe6581f886fdf2eeb05e753aaf1db02ac9240e9c81f29197299202795de282cc046452c4b7ea6684713188f96ee87aea45d6878be
+  languageName: node
+  linkType: hard
+
 "@backstage-community/plugin-rbac@npm:^1.45.1":
   version: 1.45.1
   resolution: "@backstage-community/plugin-rbac@npm:1.45.1"
@@ -12706,10 +12715,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@kuadrant/kuadrant-backstage-plugin-backend@workspace:plugins/kuadrant-backend"
   dependencies:
-    "@backstage/backend-defaults": ^0.13.1
+    "@backstage-community/plugin-rbac-node": ^1.5.1
+    "@backstage/backend-defaults": ^0.15.0
     "@backstage/backend-plugin-api": ^1.5.0
     "@backstage/backend-test-utils": ^1.10.1
     "@backstage/catalog-client": ^1.12.1
+    "@backstage/catalog-model": ^1.7.6
     "@backstage/cli": ^0.34.5
     "@backstage/errors": ^1.2.7
     "@backstage/plugin-catalog-node": ^1.20.0
@@ -12727,6 +12738,15 @@ __metadata:
     supertest: ^6.2.4
     typescript: ^5.9.3
     zod: ^3.22.4
+  peerDependencies:
+    "@backstage/backend-defaults": ^0.15.0
+    "@backstage/backend-plugin-api": ^1.5.0
+    "@backstage/catalog-client": ^1.12.1
+    "@backstage/catalog-model": ^1.7.6
+    "@backstage/errors": ^1.2.7
+    "@backstage/plugin-permission-common": ^0.9.2
+    "@backstage/plugin-permission-node": ^0.10.5
+    "@backstage/types": ^1.2.2
   languageName: unknown
   linkType: soft
 

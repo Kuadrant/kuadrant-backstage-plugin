@@ -24,15 +24,11 @@
   "scalprum": {
     "name": "internal.plugin-kuadrant-backend",
     "exposedModules": {
-      "PluginRoot": "./src/index.ts",
-      "KuadrantAlpha": "./src/module.ts",
-      "KuadrantRBAC": "./src/rbac-module.ts"
+      "PluginRoot": "./src/index.ts"
     }
   },
   "exports": {
     ".": "./src/index.ts",
-    "./alpha": "./src/module.ts",
-    "./rbac": "./src/rbac-module.ts",
     "./package.json": "./package.json"
   },
   "scripts": {
@@ -44,24 +40,28 @@
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack",
     "tsc": "tsc",
-    "export-dynamic": "janus-cli package export-dynamic-plugin --in-place",
+    "export-dynamic": "janus-cli package export-dynamic-plugin --in-place --embed-package @backstage-community/plugin-rbac-node",
     "export-dynamic:clean": "run export-dynamic --clean"
   },
   "dependencies": {
-    "@backstage/backend-defaults": "^0.13.1",
-    "@backstage/backend-plugin-api": "^1.5.0",
-    "@backstage/catalog-client": "^1.12.1",
-    "@backstage/errors": "^1.2.7",
+    "@backstage-community/plugin-rbac-node": "^1.5.1",
     "@backstage/plugin-catalog-node": "^1.20.0",
-    "@backstage/plugin-permission-common": "^0.9.2",
-    "@backstage/plugin-permission-node": "^0.10.5",
-    "@backstage/types": "^1.2.2",
     "@kubernetes/client-node": "^0.20.0",
     "@types/cors": "^2.8.19",
     "cors": "^2.8.5",
     "express": "^4.17.1",
     "express-promise-router": "^4.1.0",
     "zod": "^3.22.4"
+  },
+  "peerDependencies": {
+    "@backstage/backend-defaults": "^0.15.0",
+    "@backstage/backend-plugin-api": "^1.5.0",
+    "@backstage/catalog-client": "^1.12.1",
+    "@backstage/catalog-model": "^1.7.6",
+    "@backstage/errors": "^1.2.7",
+    "@backstage/plugin-permission-common": "^0.9.2",
+    "@backstage/plugin-permission-node": "^0.10.5",
+    "@backstage/types": "^1.2.2"
   },
   "bundledDependencies": [
     "@kubernetes/client-node",
@@ -71,8 +71,16 @@
     "zod"
   ],
   "devDependencies": {
+    "@backstage/backend-defaults": "^0.15.0",
+    "@backstage/backend-plugin-api": "^1.5.0",
     "@backstage/backend-test-utils": "^1.10.1",
+    "@backstage/catalog-client": "^1.12.1",
+    "@backstage/catalog-model": "^1.7.6",
     "@backstage/cli": "^0.34.5",
+    "@backstage/errors": "^1.2.7",
+    "@backstage/plugin-permission-common": "^0.9.2",
+    "@backstage/plugin-permission-node": "^0.10.5",
+    "@backstage/types": "^1.2.2",
     "@janus-idp/cli": "^1.13.0",
     "@types/express": "^4.17.6",
     "@types/supertest": "^2.0.12",
@@ -81,8 +89,6 @@
   },
   "files": [
     "dist",
-    "alpha",
-    "rbac",
     "dist-dynamic"
   ]
 }

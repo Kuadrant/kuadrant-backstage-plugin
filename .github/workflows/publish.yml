@@ -66,14 +66,6 @@ jobs:
       - name: Build packages
         run: yarn build
 
-      - name: Export dynamic plugins
-        run: |
-          cd plugins/kuadrant
-          yarn export-dynamic
-
-          cd ../kuadrant-backend
-          yarn export-dynamic
-
       - name: Update versions
         run: |
           VERSION="${{ steps.version.outputs.version }}"
@@ -84,6 +76,14 @@ jobs:
           cd ../kuadrant-backend
           npm pkg set version=$VERSION
 
+      - name: Export dynamic plugins
+        run: |
+          cd plugins/kuadrant
+          yarn export-dynamic
+
+          cd ../kuadrant-backend
+          yarn export-dynamic
+
       - name: Publish frontend
         run: |
           cd plugins/kuadrant
@@ -92,6 +92,7 @@ jobs:
       - name: Publish backend
         run: |
           cd plugins/kuadrant-backend
+          cd dist-dynamic
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
 
       - name: Summary
