@@ -23,12 +23,13 @@ import {
 } from '@material-ui/core';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import AddIcon from '@material-ui/icons/Add';
-import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { useApi } from '@backstage/core-plugin-api';
+import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
-import { handleFetchError } from "../../utils/errors";
+import {APIProduct} from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
 
 const useStyles = makeStyles((theme) => ({
@@ -60,9 +61,7 @@ interface CreateAPIProductDialogProps {
 
 export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIProductDialogProps) => {
   const classes = useStyles();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
+  const kuadrantApi = useApi(kuadrantApiRef);
 
   const [name, setName] = useState('');
   const [displayName, setDisplayName] = useState('');
@@ -90,31 +89,17 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     loading: httpRoutesLoading,
     error: httpRoutesError
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/httproutes`);
-
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch routes. ${error}`);
-    }
-
-    const data = await response.json();
+    const data = await kuadrantApi.getHttpRoutes();
     return data.items || [];
-  }, [backendUrl, fetchApi, open, httpRoutesRetry]);
+  }, [kuadrantApi, open, httpRoutesRetry]);
 
   // load planpolicies with full details to show associated plans
   const {
     value: planPolicies,
     error: planPoliciesError
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/planpolicies`);
-
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch PlanPolicies. ${error}`);
-    }
-
-    return await response.json();
-  }, [backendUrl, fetchApi, open]);
+    return await kuadrantApi.getPlanPolicies();
+  }, [kuadrantApi, open]);
 
   // find planpolicy associated with selected httproute
   const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
@@ -196,6 +181,27 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setTags(tags.filter(tag => tag !== tagToDelete));
   };
 
+  const handleClose = () => {
+    setName('');
+    setDisplayName('');
+    setDescription('');
+    setVersion('v1');
+    setApprovalMode('manual');
+    setPublishStatus('Published');
+    setLifecycle('production');
+    setTags([]);
+    setTagInput('');
+    setSelectedHTTPRoute('');
+    setContactEmail('');
+    setContactTeam('');
+    setDocsURL('');
+    setOpenAPISpec('');
+    setError('');
+    setNameError(null);
+    setOpenAPISpecError(null);
+    onClose();
+  };
+
   const handleCreate = async () => {
     setError('');
     setCreating(true);
@@ -210,7 +216,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       // derive namespace from selected httproute
       const namespace = selectedRouteNamespace;
 
-      const apiProduct = {
+      const apiProduct: APIProduct = {
         apiVersion: 'devportal.kuadrant.io/v1alpha1',
         kind: 'APIProduct',
         metadata: {
@@ -248,19 +254,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
         },
       };
 
-      const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(apiProduct),
-      });
-
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(`failed to create APIProduct. ${error}`);
-      }
-
+      await kuadrantApi.createApiProduct(apiProduct);
       onSuccess({ namespace, name, displayName });
       handleClose();
     } catch (err) {
@@ -268,27 +262,6 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     } finally {
       setCreating(false);
     }
-  };
-
-  const handleClose = () => {
-    setName('');
-    setDisplayName('');
-    setDescription('');
-    setVersion('v1');
-    setApprovalMode('manual');
-    setPublishStatus('Published');
-    setLifecycle('production');
-    setTags([]);
-    setTagInput('');
-    setSelectedHTTPRoute('');
-    setContactEmail('');
-    setContactTeam('');
-    setDocsURL('');
-    setOpenAPISpec('');
-    setError('');
-    setNameError(null);
-    setOpenAPISpecError(null);
-    onClose();
   };
 
   const hasValidationErrors = !!nameError || !!openAPISpecError;
@@ -619,7 +592,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               </Tooltip>
             </Box>
             <PlanPolicyDetails
-              discoveredPlans={selectedPolicy.plans}
+              discoveredPlans={selectedPolicy.spec?.plans}
               alertSeverity="warning"
               alertMessage="No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available."
               includeTopMargin={false}
