@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEntity } from '@backstage/plugin-catalog-react';
-import { useApi, configApiRef, fetchApiRef, identityApiRef } from '@backstage/core-plugin-api';
+import { useApi, identityApiRef } from '@backstage/core-plugin-api';
 import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-components';
 import { Typography, Box, makeStyles } from '@material-ui/core';
 import useAsync from 'react-use/lib/useAsync';
@@ -8,6 +8,7 @@ import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiProductReadAllPermission } from '../../permissions';
 import { ApiProductDetails } from '../ApiProductDetails';
 import { OidcProviderCard } from '../OidcProviderCard';
+import { kuadrantApiRef } from '../../api';
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -22,10 +23,8 @@ const useStyles = makeStyles((theme) => ({
 export const ApiProductInfoCard = () => {
   const classes = useStyles();
   const { entity } = useEntity();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const identityApi = useApi(identityApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
 
   const { allowed: canReadAll, loading: permLoading } = useKuadrantPermission(
     kuadrantApiProductReadAllPermission
@@ -44,17 +43,8 @@ export const ApiProductInfoCard = () => {
       return null;
     }
 
-    const productResponse = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`
-    );
-
-    if (!productResponse.ok) {
-      const errorData = await productResponse.json();
-      throw new Error(errorData.error || `Failed to fetch API product: ${productResponse.status}`);
-    }
-
-    return productResponse.json();
-  }, [backendUrl, fetchApi, namespace, apiProductName]);
+    return kuadrantApi.getApiProduct(namespace, apiProductName);
+  }, [kuadrantApi, namespace, apiProductName]);
 
   // check if user has permission to view this api product
   const owner = apiProduct?.metadata?.annotations?.['backstage.io/owner'];
