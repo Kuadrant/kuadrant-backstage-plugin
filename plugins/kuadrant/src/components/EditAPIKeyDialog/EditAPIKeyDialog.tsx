@@ -14,9 +14,9 @@ import {
   MenuItem,
   CircularProgress,
 } from "@material-ui/core";
-import { useApi, configApiRef, fetchApiRef } from "@backstage/core-plugin-api";
+import { useApi } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { APIKey } from "../../types/api-management";
-import {handleFetchError} from "../../utils/errors.ts";
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -37,9 +37,7 @@ export const EditAPIKeyDialog = ({
   request,
   availablePlans,
 }: EditAPIKeyDialogProps) => {
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
+  const kuadrantApi = useApi(kuadrantApiRef);
 
   const [planTier, setPlanTier] = useState("");
   const [useCase, setUseCase] = useState("");
@@ -71,21 +69,12 @@ export const EditAPIKeyDialog = ({
         },
       };
 
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(patch),
-        },
+      await kuadrantApi.updateRequest(
+        request.metadata.name,
+        request.metadata.namespace,
+        // @ts-ignore Applying a partial obj
+        patch,
       );
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(`Failed to update request: ${response.status}. ${err}`);
-      }
 
       onSuccess();
       onClose();
