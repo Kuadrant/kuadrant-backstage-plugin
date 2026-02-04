@@ -27,11 +27,10 @@ import {
 import useAsync from "react-use/lib/useAsync";
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   alertApiRef,
   identityApiRef,
 } from "@backstage/core-plugin-api";
+import {kuadrantApiRef, KuadrantList} from "../../api";
 import { PermissionGate } from "../PermissionGate";
 import { CreateAPIProductDialog } from "../CreateAPIProductDialog";
 import {
@@ -44,27 +43,11 @@ import {
   kuadrantPlanPolicyListPermission,
 } from "../../permissions";
 import { useKuadrantPermission } from "../../utils/permissions";
-import { handleFetchError } from "../../utils/errors";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
-import emptyStateIllustration from "../../assets/empty-state-illustration.png";
 import { getLifecycleChipStyle } from "../../utils/styles";
-
-type KuadrantResource = {
-  metadata: {
-    name: string;
-    namespace: string;
-    creationTimestamp: string;
-    annotations?: Record<string, string>;
-    labels?: Record<string, string>;
-  };
-  spec?: any;
-  status?: any;
-};
-
-type KuadrantList = {
-  items: KuadrantResource[];
-};
+import emptyStateIllustration from "../../assets/empty-state-illustration.png";
+import {APIProduct, PlanPolicy} from "../../types/api-management.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -108,11 +91,9 @@ const useStyles = makeStyles((theme) => ({
 
 const ResourceList = () => {
   const classes = useStyles();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
   const identityApi = useApi(identityApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
   const [userEntityRef, setUserEntityRef] = useState<string>("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -184,43 +165,29 @@ const ResourceList = () => {
     value: apiProducts,
     loading: apiProductsLoading,
     error: apiProductsError,
-  } = useAsync(async (): Promise<KuadrantList> => {
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apiproducts`,
-    );
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch APIProducts. ${error}`);
-    }
-    return await response.json();
-  }, [backendUrl, fetchApi, refreshTrigger]);
+  } = useAsync(async (): Promise<KuadrantList<APIProduct>> => {
+    return kuadrantApi.getApiProducts();
+  }, [kuadrantApi, refreshTrigger]);
 
   const {
     value: planPolicies,
     loading: planPoliciesLoading,
     error: planPoliciesError,
-  } = useAsync(async (): Promise<KuadrantList> => {
+  } = useAsync(async (): Promise<KuadrantList<PlanPolicy>> => {
     // skip fetch if user doesn't have permission
     if (!canListPlanPolicies) {
       return { items: [] };
     }
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/planpolicies`,
-    );
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch PlanPolicies: ${error}`);
-    }
-    return await response.json();
-  }, [backendUrl, fetchApi, refreshTrigger, canListPlanPolicies]);
+    return kuadrantApi.getPlanPolicies();
+  }, [kuadrantApi, refreshTrigger, canListPlanPolicies]);
 
   // helper to find policy for a given route
-  const getPolicyForProduct = useCallback((product: KuadrantResource): string | null => {
+  const getPolicyForProduct = useCallback((product: APIProduct): string | null => {
     if (!planPolicies?.items) return null;
     const targetRef = product.spec?.targetRef;
     if (!targetRef) return null;
 
-    const policy = planPolicies.items.find((pp: KuadrantResource) => {
+    const policy = planPolicies.items.find((pp: PlanPolicy) => {
       const ref = (pp as any).targetRef;
       return (
         ref?.kind === "HTTPRoute" &&
@@ -232,7 +199,7 @@ const ResourceList = () => {
   }, [planPolicies]);
 
   // helper to get auth schemes for a product
-  const getAuthSchemes = useCallback((product: KuadrantResource): string[] => {
+  const getAuthSchemes = useCallback((product: APIProduct): string[] => {
     const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
     const schemeObjects = Object.values(authSchemes);
     const schemes: string[] = [];
@@ -265,7 +232,7 @@ const ResourceList = () => {
     // API consumers (users without create/update permissions) should only see Published products
     // API owners can see all products (Draft and Published)
     if (!canCreateApiProduct && !canUpdateOwnApiProduct && !canUpdateAllApiProducts) {
-      return products.filter((p: KuadrantResource) => {
+      return products.filter((p: APIProduct) => {
         const publishStatus = p.spec?.publishStatus || 'Draft';
         return publishStatus === 'Published';
       });
@@ -283,7 +250,7 @@ const ResourceList = () => {
     const tagCounts = new Map<string, number>();
     const authCounts = new Map<string, number>();
 
-    allProducts.forEach((p: KuadrantResource) => {
+    allProducts.forEach((p: APIProduct) => {
       const status = p.spec?.publishStatus || "Draft";
       statusCounts[status as keyof typeof statusCounts]++;
 
@@ -387,7 +354,7 @@ const ResourceList = () => {
   }, [allProducts, getPolicyForProduct, getAuthSchemes, canListPlanPolicies]);
 
   const filteredProducts = useMemo(() => {
-    return allProducts.filter((p: KuadrantResource) => {
+    return allProducts.filter((p: APIProduct) => {
       if (filters.status.length > 0) {
         const status = p.spec?.publishStatus || "Draft";
         if (!filters.status.includes(status)) return false;
@@ -455,16 +422,7 @@ const ResourceList = () => {
     setDeleteStats(null);
 
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests?namespace=${namespace}`,
-      );
-
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(error);
-      }
-
-      const data = await response.json();
+      const data = await kuadrantApi.getRequestsByNamespace(namespace);
       const related = (data.items || []).filter(
         (r: any) =>
           r.spec.apiName === name && r.spec.apiNamespace === namespace,
@@ -492,15 +450,10 @@ const ResourceList = () => {
 
     setDeleting(true);
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${apiProductToDelete.namespace}/${apiProductToDelete.name}`,
-        { method: "DELETE" },
+      await kuadrantApi.deleteApiProduct(
+        apiProductToDelete.namespace,
+        apiProductToDelete.name,
       );
-
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(error);
-      }
 
       const deletedName = apiProductToDelete?.name || "API Product";
       setRefreshTrigger((prev) => prev + 1);
@@ -547,22 +500,15 @@ const ResourceList = () => {
       return;
     }
 
-    try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            spec: { publishStatus: newStatus },
-          }),
-        },
-      );
+    const productPatch: Partial<APIProduct> =  {
+      // @ts-ignore partial obj
+      spec: {
+        publishStatus: newStatus
+      },
+    }
 
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(error);
-      }
+    try {
+      await kuadrantApi.updateApiProduct(namespace, name, productPatch);
 
       setRefreshTrigger((prev) => prev + 1);
       alertApi.post({
