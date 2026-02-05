@@ -140,9 +140,16 @@ export async function waitForKuadrantPageReady(page: Page): Promise<void> {
 /**
  * Wait for API Keys page to be ready.
  * Uses toPass for robust polling with networkidle for stability.
+ * @param page - The Playwright Page object
+ * @param urlPattern - Optional URL pattern to wait for (defaults to any api-keys URL)
+ * @param headingPattern - Optional heading text pattern to wait for (defaults to "api keys")
  */
-export async function waitForApiKeysPageReady(page: Page): Promise<void> {
-  await page.waitForURL(/\/kuadrant\/api-keys/, { timeout: TIMEOUTS.VERY_SLOW });
+export async function waitForApiKeysPageReady(
+  page: Page,
+  urlPattern: RegExp = /\/kuadrant\/(my-api-keys|api-key-approval)/,
+  headingPattern: RegExp = /api key/i,
+): Promise<void> {
+  await page.waitForURL(urlPattern, { timeout: TIMEOUTS.VERY_SLOW });
   await page.waitForLoadState("networkidle").catch(() => {});
 
   await expect(async () => {
@@ -150,7 +157,7 @@ export async function waitForApiKeysPageReady(page: Page): Promise<void> {
     const spinner = page.locator('[role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
     // page header is visible (Backstage Header renders as h1)
-    const heading = page.locator("h1").filter({ hasText: /api keys/i });
+    const heading = page.locator("h1").filter({ hasText: headingPattern });
     await expect(heading).toBeVisible();
   }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }

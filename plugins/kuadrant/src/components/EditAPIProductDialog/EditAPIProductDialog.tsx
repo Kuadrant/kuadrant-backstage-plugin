@@ -10,6 +10,7 @@ import {
   Typography,
   Chip,
   Grid,
+  MenuItem,
   CircularProgress,
   makeStyles,
   FormControl,
@@ -28,6 +29,7 @@ import { Progress } from '@backstage/core-components';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateURL } from '../../utils/validation';
 import { handleFetchError } from "../../utils/errors";
+import { Lifecycle } from '../../types/api-management';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -68,6 +70,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
   const [description, setDescription] = useState('');
   const [version, setVersion] = useState('v1');
   const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Draft');
+  const [lifecycle, setLifecycle] = useState<Lifecycle>('production');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
   const [tags, setTags] = useState<string[]>([]);
   const [targetRef, setTargetRef] = useState<any>(null);
@@ -100,6 +103,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setDescription(data.spec.description || '');
           setVersion(data.spec.version || 'v1');
           setPublishStatus(data.spec.publishStatus || 'Draft');
+          setLifecycle(data.metadata.labels?.lifecycle || 'production');
           setApprovalMode(data.spec.approvalMode || 'manual');
           setTags(data.spec.tags || []);
           setTargetRef(data.spec.targetRef || null);
@@ -144,8 +148,20 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     setError('');
     setSaving(true);
 
+    // validate retired APIs cannot be published
+    if (lifecycle === 'retired' && publishStatus === 'Published') {
+      setError('Cannot publish a retired API product. Please set publish status to Draft.');
+      setSaving(false);
+      return;
+    }
+
     try {
       const patch = {
+        metadata: {
+          labels: {
+            lifecycle,
+          },
+        },
         spec: {
           displayName,
           description,
@@ -380,6 +396,48 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                 />
               </>
             )}
+
+            {/* Lifecycle and Visibility section */}
+            <Box className={classes.sectionHeader}>
+              <Typography variant="subtitle1"><strong>Lifecycle and Visibility</strong></Typography>
+              <Tooltip title="Control the lifecycle state and catalog visibility of this API product">
+                <InfoOutlinedIcon className={classes.infoIcon} />
+              </Tooltip>
+            </Box>
+            <Grid container spacing={2}>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Lifecycle"
+                  value={lifecycle}
+                  onChange={e => setLifecycle(e.target.value as Lifecycle)}
+                  margin="normal"
+                  helperText="API lifecycle state"
+                  disabled={saving}
+                >
+                  <MenuItem value="experimental">Experimental</MenuItem>
+                  <MenuItem value="production">Production</MenuItem>
+                  <MenuItem value="deprecated">Deprecated</MenuItem>
+                  <MenuItem value="retired">Retired</MenuItem>
+                </TextField>
+              </Grid>
+              <Grid item xs={6}>
+                <TextField
+                  fullWidth
+                  select
+                  label="Publish Status"
+                  value={publishStatus}
+                  onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
+                  margin="normal"
+                  helperText="Controls catalog visibility"
+                  disabled={saving}
+                >
+                  <MenuItem value="Draft">Draft</MenuItem>
+                  <MenuItem value="Published">Published</MenuItem>
+                </TextField>
+              </Grid>
+            </Grid>
 
             {/* API Key approval section */}
             <Box className={classes.sectionHeader}>

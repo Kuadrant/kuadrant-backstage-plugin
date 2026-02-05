@@ -48,6 +48,7 @@ import { handleFetchError } from "../../utils/errors";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import emptyStateIllustration from "../../assets/empty-state-illustration.png";
+import { getLifecycleChipStyle } from "../../utils/styles";
 
 type KuadrantResource = {
   metadata: {
@@ -55,6 +56,7 @@ type KuadrantResource = {
     namespace: string;
     creationTimestamp: string;
     annotations?: Record<string, string>;
+    labels?: Record<string, string>;
   };
   spec?: any;
   status?: any;
@@ -131,6 +133,7 @@ const ResourceList = () => {
   } | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     status: [],
+    lifecycle: [],
     policy: [],
     route: [],
     namespace: [],
@@ -257,11 +260,23 @@ const ResourceList = () => {
     createPermissionError || deletePermissionError || planPolicyPermissionError;
 
   const allProducts = useMemo(() => {
-    return apiProducts?.items || [];
-  }, [apiProducts]);
+    const products = apiProducts?.items || [];
+
+    // API consumers (users without create/update permissions) should only see Published products
+    // API owners can see all products (Draft and Published)
+    if (!canCreateApiProduct && !canUpdateOwnApiProduct && !canUpdateAllApiProducts) {
+      return products.filter((p: KuadrantResource) => {
+        const publishStatus = p.spec?.publishStatus || 'Draft';
+        return publishStatus === 'Published';
+      });
+    }
+
+    return products;
+  }, [apiProducts, canCreateApiProduct, canUpdateOwnApiProduct, canUpdateAllApiProducts]);
 
   const filterSections: FilterSection[] = useMemo(() => {
     const statusCounts = { Draft: 0, Published: 0 };
+    const lifecycleCounts = new Map<string, number>();
     const policyCounts = new Map<string, number>();
     const routeCounts = new Map<string, number>();
     const namespaceCounts = new Map<string, number>();
@@ -271,6 +286,9 @@ const ResourceList = () => {
     allProducts.forEach((p: KuadrantResource) => {
       const status = p.spec?.publishStatus || "Draft";
       statusCounts[status as keyof typeof statusCounts]++;
+
+      const lifecycle = p.metadata.labels?.lifecycle || "production";
+      lifecycleCounts.set(lifecycle, (lifecycleCounts.get(lifecycle) || 0) + 1);
 
       const policy = getPolicyForProduct(p) || "N/A";
       policyCounts.set(policy, (policyCounts.get(policy) || 0) + 1);
@@ -295,11 +313,20 @@ const ResourceList = () => {
     const sections: FilterSection[] = [
       {
         id: "status",
-        title: "Status",
+        title: "Publish Status",
         options: [
           { value: "Draft", label: "Draft", count: statusCounts.Draft },
           { value: "Published", label: "Published", count: statusCounts.Published },
         ],
+      },
+      {
+        id: "lifecycle",
+        title: "Lifecycle",
+        options: Array.from(lifecycleCounts.entries()).map(([state, count]) => ({
+          value: state,
+          label: state.charAt(0).toUpperCase() + state.slice(1),
+          count,
+        })),
       },
       {
         id: "authentication",
@@ -364,6 +391,11 @@ const ResourceList = () => {
       if (filters.status.length > 0) {
         const status = p.spec?.publishStatus || "Draft";
         if (!filters.status.includes(status)) return false;
+      }
+
+      if (filters.lifecycle && filters.lifecycle.length > 0) {
+        const lifecycle = p.metadata.labels?.lifecycle || "production";
+        if (!filters.lifecycle.includes(lifecycle)) return false;
       }
 
       if (filters.authentication.length > 0) {
@@ -503,6 +535,17 @@ const ResourceList = () => {
     const displayName = row.spec?.displayName || name;
     const currentStatus = row.spec?.publishStatus || "Draft";
     const newStatus = currentStatus === "Published" ? "Draft" : "Published";
+    const lifecycle = row.metadata.labels?.lifecycle;
+
+    // prevent publishing retired APIs
+    if (newStatus === "Published" && lifecycle === "retired") {
+      alertApi.post({
+        message: `Cannot publish a retired API product. Please change the lifecycle status first.`,
+        severity: "error",
+        display: "transient",
+      });
+      return;
+    }
 
     try {
       const response = await fetchApi.fetch(
@@ -600,6 +643,21 @@ const ResourceList = () => {
             label={status}
             size="small"
             color={status === "Published" ? "primary" : "default"}
+          />
+        );
+      },
+    },
+    {
+      title: "Lifecycle",
+      field: "metadata.labels.lifecycle",
+      render: (row: any) => {
+        const lifecycle = row.metadata.labels?.lifecycle;
+        if (!lifecycle) return "-";
+        return (
+          <Chip
+            label={lifecycle.charAt(0).toUpperCase() + lifecycle.slice(1)}
+            size="small"
+            style={getLifecycleChipStyle(lifecycle)}
           />
         );
       },

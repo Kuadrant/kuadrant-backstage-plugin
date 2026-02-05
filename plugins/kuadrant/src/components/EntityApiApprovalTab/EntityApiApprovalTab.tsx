@@ -34,7 +34,7 @@ import {
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { APIKey } from "../../types/api-management";
-import { getStatusChipStyle } from "../../utils/styles";
+import { getApprovalQueueStatusChipStyle } from "../../utils/styles";
 import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
@@ -350,7 +350,7 @@ export const EntityApiApprovalTab = () => {
         const phase = row.status?.phase || "Pending";
         const label = phase === "Approved" ? "Active" : phase;
         return (
-          <Chip label={label} size="small" style={getStatusChipStyle(phase)} />
+          <Chip label={label} size="small" style={getApprovalQueueStatusChipStyle(phase)} />
         );
       },
     },

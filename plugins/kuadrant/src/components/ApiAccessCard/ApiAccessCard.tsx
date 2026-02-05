@@ -336,6 +336,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
                 size="small"
                 startIcon={<AddIcon />}
                 onClick={() => setRequestDialogOpen(true)}
+                data-testid="request-api-access-button"
               >
                 Request API Access
               </Button>

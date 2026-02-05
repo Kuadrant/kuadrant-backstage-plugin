@@ -254,16 +254,8 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test("4. admin sees the request in approval queue", async ({ page }) => {
     const common = new Common(page);
     await common.dexQuickLogin("admin@kuadrant.local");
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
-
-    // admin should see approval tab (has approve.all permission)
-    const approvalTab = page.getByTestId("api-keys-approval-tab");
-    await expect(
-      approvalTab,
-      "Admin should see API keys approval tab",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    await approvalTab.click();
 
     // should see consumer1's request in the approval queue table
     const consumerRequest = page.getByText(/consumer1/i).first();
@@ -278,16 +270,8 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   }) => {
     const common = new Common(page);
     await common.dexQuickLogin("owner1@kuadrant.local");
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
-
-    // owner1 should see approval tab (has approve.own permission)
-    const approvalTab = page.getByTestId("api-keys-approval-tab");
-    await expect(
-      approvalTab,
-      "Owner1 should see API keys approval tab",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    await approvalTab.click();
 
     // owner1 should NOT see toystore requests (toystore is owned by guest)
     // verify the table shows no API keys
@@ -301,13 +285,8 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test("6. admin approves consumer1's request", async ({ page }) => {
     const common = new Common(page);
     await common.dexQuickLogin("admin@kuadrant.local");
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
-
-    // click approval tab
-    const approvalTab = page.getByTestId("api-keys-approval-tab");
-    await expect(approvalTab).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    await approvalTab.click();
 
     // find approve button for consumer1's request
     const approveButton = page
@@ -338,15 +317,8 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test("7. consumer1 sees their approved API key", async ({ page }) => {
     const common = new Common(page);
     await common.dexQuickLogin("consumer1@kuadrant.local");
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
-
-    // My API Keys tab is the default tab, should already be selected
-    const myApiKeysTab = page.getByTestId("my-api-keys-tab");
-    await expect(
-      myApiKeysTab,
-      "Consumer should see My API keys tab",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // should see the approved key in table
     const approvedKey = page.locator("table tbody tr").first();
@@ -359,7 +331,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test("8. consumer1 views API key detail page", async ({ page }) => {
     const common = new Common(page);
     await common.dexQuickLogin("consumer1@kuadrant.local");
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
     // find view details button (eye icon) and click

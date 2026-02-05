@@ -25,7 +25,7 @@ test.describe("Kuadrant Plugin", () => {
     });
   });
 
-  test("should display API Products and API Keys sub-menu items", async ({
+  test("should display API Products, My API Keys, and API Key Approval sub-menu items", async ({
     page,
   }) => {
     // expand kuadrant menu if needed
@@ -36,10 +36,14 @@ test.describe("Kuadrant Plugin", () => {
     const apiProductsLink = page.locator(
       'nav a[href="/kuadrant/api-products"]',
     );
-    const apiKeysLink = page.locator('nav a[href="/kuadrant/api-keys"]');
+    const myApiKeysLink = page.locator('nav a[href="/kuadrant/my-api-keys"]');
+    const apiKeyApprovalLink = page.locator(
+      'nav a[href="/kuadrant/api-key-approval"]',
+    );
 
     await expect(apiProductsLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    await expect(apiKeysLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+    await expect(myApiKeysLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+    // API Key Approval may not be visible depending on permissions
   });
 
   test("should display API Products page", async ({ page }) => {
@@ -53,16 +57,16 @@ test.describe("Kuadrant Plugin", () => {
     await expect(content).toBeVisible();
   });
 
-  test("should display API Keys page", async ({ page }) => {
-    await page.goto("/kuadrant/api-keys");
+  test("should display My API Keys page", async ({ page }) => {
+    await page.goto("/kuadrant/my-api-keys");
 
-    // check for api keys heading
-    const heading = page.locator("h1, h2").filter({ hasText: /api keys/i });
+    // check for my api keys heading
+    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
     await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-    // check for tabs
-    const myApiKeysTab = page.getByTestId("my-api-keys-tab");
-    await expect(myApiKeysTab).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+    // check for content area
+    const content = page.locator("main");
+    await expect(content).toBeVisible();
   });
 
   test("should display Create API Product button for users with permission", async ({
@@ -89,11 +93,11 @@ test.describe("Kuadrant Plugin", () => {
     });
   });
 
-  test("should display filter panel on API Keys page", async ({ page }) => {
-    await page.goto("/kuadrant/api-keys");
+  test("should display filter panel on My API Keys page", async ({ page }) => {
+    await page.goto("/kuadrant/my-api-keys");
 
     // wait for page to load
-    const heading = page.locator("h1, h2").filter({ hasText: /api keys/i });
+    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
     await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     // check for filter panel
@@ -103,20 +107,13 @@ test.describe("Kuadrant Plugin", () => {
     });
   });
 
-  test("should display My API Keys tab on API Keys page", async ({ page }) => {
-    await page.goto("/kuadrant/api-keys");
-
-    const myApiKeysTab = page.getByTestId("my-api-keys-tab");
-    await expect(myApiKeysTab).toBeVisible({ timeout: TIMEOUTS.SLOW });
-  });
-
-  test("should display status filter options on API Keys page", async ({
+  test("should display status filter options on My API Keys page", async ({
     page,
   }) => {
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/my-api-keys");
 
     // wait for page to load
-    const heading = page.locator("h1, h2").filter({ hasText: /api keys/i });
+    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
     await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     // check for status filter options
@@ -127,10 +124,10 @@ test.describe("Kuadrant Plugin", () => {
   });
 
   test("should navigate to API Key detail page", async ({ page }) => {
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/my-api-keys");
 
     // wait for page to load
-    const heading = page.locator("h1, h2").filter({ hasText: /api keys/i });
+    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
     await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     // look for view details button (eye icon)
@@ -158,9 +155,9 @@ test.describe("Kuadrant Plugin", () => {
     page,
   }) => {
     // navigate directly to a known API key detail page
-    await page.goto("/kuadrant/api-keys");
+    await page.goto("/kuadrant/my-api-keys");
 
-    const heading = page.locator("h1, h2").filter({ hasText: /api keys/i });
+    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
     await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     // find first row in table and click view details

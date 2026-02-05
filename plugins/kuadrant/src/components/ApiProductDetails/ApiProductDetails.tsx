@@ -13,6 +13,7 @@ import {
 } from "@material-ui/core";
 import { Link } from "@backstage/core-components";
 import { APIProduct, Plan } from "../../types/api-management";
+import { getLifecycleChipStyle } from "../../utils/styles";
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -56,12 +57,14 @@ interface ApiProductDetailsProps {
   product: APIProduct;
   showStatus?: boolean;
   showCatalogLink?: boolean;
+  httpRouteHostnames?: string[] | null;
 }
 
 export const ApiProductDetails = ({
   product,
   showStatus = true,
   showCatalogLink = true,
+  httpRouteHostnames,
 }: ApiProductDetailsProps) => {
   const classes = useStyles();
 
@@ -91,7 +94,7 @@ export const ApiProductDetails = ({
         {showStatus && (
           <Box className={classes.infoItem}>
             <Typography variant="caption" className={classes.label}>
-              Status
+              Publish Status
             </Typography>
             <Box>
               <Chip
@@ -103,6 +106,21 @@ export const ApiProductDetails = ({
                     : classes.statusChipDraft
                 }
                 data-testid="publish-status-chip"
+              />
+            </Box>
+          </Box>
+        )}
+        {product.metadata.labels?.lifecycle && (
+          <Box className={classes.infoItem}>
+            <Typography variant="caption" className={classes.label}>
+              Lifecycle
+            </Typography>
+            <Box>
+              <Chip
+                label={product.metadata.labels.lifecycle}
+                size="small"
+                style={getLifecycleChipStyle(product.metadata.labels.lifecycle)}
+                data-testid="lifecycle-chip"
               />
             </Box>
           </Box>
@@ -178,6 +196,18 @@ export const ApiProductDetails = ({
             {product.spec?.targetRef?.name || "-"}
           </Typography>
         </Box>
+        {httpRouteHostnames && httpRouteHostnames.length > 0 && (
+          <Box className={classes.infoItem}>
+            <Typography variant="caption" className={classes.label}>
+              {httpRouteHostnames.length > 1 ? "Hostnames" : "Hostname"}
+            </Typography>
+            {httpRouteHostnames.map((hostname, index) => (
+              <Typography key={index} variant="body2">
+                {hostname}
+              </Typography>
+            ))}
+          </Box>
+        )}
       </Box>
 
       {tiers.length > 0 && (

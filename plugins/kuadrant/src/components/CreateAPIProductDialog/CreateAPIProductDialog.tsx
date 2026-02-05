@@ -29,6 +29,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
 import { handleFetchError } from "../../utils/errors";
+import { Lifecycle } from '../../types/api-management';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -69,6 +70,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [version, setVersion] = useState('v1');
   const [approvalMode, setApprovalMode] = useState<'automatic' | 'manual'>('manual');
   const [publishStatus, setPublishStatus] = useState<'Draft' | 'Published'>('Published');
+  const [lifecycle, setLifecycle] = useState<Lifecycle>('production');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
   const [selectedHTTPRoute, setSelectedHTTPRoute] = useState('');
@@ -81,6 +83,8 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const [httpRoutesRetry, setHttpRoutesRetry] = useState(0);
   const [nameError, setNameError] = useState<string | null>(null);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
+  const [routeSearchTerm, setRouteSearchTerm] = useState('');
+  const [routeSearchField, setRouteSearchField] = useState<'name' | 'namespace' | 'planpolicy'>('name');
   const {
     value: httpRoutes,
     loading: httpRoutesLoading,
@@ -164,6 +168,18 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setNameError(validateKubernetesName(value));
   };
 
+  const handleDisplayNameChange = (value: string) => {
+    setDisplayName(value);
+    // Auto-generate Kubernetes resource name from display name with random hex suffix
+    if (!name || name.match(/-[a-f0-9]{6}$/)) {
+      const baseName = value.toLowerCase().replace(/[^a-z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+      const randomHex = Math.floor(Math.random() * 16777215).toString(16).padStart(6, '0');
+      const autoName = `${baseName}-${randomHex}`;
+      setName(autoName);
+      setNameError(validateKubernetesName(autoName));
+    }
+  };
+
   const handleOpenAPISpecChange = (value: string) => {
     setOpenAPISpec(value);
     setOpenAPISpecError(validateURL(value));
@@ -200,6 +216,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
         metadata: {
           name,
           namespace,
+          labels: {
+            lifecycle,
+          },
         },
         spec: {
           displayName,
@@ -258,6 +277,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     setVersion('v1');
     setApprovalMode('manual');
     setPublishStatus('Published');
+    setLifecycle('production');
     setTags([]);
     setTagInput('');
     setSelectedHTTPRoute('');
@@ -315,9 +335,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               fullWidth
               label="API product name"
               value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
+              onChange={e => handleDisplayNameChange(e.target.value)}
               placeholder="My API"
-              helperText="Give a unique name for your API product"
+              helperText="Display name for your API product (shown to users)"
               margin="normal"
               required
               disabled={creating}
@@ -331,11 +351,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
           <Grid item xs={6}>
             <TextField
               fullWidth
-              label="Resource name"
+              label="Kubernetes resource name"
               value={name}
               onChange={e => handleNameChange(e.target.value)}
               placeholder="my-api"
-              helperText={nameError || "Kubernetes resource name with lowercase, hyphens. Eg.flight_API"}
+              helperText={nameError || "Auto-generated from product name. Only lowercase, numbers, and hyphens allowed."}
               error={!!nameError}
               margin="normal"
               required
@@ -491,8 +511,54 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               }}
               SelectProps={{
                 'data-testid': 'httproute-select',
+                MenuProps: {
+                  PaperProps: {
+                    style: { maxHeight: 400 },
+                  },
+                  anchorOrigin: {
+                    vertical: 'bottom',
+                    horizontal: 'left',
+                  },
+                  transformOrigin: {
+                    vertical: 'top',
+                    horizontal: 'left',
+                  },
+                  getContentAnchorEl: null,
+                },
               } as any}
             >
+              {/* Search bar inside dropdown */}
+              <Box px={2} pt={1} pb={1} style={{ position: 'sticky', top: 0, zIndex: 1 }}>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Search..."
+                  value={routeSearchTerm}
+                  onChange={e => setRouteSearchTerm(e.target.value)}
+                  onKeyDown={e => e.stopPropagation()}
+                  onClick={e => e.stopPropagation()}
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <TextField
+                          select
+                          size="small"
+                          value={routeSearchField}
+                          onChange={e => setRouteSearchField(e.target.value as 'name' | 'namespace' | 'planpolicy')}
+                          onKeyDown={e => e.stopPropagation()}
+                          onClick={e => e.stopPropagation()}
+                          style={{ minWidth: 120 }}
+                          variant="standard"
+                        >
+                          <MenuItem value="name">Name</MenuItem>
+                          <MenuItem value="namespace">Namespace</MenuItem>
+                          <MenuItem value="planpolicy">PlanPolicy</MenuItem>
+                        </TextField>
+                      </InputAdornment>
+                    ),
+                  }}
+                />
+              </Box>
               {httpRoutesLoading && (
                 <MenuItem value="">Loading...</MenuItem>
               )}
@@ -502,7 +568,26 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               {!httpRoutesLoading && !httpRoutesError && httpRoutes && httpRoutes.length === 0 && (
                 <MenuItem value="">No HTTPRoutes available</MenuItem>
               )}
-              {!httpRoutesLoading && !httpRoutesError && httpRoutes && httpRoutes.map((route: any) => {
+              {!httpRoutesLoading && !httpRoutesError && httpRoutes && httpRoutes
+                .filter((route: any) => {
+                  if (!routeSearchTerm) return true;
+                  const routeNs = route.metadata.namespace;
+                  const routeName = route.metadata.name;
+                  const policyInfo = getPolicyInfoForRoute(routeNs, routeName);
+                  const searchLower = routeSearchTerm.toLowerCase();
+
+                  switch (routeSearchField) {
+                    case 'name':
+                      return routeName.toLowerCase().includes(searchLower);
+                    case 'namespace':
+                      return routeNs.toLowerCase().includes(searchLower);
+                    case 'planpolicy':
+                      return policyInfo.toLowerCase().includes(searchLower);
+                    default:
+                      return true;
+                  }
+                })
+                .map((route: any) => {
                 const routeNs = route.metadata.namespace;
                 const routeName = route.metadata.name;
                 const policyInfo = getPolicyInfoForRoute(routeNs, routeName);
@@ -541,6 +626,47 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             />
           </>
         )}
+
+        <Box className={classes.sectionHeader}>
+          <Typography variant="subtitle1"><strong>Lifecycle and Visibility</strong></Typography>
+          <Tooltip title="Control the lifecycle state and catalog visibility of this API product">
+            <InfoOutlinedIcon className={classes.infoIcon} />
+          </Tooltip>
+        </Box>
+        <Grid container spacing={2}>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              select
+              label="Lifecycle"
+              value={lifecycle}
+              onChange={e => setLifecycle(e.target.value as Lifecycle)}
+              margin="normal"
+              helperText="API lifecycle state"
+              disabled={creating}
+            >
+              <MenuItem value="experimental">Experimental</MenuItem>
+              <MenuItem value="production">Production</MenuItem>
+              <MenuItem value="deprecated">Deprecated</MenuItem>
+              <MenuItem value="retired">Retired</MenuItem>
+            </TextField>
+          </Grid>
+          <Grid item xs={6}>
+            <TextField
+              fullWidth
+              select
+              label="Publish Status"
+              value={publishStatus}
+              onChange={e => setPublishStatus(e.target.value as 'Draft' | 'Published')}
+              margin="normal"
+              helperText="Controls catalog visibility (Draft = hidden from consumers)"
+              disabled={creating}
+            >
+              <MenuItem value="Draft">Draft</MenuItem>
+              <MenuItem value="Published">Published</MenuItem>
+            </TextField>
+          </Grid>
+        </Grid>
 
         {/* API Key approval section */}
         <Box className={classes.sectionHeader}>

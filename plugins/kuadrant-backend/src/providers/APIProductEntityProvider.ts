@@ -104,7 +104,7 @@ export class APIProductEntityProvider implements EntityProvider {
       const apiProducts = (response.items || []) as APIProduct[];
       console.log(`apiproduct provider: found ${apiProducts.length} apiproducts`);
 
-      // filter out Draft API products - only include Published ones
+      // filter out Draft API products - only include Published ones 
       const publishedProducts = apiProducts.filter(product => {
         const publishStatus = product.spec.publishStatus || 'Draft';  // default to Draft if not specified
         return publishStatus === 'Published';
