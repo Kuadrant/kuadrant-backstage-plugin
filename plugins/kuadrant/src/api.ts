@@ -10,7 +10,7 @@ import {
   APIKey, APIKeyRequest,
   APIKeySpec,
   APIProduct,
-  APIProductSpec, ExtractedSecret,
+  ExtractedSecret,
   PlanPolicy,
 } from './types/api-management';
 
@@ -183,7 +183,7 @@ export interface KuadrantAPI {
   updateApiProduct(
     namespace: string,
     name: string,
-    patch: Partial<APIProductSpec>,
+    patch: Partial<APIProduct>,
   ): Promise<APIProduct>;
 
   /**
@@ -424,7 +424,7 @@ export class KuadrantApiClient implements KuadrantAPI {
   async updateApiProduct(
     namespace: string,
     name: string,
-    patch: Partial<APIProductSpec>,
+    patch: Partial<APIProduct>,
   ): Promise<APIProduct> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/apiproducts/${namespace}/${name}`, {
