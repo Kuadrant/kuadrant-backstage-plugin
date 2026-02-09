@@ -245,15 +245,9 @@ export const EntityApiApprovalTab = () => {
 
     try {
       if (dialogState.action === "approve") {
-        await kuadrantApi.approveRequest(
-          dialogState.request.metadata.namespace,
-          dialogState.request.metadata.name,
-        );
+        await kuadrantApi.approveRequest(dialogState.request.metadata.namespace, dialogState.request.metadata.name);
       } else {
-        await kuadrantApi.rejectRequest(
-          dialogState.request.metadata.namespace,
-          dialogState.request.metadata.name,
-        );
+        await kuadrantApi.rejectRequest(dialogState.request.metadata.namespace, dialogState.request.metadata.name);
       }
 
       setDialogState({

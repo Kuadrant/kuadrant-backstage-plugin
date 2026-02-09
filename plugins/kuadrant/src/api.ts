@@ -10,7 +10,7 @@ import {
   APIKey, APIKeyRequest,
   APIKeySpec,
   APIProduct,
-  ExtractedSecret,
+  BulkOperationResult, ExtractedSecret,
   PlanPolicy,
 } from './types/api-management';
 
@@ -50,10 +50,16 @@ export interface KuadrantAPI {
   // ===== APIKey Requests =====
 
   /**
-   * Fetch all API key requests
+   * Fetch all API key requests per user
    * @returns Promise with list of all API key requests
    */
   getRequests(): Promise<KuadrantList<APIKey>>;
+
+  /**
+   * Fetch all API key requests
+   * @returns Promise with list of all API key requests
+   */
+  getAllRequests(): Promise<KuadrantList<APIKey>>;
 
   /**
    * Fetch API key requests for a specific namespace
@@ -102,35 +108,39 @@ export interface KuadrantAPI {
    * Approve an API key request
    * @param namespace - Kubernetes namespace
    * @param name - API key request name
+   * @param reviewedBy - Reviewed By User / System
    * @returns Promise with the approved API key
    */
-  approveRequest(namespace: string, name: string): Promise<APIKey>;
+  approveRequest(namespace: string, name: string, reviewedBy: string): Promise<APIKey>;
 
   /**
    * Reject an API key request
    * @param namespace - Kubernetes namespace
    * @param name - API key request name
+   * @param reviewedBy - Reviewed By User / System
    * @returns Promise with the rejected API key
    */
-  rejectRequest(namespace: string, name: string): Promise<APIKey>;
+  rejectRequest(namespace: string, name: string, reviewedBy: string): Promise<APIKey>;
 
   /**
    * Bulk approve multiple API key requests
    * @param requests - Array of namespace/name pairs to approve
+   * @param reviewedBy - Reviewed By User / System
    * @returns Promise that resolves when all approvals complete
    */
   bulkApproveRequests(
     requests: Array<{ namespace: string; name: string }>,
-  ): Promise<void>;
+    reviewedBy: string): Promise<Array<BulkOperationResult>>;
 
   /**
    * Bulk reject multiple API key requests
    * @param requests - Array of namespace/name pairs to reject
+   * @param reviewedBy - Reviewed By User / System
    * @returns Promise that resolves when all rejections complete
    */
   bulkRejectRequests(
     requests: Array<{ namespace: string; name: string }>,
-  ): Promise<void>;
+    reviewedBy: string): Promise<Array<BulkOperationResult>>;
 
   // ===== API Keys/Secrets =====
 
@@ -297,6 +307,14 @@ export class KuadrantApiClient implements KuadrantAPI {
     );
   }
 
+  async getAllRequests(): Promise<KuadrantList<APIKey>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/requests`,
+      "Failed to fetch API Key requests."
+    );
+  }
+
   async getRequestsByNamespace(namespace: string): Promise<KuadrantList<APIKey>> {
     const baseUrl = await this.getBaseUrl();
     const url = namespace
@@ -340,37 +358,39 @@ export class KuadrantApiClient implements KuadrantAPI {
     }, "Failed to delete APIKey request.");
   }
 
-  async approveRequest(namespace: string, name: string): Promise<APIKey> {
+  async approveRequest(namespace: string, name: string, reviewedBy: string = "system"): Promise<APIKey> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/${namespace}/${name}/approve`, {
       method: 'POST',
+      body: JSON.stringify({ reviewedBy }),
     }, "Failed to approve APIKey request.");
   }
 
-  async rejectRequest(namespace: string, name: string): Promise<APIKey> {
+  async rejectRequest(namespace: string, name: string, reviewedBy: string = "system"): Promise<APIKey> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/${namespace}/${name}/reject`, {
       method: 'POST',
+      body: JSON.stringify({ reviewedBy }),
     }, "Failed to reject APIKey request.");
   }
 
   async bulkApproveRequests(
     requests: Array<{ namespace: string; name: string }>,
-  ): Promise<void> {
+    reviewedBy: string): Promise<Array<BulkOperationResult>> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-approve`, {
       method: 'POST',
-      body: JSON.stringify({requests}),
+      body: JSON.stringify({requests, reviewedBy}),
     }, "Failed to bulk approve APIKey requests.");
   }
 
   async bulkRejectRequests(
     requests: Array<{ namespace: string; name: string }>,
-  ): Promise<void> {
+    reviewedBy: string): Promise<Array<BulkOperationResult>> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-reject`, {
       method: 'POST',
-      body: JSON.stringify({requests}),
+      body: JSON.stringify({requests, reviewedBy}),
     }, "Failed to bulk reject APIKey requests");
   }
 

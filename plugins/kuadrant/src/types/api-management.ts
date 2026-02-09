@@ -228,6 +228,13 @@ export interface PlanPolicy {
   };
 }
 
+export interface BulkOperationResult {
+  namespace: string;
+  name: string;
+  success: boolean;
+  error?: string;
+}
+
 export interface ExtractedSecret {
   apiKey: string;
 }
