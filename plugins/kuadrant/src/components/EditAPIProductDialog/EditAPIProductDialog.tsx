@@ -27,10 +27,10 @@ import { useApi } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
-import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
+import { ApiProductPolicies } from '../ApiProductPolicies';
 import { validateURL } from '../../utils/validation';
 import {APIProduct, Plan} from "../../types/api-management.ts";
-import { Lifecycle } from '../../types/api-management';
+import { Lifecycle, StatusCondition } from '../../types/api-management';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -78,7 +78,8 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
   const [contactTeam, setContactTeam] = useState('');
   const [docsURL, setDocsURL] = useState('');
   const [openAPISpec, setOpenAPISpec] = useState('');
-  const [discoveredPlans, setdiscoveredPlans] = useState<Plan[]>([]);
+  const [discoveredPlans, setDiscoveredPlans] = useState<Plan[]>([]);
+  const [planPolicyDiscovered, setPlanPolicyDiscovered] = useState<StatusCondition | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
@@ -102,7 +103,11 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
           setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
-          setdiscoveredPlans(data.status?.discoveredPlans || []);
+          setDiscoveredPlans(data.status.discoveredPlans || null);
+          const authPolicyCondition = data.status?.conditions?.find(
+            (c: any) => c.type === "PlanPolicyDiscovered"
+          );
+          setPlanPolicyDiscovered(authPolicyCondition);
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -365,11 +370,10 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                     <InfoOutlinedIcon className={classes.infoIcon} />
                   </Tooltip>
                 </Box>
-                <PlanPolicyDetails
-                  discoveredPlans={discoveredPlans}
-                  alertSeverity="info"
-                  alertMessage="No PlanPolicy found for this HTTPRoute."
+                <ApiProductPolicies
                   includeTopMargin={false}
+                  planPolicyCondition={planPolicyDiscovered}
+                  discoveredPlans={discoveredPlans}
                 />
               </>
             )}

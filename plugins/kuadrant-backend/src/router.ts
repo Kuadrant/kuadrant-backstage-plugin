@@ -622,6 +622,7 @@ export async function createRouter({
             description: plan.description,
             limits: plan.limits,
           })),
+          status: policy.status,
         })),
       };
 
@@ -1560,13 +1561,17 @@ export async function createRouter({
             name: policy.metadata.name,
             namespace: policy.metadata.namespace,
           },
-          // only expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
-          targetRef: policy.spec?.targetRef ? {
-            kind: policy.spec.targetRef.kind,
-            name: policy.spec.targetRef.name,
-            namespace: policy.spec.targetRef.namespace,
+          spec: policy.spec ? {
+            // only expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
+            targetRef: policy.spec?.targetRef ? {
+              kind: policy.spec.targetRef.kind,
+              name: policy.spec.targetRef.name,
+              namespace: policy.spec.targetRef.namespace,
+            } : undefined,
           } : undefined,
-          missing status
+          status: policy.status ? {
+            conditions: policy.status.conditions,
+          } : undefined,
         })),
       };
 
