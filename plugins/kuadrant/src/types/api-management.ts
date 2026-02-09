@@ -1,6 +1,6 @@
 export type PlanTier = string; // custom tier names defined by api owners
 export type RequestPhase = 'Pending' | 'Approved' | 'Rejected';
-export type Lifecycle = 'experimental' | 'production' | 'deprecated' | 'retired'; 
+export type Lifecycle = 'experimental' | 'production' | 'deprecated' | 'retired';
 
 export interface PlanLimits {
   daily?: number;
@@ -237,4 +237,29 @@ export interface BulkOperationResult {
 
 export interface ExtractedSecret {
   apiKey: string;
+}
+
+// TODO: The following might be better to have them in a different file or reuse with backend (?). Importend from k8s-client
+// K8S resources
+
+export interface K8sResource {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace?: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+    [key: string]: any;
+  };
+  spec?: any;
+  status?: any;
+  data?: any;
+  stringData?: any;
+  [key: string]: any;
+}
+
+export interface K8sList {
+  items: K8sResource[];
 }

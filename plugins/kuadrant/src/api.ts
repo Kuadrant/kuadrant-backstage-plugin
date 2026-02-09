@@ -10,7 +10,7 @@ import {
   APIKey, APIKeyRequest,
   APIKeySpec,
   APIProduct,
-  BulkOperationResult, ExtractedSecret,
+  BulkOperationResult, ExtractedSecret, K8sList, K8sResource,
   PlanPolicy,
 } from './types/api-management';
 
@@ -207,10 +207,18 @@ export interface KuadrantAPI {
   // ===== HTTP Routes & Policies =====
 
   /**
-   * Fetch all HTTP routes
+   * Fetch all HTTPRoute(s)
    * @returns Promise with list of all HTTP routes
    */
-  getHttpRoutes(): Promise<KuadrantList>;
+  getHttpRoutes(): Promise<K8sList>;
+
+  /**
+   * Fetch a specific HTTPRoute
+   * @param namespace - Kubernetes namespace
+   * @param name - HTTPRoute name
+   * @returns Promise with an HTTPRoute
+   */
+  getHttpRoute(namespace: string, name: string): Promise<K8sResource>;
 
   // ===== Plan Policies =====
 
@@ -462,11 +470,19 @@ export class KuadrantApiClient implements KuadrantAPI {
 
   // ===== HTTP Routes =====
 
-  async getHttpRoutes(): Promise<KuadrantList> {
+  async getHttpRoutes(): Promise<K8sList> {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/httproutes`,
       "Failed to fetch HTTPRoutes."
+    );
+  }
+
+  async getHttpRoute(namespace: string, name: string): Promise<K8sResource> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/httproutes/${namespace}/${name}`,
+      `Failed to fetc HTTPRoute ${namespace}/${name}.`
     );
   }
 

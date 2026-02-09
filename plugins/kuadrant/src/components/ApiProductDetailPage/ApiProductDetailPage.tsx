@@ -107,18 +107,10 @@ export const ApiProductDetailPage = () => {
     }
 
     const routeName = product.spec.targetRef.name;
-    const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/httproutes/${namespace}/${routeName}`
-    );
+    const route = await kuadrantApi.getHttpRoute(namespace!, routeName)
 
-    if (!response.ok) {
-      const err = await handleFetchError(response);
-      throw new Error(`Failed to fetch HTTPRoute. ${err}`);
-    }
-
-    const route = await response.json();
     return route?.spec?.hostnames || null;
-  }, [product, namespace, backendUrl, fetchApi]);
+  }, [product, namespace, kuadrantApi]);
 
   const handlePublishToggle = async () => {
     if (!product) return;
