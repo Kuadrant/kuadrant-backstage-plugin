@@ -611,7 +611,7 @@ export async function createRouter({
             namespace: policy.metadata.namespace,
           },
           spec: policy.spec ? {
-            // only expose targetRef to allow UI to match PlanPolicy -> HTTPRoute
+            // expose targetRef to allow UI to match PlanPolicy -> HTTPRoute
             targetRef: policy.spec.targetRef ? {
               kind: policy.spec.targetRef.kind,
               name: policy.spec.targetRef.name,
@@ -623,7 +623,6 @@ export async function createRouter({
               limits: plan.limits,
             })),
           } : {},
-          // only expose plan tier info, no other spec details
           status: policy.status,
         })),
       };
@@ -1564,7 +1563,7 @@ export async function createRouter({
             namespace: policy.metadata.namespace,
           },
           spec: policy.spec ? {
-            // only expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
+            // expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
             targetRef: policy.spec.targetRef ? {
               kind: policy.spec.targetRef.kind,
               name: policy.spec.targetRef.name,
