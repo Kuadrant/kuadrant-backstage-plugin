@@ -31,6 +31,7 @@ import { ApiProductPolicies } from '../ApiProductPolicies';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
 import {APIProduct} from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
+import { getPolicyForRoute } from '../../utils/policies';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -102,25 +103,21 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   }, [kuadrantApi, open]);
 
   // load authpolicies
-  // const {
-  //   value: authPolicies,
-  //   error: authPoliciesError
-  // } = useAsync(async () => {
+  const {
+    value: authPolicies,
+    error: authPoliciesError
+  } = useAsync(async () => {
     return await kuadrantApi.getAuthPolicies();
-  // }, [kuadrantApi, open]);
+  }, [kuadrantApi, open]);
 
   // find planpolicy associated with selected httproute
   const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
-    if (!planPolicies?.items) return null;
+    return getPolicyForRoute(planPolicies?.items, routeNamespace, routeName);
+  };
 
-    return planPolicies.items.find((pp: any) => {
-      const ref = pp.targetRef;
-      return (
-        ref?.kind === 'HTTPRoute' &&
-        ref?.name === routeName &&
-        (!ref?.namespace || ref?.namespace === routeNamespace)
-      );
-    });
+  // find authpolicy associated with selected httproute
+  const getAuthPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    return getPolicyForRoute(authPolicies?.items, routeNamespace, routeName);
   };
 
   const selectedRouteInfo = selectedHTTPRoute ? selectedHTTPRoute.split('/') : null;
@@ -130,6 +127,23 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const planPolicyAcceptedCondition = selectedPlanPolicy?.status?.conditions?.find(
     (c: any) => c.type === "Accepted"
   );
+  const selectedAuthPolicy = selectedRouteInfo
+    ? getAuthPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
+  const authPolicyAcceptedCondition = selectedAuthPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const planPolicyProps = {
+    statusCondition: planPolicyAcceptedCondition,
+    discoveredPlans: selectedPlanPolicy?.spec.plans,
+  }
+  const authPolicyProps = {
+    namespacedName: {
+      namespace: selectedAuthPolicy?.metadata.namespace,
+      name: selectedAuthPolicy?.metadata.name,
+    },
+    statusCondition: authPolicyAcceptedCondition,
+  }
 
   // format tier info for dropdown display
   const formatTierInfo = (policy: any): string => {
@@ -307,6 +321,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             <Typography variant="body2" style={{ marginTop: 8 }}>
               You can still create the API Product, but plan information may be incomplete.
             </Typography>
+          </Alert>
+        )}
+        {authPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load AuthPolicies:</strong> {authPoliciesError.message}
           </Alert>
         )}
         {/* API product info section */}
@@ -603,9 +622,9 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               </Tooltip>
             </Box>
             <ApiProductPolicies
+              planPolicy={planPolicyProps}
+              authPolicy={authPolicyProps}
               includeTopMargin={false}
-              planPolicyCondition={planPolicyAcceptedCondition}
-              discoveredPlans={selectedPlanPolicy?.plans}
             />
           </>
         )}

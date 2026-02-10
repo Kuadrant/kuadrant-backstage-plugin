@@ -83,6 +83,16 @@ jobs:
           cd plugins/kuadrant-backend
           yarn test
 
+      - name: Install kuadrant tests dependencies
+        run: |
+          cd plugins/kuadrant
+          yarn install --immutable
+
+      - name: Run kuadrant tests
+        run: |
+          cd plugins/kuadrant
+          yarn test
+
   e2e-tests:
     runs-on: ubuntu-latest
 

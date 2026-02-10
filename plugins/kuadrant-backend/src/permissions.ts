@@ -140,6 +140,7 @@ export const kuadrantPermissions = [
   kuadrantPlanPolicyUpdatePermission,
   kuadrantPlanPolicyDeletePermission,
   kuadrantPlanPolicyListPermission,
+  kuadrantAuthPolicyListPermission,
   kuadrantApiProductCreatePermission,
   kuadrantApiProductReadOwnPermission,
   kuadrantApiProductReadAllPermission,

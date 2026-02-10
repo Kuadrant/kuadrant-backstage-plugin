@@ -610,18 +610,20 @@ export async function createRouter({
             name: policy.metadata.name,
             namespace: policy.metadata.namespace,
           },
-          // only expose targetRef to allow UI to match PlanPolicy -> HTTPRoute
-          targetRef: policy.spec?.targetRef ? {
-            kind: policy.spec.targetRef.kind,
-            name: policy.spec.targetRef.name,
-            namespace: policy.spec.targetRef.namespace,
-          } : undefined,
+          spec: policy.spec ? {
+            // only expose targetRef to allow UI to match PlanPolicy -> HTTPRoute
+            targetRef: policy.spec.targetRef ? {
+              kind: policy.spec.targetRef.kind,
+              name: policy.spec.targetRef.name,
+              namespace: policy.spec.targetRef.namespace,
+            } : undefined,
+            plans: (policy.spec.plans || []).map((plan: any) => ({
+              tier: plan.tier,
+              description: plan.description,
+              limits: plan.limits,
+            })),
+          } : {},
           // only expose plan tier info, no other spec details
-          plans: (policy.spec?.plans || []).map((plan: any) => ({
-            tier: plan.tier,
-            description: plan.description,
-            limits: plan.limits,
-          })),
           status: policy.status,
         })),
       };
@@ -1563,15 +1565,13 @@ export async function createRouter({
           },
           spec: policy.spec ? {
             // only expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
-            targetRef: policy.spec?.targetRef ? {
+            targetRef: policy.spec.targetRef ? {
               kind: policy.spec.targetRef.kind,
               name: policy.spec.targetRef.name,
               namespace: policy.spec.targetRef.namespace,
             } : undefined,
-          } : undefined,
-          status: policy.status ? {
-            conditions: policy.status.conditions,
-          } : undefined,
+          } : {},
+          status: policy.status,
         })),
       };
 
