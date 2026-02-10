@@ -243,12 +243,13 @@ export const EntityApiApprovalTab = () => {
 
     setDialogState((prev) => ({ ...prev, processing: true }));
 
+    const isApprove = dialogState.action === "approve"
+    const requestFn = isApprove
+      ? (ns: string, n: string, r: string) => kuadrantApi.approveRequest(ns, n, r)
+      : (ns: string, n: string, r: string) => kuadrantApi.rejectRequest(ns, n, r)
+
     try {
-      if (dialogState.action === "approve") {
-        await kuadrantApi.approveRequest(dialogState.request.metadata.namespace, dialogState.request.metadata.name);
-      } else {
-        await kuadrantApi.rejectRequest(dialogState.request.metadata.namespace, dialogState.request.metadata.name);
-      }
+      await requestFn(dialogState.request.metadata.namespace, dialogState.request.metadata.name, value.reviewedBy);
 
       setDialogState({
         open: false,
@@ -258,7 +259,7 @@ export const EntityApiApprovalTab = () => {
       });
       setRefresh((r) => r + 1);
       alertApi.post({
-        message: `API key ${dialogState.action === "approve" ? "approved" : "rejected"}`,
+        message: `API key ${isApprove ? "approved" : "rejected"}`,
         severity: "success",
         display: "transient",
       });
