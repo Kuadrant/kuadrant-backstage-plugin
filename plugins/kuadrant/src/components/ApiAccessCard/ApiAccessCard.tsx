@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useAsync } from 'react-use';
 import {
   InfoCard,
-  Progress,
   ResponseErrorPanel,
 } from '@backstage/core-components';
 import {
@@ -17,6 +16,7 @@ import {
   DialogContent,
   DialogActions,
 } from '@material-ui/core';
+import { Skeleton } from '@material-ui/lab';
 import AddIcon from '@material-ui/icons/Add';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
@@ -201,7 +201,15 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   const loading = keysLoading || productLoading || permissionLoading;
 
   if (loading) {
-    return <Progress />;
+    return (
+      <InfoCard title="Kuadrant API Keys">
+        <Box p={2}>
+          <Skeleton variant="text" width="80%" />
+          <Skeleton variant="text" width="60%" />
+          <Skeleton variant="text" width="70%" />
+        </Box>
+      </InfoCard>
+    );
   }
 
   if (keysError) {

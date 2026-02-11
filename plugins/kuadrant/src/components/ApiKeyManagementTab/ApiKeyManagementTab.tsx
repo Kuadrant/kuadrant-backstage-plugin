@@ -3,7 +3,6 @@ import { useAsync } from "react-use";
 import {
   Table,
   TableColumn,
-  Progress,
   ResponseErrorPanel,
   CodeSnippet,
 } from "@backstage/core-components";
@@ -25,6 +24,7 @@ import {
   Tooltip,
   CircularProgress,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import {
   useApi,
   configApiRef,
@@ -518,7 +518,15 @@ export const ApiKeyManagementTab = ({
     updateRequestPermissionError;
 
   if (loading) {
-    return <Progress />;
+    return (
+      <Box p={2}>
+        {[...Array(5)].map((_, i) => (
+          <Box key={i} p={2}>
+            <Skeleton variant="text" width="100%" />
+          </Box>
+        ))}
+      </Box>
+    );
   }
 
   if (error) {

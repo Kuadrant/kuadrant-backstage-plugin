@@ -11,7 +11,6 @@ import { useAsync } from "react-use";
 import {
   Table,
   TableColumn,
-  Progress,
   ResponseErrorPanel,
 } from "@backstage/core-components";
 import { kuadrantApiKeyApprovePermission } from "../../permissions";
@@ -31,6 +30,7 @@ import {
   CircularProgress,
   makeStyles,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { APIKey } from "../../types/api-management";
@@ -297,7 +297,15 @@ export const EntityApiApprovalTab = () => {
   };
 
   if (loading || permissionLoading) {
-    return <Progress />;
+    return (
+      <Box p={2}>
+        {[...Array(5)].map((_, i) => (
+          <Box key={i} p={2}>
+            <Skeleton variant="text" width="100%" />
+          </Box>
+        ))}
+      </Box>
+    );
   }
 
   if (error) {

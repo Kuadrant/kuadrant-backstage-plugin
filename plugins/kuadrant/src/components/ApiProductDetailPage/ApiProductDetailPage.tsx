@@ -11,7 +11,6 @@ import {
   Header,
   Page,
   Content,
-  Progress,
   ResponseErrorPanel,
   InfoCard,
   Link,
@@ -38,7 +37,7 @@ import {
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import EditIcon from "@material-ui/icons/Edit";
 import DeleteIcon from "@material-ui/icons/Delete";
-import { Alert } from '@material-ui/lab';
+import { Alert, Skeleton } from '@material-ui/lab';
 import { APIProduct } from "../../types/api-management";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
@@ -219,7 +218,20 @@ export const ApiProductDetailPage = () => {
   };
 
   if (loading) {
-    return <Progress />;
+    return (
+      <Page themeId="tool">
+        <Header title="Loading..." />
+        <Content>
+          <Box p={2}>
+            {[...Array(5)].map((_, i) => (
+              <Box key={i} p={2}>
+                <Skeleton variant="text" width="100%" />
+              </Box>
+            ))}
+          </Box>
+        </Content>
+      </Page>
+    );
   }
 
   if (error || !product) {

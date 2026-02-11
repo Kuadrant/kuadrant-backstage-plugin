@@ -4,7 +4,6 @@ import {
   Table,
   TableColumn,
   Link,
-  Progress,
   ResponseErrorPanel,
 } from "@backstage/core-components";
 import {
@@ -30,6 +29,7 @@ import {
   Button,
   makeStyles,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import { SimpleRequestAccessDialog } from "../SimpleRequestAccessDialog";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
@@ -656,7 +656,15 @@ export const MyApiKeysTable = () => {
   );
 
   if (loading) {
-    return <Progress />;
+    return (
+      <Box p={2}>
+        {[...Array(5)].map((_, i) => (
+          <Box key={i} p={2}>
+            <Skeleton variant="text" width="100%" />
+          </Box>
+        ))}
+      </Box>
+    );
   }
 
   if (error) {
