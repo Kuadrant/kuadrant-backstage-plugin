@@ -122,6 +122,18 @@ Permissions follow the pattern: `kuadrant.<resource>.<action>[.scope]`
 | `kuadrant.apikey.approve` | Access approval queue, approve/reject requests | - |
 | `kuadrant.apikey.list` | List requests (filtered by read permissions) | - |
 
+### AuthPolicy Permissions
+
+| Permission | Description | Notes |
+|------------|-------------|-------|
+| `kuadrant.authpolicy.list` | List authpolicies | Read-only access for API Admins and Owners |
+
+### RateLimitPolicy Permissions
+
+| Permission | Description | Notes |
+|------------|-------------|-------|
+| `kuadrant.ratelimitpolicy.list` | List ratelimitpolicies | Read-only access for API Admins and Owners |
+
 ## Role Definitions
 
 The Kuadrant plugin defines four personas with distinct responsibilities and permissions:
@@ -190,6 +202,8 @@ The Kuadrant plugin defines four personas with distinct responsibilities and per
 
 **Cannot**:
 - Create/update/delete PlanPolicies (managed on cluster)
+- Create/update/delete AuthPolicies (managed on cluster)
+- Create/update/delete RateLimitPolicies (managed on cluster)
 - Modify platform infrastructure (HTTPRoutes, Gateways)
 
 ### Platform Engineer
@@ -248,6 +262,18 @@ Comprehensive view of what each persona can and cannot do:
 - API Admin: create, read (all), update (all), delete (all), approve
 - API Owner: create, read (own), update (own), delete (own), approve (for own APIs)
 - API Consumer: create, read (own), update (own - edit pending), delete (own)
+
+**AuthPolicy (authentication rules):**
+- Platform Engineer: create, read, update, delete
+- API Admin: list (for reference)
+- API Owner: list (for reference)
+- API Consumer: none
+
+**RateLimitPolicy (rate limiting rules):**
+- Platform Engineer: create, read, update, delete
+- API Admin: list (for reference)
+- API Owner: list (for reference)
+- API Consumer: none
 
 ### Role Hierarchy
 

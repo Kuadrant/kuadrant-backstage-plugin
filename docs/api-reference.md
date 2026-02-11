@@ -25,6 +25,18 @@ The backend plugin exposes REST API endpoints at `/api/kuadrant/*`. All endpoint
 | GET | `/api/kuadrant/planpolicies` | List all Plan Policies | `kuadrant.planpolicy.list` |
 | GET | `/api/kuadrant/planpolicies/:namespace/:name` | Get specific Plan Policy | `kuadrant.planpolicy.read` |
 
+## AuthPolicy Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/authpolicies` | List all AuthPolicies | `kuadrant.authpolicy.list` |
+
+## RateLimitPolicy Endpoints
+
+| Method | Endpoint | Description | Permission |
+|--------|----------|-------------|------------|
+| GET | `/api/kuadrant/ratelimitpolicies` | List all RateLimitPolicies | `kuadrant.ratelimitpolicy.list` |
+
 ## APIKey Endpoints
 
 | Method | Endpoint | Description | Permission |
