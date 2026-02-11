@@ -22,15 +22,25 @@ export type AuthPoliciesProps = {
   statusCondition: StatusCondition | null;
 };
 
+export type RateLimitPoliciesProps = {
+  namespacedName: {
+    name: string | null;
+    namespace: string | null;
+  } | null;
+  statusCondition: StatusCondition | null;
+};
+
 interface ApiProductPoliciesProps {
   planPolicy: PlanPoliciesProps | null;
   authPolicy: AuthPoliciesProps | null;
+  rateLimitPolicy: RateLimitPoliciesProps | null;
   includeTopMargin?: boolean;
 }
 // Displays APIProduct policies
 export const ApiProductPolicies: React.FC<ApiProductPoliciesProps> = ({
   planPolicy,
   authPolicy,
+  rateLimitPolicy,
   includeTopMargin = true,
 }) => {
   const theme = useTheme();
@@ -44,67 +54,123 @@ export const ApiProductPolicies: React.FC<ApiProductPoliciesProps> = ({
       border={`1px solid ${theme.palette.divider}`}
     >
       <Grid container spacing={2}>
-        <Grid item xs={12} md={6}>
-          <Typography variant="body2" color="textSecondary" gutterBottom>
-            Plan Policy
-          </Typography>
-          {planPolicy?.statusCondition ? (
-            <Box>
+        {/* planpolicy chip shown when either plan exist or ratelimitpolicy does not exit*/}
+        {((planPolicy?.statusCondition && planPolicy.statusCondition.status === "True") || !rateLimitPolicy?.statusCondition) ? (
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              Plan Policy
+            </Typography>
+            {planPolicy?.statusCondition ? (
+              <Box>
+                <Chip
+                  label={planPolicy.statusCondition.reason}
+                  size="small"
+                  style={{
+                    backgroundColor: planPolicy.statusCondition.status === "True" ? "#4caf50" : "#ff9800",
+                    color: "#fff",
+                    marginBottom: 8,
+                  }}
+                />
+                {planPolicy.discoveredPlans && planPolicy.discoveredPlans.length > 0 && (
+                  <>
+                    <Typography
+                      variant="caption"
+                      display="block"
+                      gutterBottom
+                      color="textSecondary"
+                      style={{ marginTop: 8 }}
+                    >
+                      Available PlanPolicy Tiers:
+                    </Typography>
+                    <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
+                      {planPolicy.discoveredPlans.map((plan: any, idx: number) => {
+                        const limitText = plan.limits?.daily
+                          ? `${plan.limits.daily}/day`
+                          : plan.limits?.monthly
+                            ? `${plan.limits.monthly}/month`
+                            : plan.limits?.yearly
+                              ? `${plan.limits.yearly}/year`
+                              : 'No limit';
+                        return (
+                          <Chip
+                            key={idx}
+                            label={`${plan.tier}: ${limitText}`}
+                            size="small"
+                            variant="outlined"
+                            color="primary"
+                          />
+                        );
+                      })}
+                    </Box>
+                  </>
+                )}
+              </Box>
+            ) : (
               <Chip
-                label={planPolicy.statusCondition.reason}
+                label="NotFound"
                 size="small"
                 style={{
-                  backgroundColor: planPolicy.statusCondition.status === "True" ? "#4caf50" : "#ff9800",
+                  backgroundColor: "#ff9800",
                   color: "#fff",
                   marginBottom: 8,
                 }}
               />
-              {planPolicy.discoveredPlans && planPolicy.discoveredPlans.length > 0 && (
-                <>
-                  <Typography
-                    variant="caption"
-                    display="block"
-                    gutterBottom
-                    color="textSecondary"
-                    style={{ marginTop: 8 }}
-                  >
-                    Available PlanPolicy Tiers:
-                  </Typography>
-                  <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
-                    {planPolicy.discoveredPlans.map((plan: any, idx: number) => {
-                      const limitText = plan.limits?.daily
-                        ? `${plan.limits.daily}/day`
-                        : plan.limits?.monthly
-                          ? `${plan.limits.monthly}/month`
-                          : plan.limits?.yearly
-                            ? `${plan.limits.yearly}/year`
-                            : 'No limit';
-                      return (
-                        <Chip
-                          key={idx}
-                          label={`${plan.tier}: ${limitText}`}
-                          size="small"
-                          variant="outlined"
-                          color="primary"
-                        />
-                      );
-                    })}
-                  </Box>
-                </>
-              )}
-            </Box>
-          ) : (
-            <Chip
-              label="NotFound"
-              size="small"
-              style={{
-                backgroundColor: "#ff9800",
-                color: "#fff",
-                marginBottom: 8,
-              }}
-            />
-          )}
-        </Grid>
+            )}
+          </Grid>
+        ) : (
+          <Grid item xs={12} md={6}>
+            <Typography variant="body2" color="textSecondary" gutterBottom>
+              RateLimitPolicy
+            </Typography>
+            {rateLimitPolicy?.statusCondition ? (
+              <Box>
+                <Chip
+                  label={rateLimitPolicy.statusCondition.reason}
+                  size="small"
+                  style={{
+                    backgroundColor: rateLimitPolicy.statusCondition.status === "True" ? "#4caf50" : "#ff9800",
+                    color: "#fff",
+                    marginBottom: 8,
+                  }}
+                />
+                {rateLimitPolicy.statusCondition.status === "True" && (
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={6}>
+                      <Box>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          Resource Name
+                        </Typography>
+                        <Typography variant="body2">
+                          {rateLimitPolicy.namespacedName?.name || "No RateLimit Policy name available"}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                    <Grid item xs={12} md={6}>
+                      <Box>
+                        <Typography variant="body2" color="textSecondary" gutterBottom>
+                          Resource Namespace
+                        </Typography>
+                        <Typography variant="body2">
+                          {rateLimitPolicy.namespacedName?.namespace || "No RateLimit Policy namespace available"}
+                        </Typography>
+                      </Box>
+                    </Grid>
+                  </Grid>
+                )}
+              </Box>
+            ) : (
+              <Chip
+                label="NotFound"
+                size="small"
+                style={{
+                  backgroundColor: "#ff9800",
+                  color: "#fff",
+                  marginBottom: 8,
+                }}
+              />
+            )}
+          </Grid>
+        )}
         <Grid item xs={12} md={6}>
           <Typography variant="body2" color="textSecondary" gutterBottom>
             Auth Policy

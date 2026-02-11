@@ -26,11 +26,13 @@ import AddIcon from '@material-ui/icons/Add';
 import { useApi } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
+import useAsync from 'react-use/lib/useAsync';
 import { Progress } from '@backstage/core-components';
-import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps } from '../ApiProductPolicies';
+import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps, RateLimitPoliciesProps } from '../ApiProductPolicies';
 import { validateURL } from '../../utils/validation';
 import {APIProduct, Plan} from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
+import { getPolicyForRoute } from '../../utils/policies';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -144,6 +146,35 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     }
   }, [open]);
 
+  // load ratelimitpolicies
+  const {
+    value: rateLimitPolicies,
+    error: rateLimitPoliciesError
+  } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
+
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch RateLimitPolicies. ${error}`);
+    }
+
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
+  const selectedRateLimitPolicy = targetRef
+    ? getPolicyForRoute(rateLimitPolicies?.items, namespace, targetRef.name)
+    : null;
+  const rateLimitPolicyAcceptedCondition = selectedRateLimitPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const rateLimitPolicyProps: RateLimitPoliciesProps = {
+    namespacedName: {
+      namespace: selectedRateLimitPolicy?.metadata.namespace,
+      name: selectedRateLimitPolicy?.metadata.name,
+    },
+    statusCondition: rateLimitPolicyAcceptedCondition,
+  }
+
   const handleOpenAPISpecChange = (value: string) => {
     setOpenAPISpec(value);
     setOpenAPISpecError(validateURL(value));
@@ -219,6 +250,11 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         {error && (
           <Alert severity="error" style={{ marginBottom: 16 }}>
             {error}
+          </Alert>
+        )}
+        {rateLimitPoliciesError && (
+          <Alert severity="error" style={{ marginBottom: 16 }}>
+            <strong>Failed to load RateLimitPolicies:</strong> {rateLimitPoliciesError.message}
           </Alert>
         )}
         {loading ? (
@@ -393,6 +429,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                 <ApiProductPolicies
                   planPolicy={planPolicyProps}
                   authPolicy={authPolicyProps}
+                  rateLimitPolicy={rateLimitPolicyProps}
                   includeTopMargin={false}
                 />
               </>

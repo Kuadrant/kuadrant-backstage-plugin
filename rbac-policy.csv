@@ -4,6 +4,7 @@
 p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
 p, role:default/api-admin, kuadrant.planpolicy.list, read, allow
 p, role:default/api-admin, kuadrant.authpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.ratelimitpolicy.list, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.create, create, allow
 p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
@@ -28,6 +29,7 @@ p, role:default/api-admin, policy.entity.delete, delete, allow
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.authpolicy.list, read, allow
+p, role:default/api-owner, kuadrant.ratelimitpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
 p, role:default/api-owner, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.update.own, update, allow

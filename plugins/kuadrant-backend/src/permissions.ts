@@ -41,6 +41,11 @@ export const kuadrantAuthPolicyListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+export const kuadrantRateLimitPolicyListPermission = createPermission({
+  name: 'kuadrant.ratelimitpolicy.list',
+  attributes: { action: 'read' },
+});
+
 // apiproduct permissions (catalog entries)
 export const kuadrantApiProductCreatePermission = createPermission({
   name: 'kuadrant.apiproduct.create',
@@ -141,6 +146,7 @@ export const kuadrantPermissions = [
   kuadrantPlanPolicyDeletePermission,
   kuadrantPlanPolicyListPermission,
   kuadrantAuthPolicyListPermission,
+  kuadrantRateLimitPolicyListPermission,
   kuadrantApiProductCreatePermission,
   kuadrantApiProductReadOwnPermission,
   kuadrantApiProductReadAllPermission,

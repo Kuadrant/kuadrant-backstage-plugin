@@ -98,6 +98,22 @@ spec:
         jwt:
           issuerUrl: https://oidc.example.com/realms/demo
 ---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: gamestore
+  namespace: gamestore
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: gamestore
+  limits:
+    "basic":
+      rates:
+      - limit: 100
+        window: 60s
+---
 apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:

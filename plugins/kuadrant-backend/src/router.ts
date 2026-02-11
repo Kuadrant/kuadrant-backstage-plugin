@@ -30,6 +30,7 @@ import {
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
   kuadrantAuthPolicyListPermission,
+  kuadrantRateLimitPolicyListPermission,
 } from './permissions';
 
 const secretKey = 'api_key';
@@ -1554,6 +1555,52 @@ export async function createRouter({
       }
 
       const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'authpolicies');
+
+      // only expose minimal info needed for UI association
+      const filtered = {
+        items: (data.items || []).map((policy: any) => ({
+          metadata: {
+            name: policy.metadata.name,
+            namespace: policy.metadata.namespace,
+          },
+          spec: policy.spec ? {
+            // expose targetRef to allow UI to match AuthPolicy -> HTTPRoute
+            targetRef: policy.spec.targetRef ? {
+              kind: policy.spec.targetRef.kind,
+              name: policy.spec.targetRef.name,
+              namespace: policy.spec.targetRef.namespace,
+            } : undefined,
+          } : {},
+          status: policy.status,
+        })),
+      };
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('error fetching authpolicies:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch authpolicies' });
+      }
+    }
+  });
+
+  // ratelimitpolicies endpoints
+  router.get('/ratelimitpolicies', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantRateLimitPolicyListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const data = await k8sClient.listCustomResources('kuadrant.io', 'v1', 'ratelimitpolicies');
 
       // only expose minimal info needed for UI association
       const filtered = {

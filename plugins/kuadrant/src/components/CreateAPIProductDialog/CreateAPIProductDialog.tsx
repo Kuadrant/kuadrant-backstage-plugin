@@ -110,6 +110,21 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     return await kuadrantApi.getAuthPolicies();
   }, [kuadrantApi, open]);
 
+  // load ratelimitpolicies
+  const {
+    value: rateLimitPolicies,
+    error: rateLimitPoliciesError
+  } = useAsync(async () => {
+    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
+
+    if (!response.ok) {
+      const error = await handleFetchError(response);
+      throw new Error(`failed to fetch RateLimitPolicies. ${error}`);
+    }
+
+    return await response.json();
+  }, [backendUrl, fetchApi, open]);
+
   // find planpolicy associated with selected httproute
   const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
     return getPolicyForRoute(planPolicies?.items, routeNamespace, routeName);
@@ -118,6 +133,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   // find authpolicy associated with selected httproute
   const getAuthPolicyForRoute = (routeNamespace: string, routeName: string) => {
     return getPolicyForRoute(authPolicies?.items, routeNamespace, routeName);
+  };
+
+  // find ratelimitpolicy associated with selected httproute
+  const getRateLimitPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    return getPolicyForRoute(rateLimitPolicies?.items, routeNamespace, routeName);
   };
 
   const selectedRouteInfo = selectedHTTPRoute ? selectedHTTPRoute.split('/') : null;
@@ -133,6 +153,12 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
   const authPolicyAcceptedCondition = selectedAuthPolicy?.status?.conditions?.find(
     (c: any) => c.type === "Accepted"
   );
+  const selectedRateLimitPolicy = selectedRouteInfo
+    ? getRateLimitPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
+  const rateLimitPolicyAcceptedCondition = selectedRateLimitPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
   const planPolicyProps = {
     statusCondition: planPolicyAcceptedCondition,
     discoveredPlans: selectedPlanPolicy?.spec.plans,
@@ -143,6 +169,13 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
       name: selectedAuthPolicy?.metadata.name,
     },
     statusCondition: authPolicyAcceptedCondition,
+  }
+  const rateLimitPolicyProps = {
+    namespacedName: {
+      namespace: selectedRateLimitPolicy?.metadata.namespace,
+      name: selectedRateLimitPolicy?.metadata.name,
+    },
+    statusCondition: rateLimitPolicyAcceptedCondition,
   }
 
   // format tier info for dropdown display
@@ -326,6 +359,11 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
         {authPoliciesError && (
           <Alert severity="warning" style={{ marginBottom: 16 }}>
             <strong>Failed to load AuthPolicies:</strong> {authPoliciesError.message}
+          </Alert>
+        )}
+        {rateLimitPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load RateLimitPolicies:</strong> {rateLimitPoliciesError.message}
           </Alert>
         )}
         {/* API product info section */}
@@ -624,6 +662,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             <ApiProductPolicies
               planPolicy={planPolicyProps}
               authPolicy={authPolicyProps}
+              rateLimitPolicy={rateLimitPolicyProps}
               includeTopMargin={false}
             />
           </>
