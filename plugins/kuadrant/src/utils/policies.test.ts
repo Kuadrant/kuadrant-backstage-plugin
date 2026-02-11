@@ -53,8 +53,8 @@ describe('getPolicyForRoute', () => {
 
       const result = getPolicyForRoute(policies, 'namespace-a', 'route-r');
       expect(result).toBeDefined();
-      expect(result?.metadata.name).toBe('policy-1');
-      expect(result?.metadata.namespace).toBe('namespace-a');
+      expect(result.metadata.name).toBe('policy-1');
+      expect(result.metadata.namespace).toBe('namespace-a');
     });
 
     it('should NOT match when policy in namespace A (without targetRef.namespace) is searched with route in namespace B', () => {
@@ -101,9 +101,10 @@ describe('getPolicyForRoute', () => {
 
       const result = getPolicyForRoute(policies, 'namespace-b', 'route-r');
       expect(result).toBeDefined();
-      expect(result?.metadata.name).toBe('policy-1');
-      expect(result?.metadata.namespace).toBe('namespace-a');
-      expect(result?.targetRef.namespace).toBe('namespace-b');
+      expect(result.metadata.name).toBe('policy-1');
+      expect(result.metadata.namespace).toBe('namespace-a');
+      expect(result.spec.targetRef).toBeDefined();
+      expect(result.spec.targetRef.namespace).toBe('namespace-b');
     });
 
     it('should NOT match when explicit namespace differs from search namespace', () => {
@@ -213,7 +214,7 @@ describe('getPolicyForRoute', () => {
 
       const result = getPolicyForRoute(policies, 'namespace-a', 'route-r');
       expect(result).toBeDefined();
-      expect(result?.targetRef.name).toBe('route-r');
+      expect(result.spec.targetRef.name).toBe('route-r');
     });
   });
 
@@ -250,7 +251,7 @@ describe('getPolicyForRoute', () => {
 
       const result = getPolicyForRoute(policies, 'namespace-a', 'route-r');
       expect(result).toBeDefined();
-      expect(result?.metadata.name).toBe('policy-1'); // First match
+      expect(result.metadata.name).toBe('policy-1'); // First match
     });
 
     it('should find correct policy among multiple non-matching policies', () => {
@@ -298,7 +299,7 @@ describe('getPolicyForRoute', () => {
 
       const result = getPolicyForRoute(policies, 'namespace-a', 'route-r');
       expect(result).toBeDefined();
-      expect(result?.metadata.name).toBe('policy-correct');
+      expect(result.metadata.name).toBe('policy-correct');
     });
   });
 
