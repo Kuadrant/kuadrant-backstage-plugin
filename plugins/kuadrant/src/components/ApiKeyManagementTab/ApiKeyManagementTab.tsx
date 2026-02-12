@@ -40,7 +40,7 @@ import AddIcon from "@material-ui/icons/Add";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
 import WarningIcon from "@material-ui/icons/Warning";
-import {APIKey, APIProduct, PlanPolicyPlan} from "../../types/api-management";
+import { APIKey, APIProduct, Plan } from "../../types/api-management";
 import {
   kuadrantApiKeyCreatePermission,
   kuadrantApiKeyDeleteOwnPermission,
@@ -496,7 +496,7 @@ export const ApiKeyManagementTab = ({
   const myRequests = ((requests || []) as APIKey[]).filter(
     (r) => !optimisticallyDeleted.has(r.metadata.name),
   );
-  const plans = (apiProduct?.status?.discoveredPlans || []) as PlanPolicyPlan[];
+  const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(
     (r) => !r.status?.phase || r.status.phase === "Pending",

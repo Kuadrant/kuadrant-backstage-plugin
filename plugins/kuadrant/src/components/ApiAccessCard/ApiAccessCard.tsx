@@ -28,7 +28,7 @@ import { useEntity } from '@backstage/plugin-catalog-react';
 import { RequestAccessDialog } from '../RequestAccessDialog';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiKeyCreatePermission } from '../../permissions';
-import {APIKey, APIProduct, PlanPolicyPlan} from "../../types/api-management.ts";
+import { APIKey, APIProduct, Plan } from "../../types/api-management.ts";
 
 export interface ApiAccessCardProps {
   // deprecated: use entity annotations instead
@@ -166,7 +166,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   }
 
   const keys = (requests as APIKey[]) || [];
-  const plans = (apiProduct?.status?.discoveredPlans || []) as PlanPolicyPlan[];
+  const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
   const canRequest = canCreateRequest && plans.length > 0;
 
   const renderKeyRow = (request: APIKey) => {

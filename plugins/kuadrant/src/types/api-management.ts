@@ -121,12 +121,6 @@ export interface APIKeyRequest {
   userEmail: string
 }
 
-export interface Plan {
-  tier: string;
-  description?: string;
-  limits?: PlanLimits;
-}
-
 export interface APIProductSpec {
   displayName: string;
   description?: string;
@@ -198,7 +192,7 @@ export interface APIProduct {
   status?: APIProductStatus;
 }
 
-export interface PlanPolicyPlan {
+export interface Plan {
   tier: string;
   predicate?: string;
   description?: string;
@@ -221,7 +215,7 @@ export interface PlanPolicy {
       name: string;
       namespace?: string;
     };
-    plans: PlanPolicyPlan[];
+    plans: Plan[];
   };
   status?: {
     conditions?: StatusCondition[];
@@ -262,4 +256,48 @@ export interface K8sResource {
 
 export interface K8sList {
   items: K8sResource[];
+}
+
+export interface AuthPolicy {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    targetRef: {
+      kind: 'HTTPRoute' | 'Gateway';
+      name: string;
+      namespace?: string;
+    };
+  };
+  status?: {
+    conditions?: StatusCondition[];
+  };
+}
+
+export interface RateLimitPolicy {
+  apiVersion: string;
+  kind: string;
+  metadata: {
+    name: string;
+    namespace: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+  };
+  spec: {
+    targetRef: {
+      kind: 'HTTPRoute' | 'Gateway';
+      name: string;
+      namespace?: string;
+    };
+  };
+  status?: {
+    conditions?: StatusCondition[];
+  };
 }

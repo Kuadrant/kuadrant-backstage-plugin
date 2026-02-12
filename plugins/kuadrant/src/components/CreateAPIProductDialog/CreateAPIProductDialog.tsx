@@ -29,7 +29,7 @@ import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { ApiProductPolicies } from '../ApiProductPolicies';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
-import {APIProduct} from "../../types/api-management.ts";
+import { APIProduct } from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
 import { getPolicyForRoute } from '../../utils/policies';
 
@@ -115,15 +115,8 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     value: rateLimitPolicies,
     error: rateLimitPoliciesError
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
-
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch RateLimitPolicies. ${error}`);
-    }
-
-    return await response.json();
-  }, [backendUrl, fetchApi, open]);
+    return await kuadrantApi.getRateLimitPolicies();
+  }, [kuadrantApi, open]);
 
   // find planpolicy associated with selected httproute
   const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {

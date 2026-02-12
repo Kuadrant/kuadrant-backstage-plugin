@@ -11,7 +11,7 @@ export type PlanPoliciesProps = {
       monthly?: number;
       yearly?: number;
     };
-  }>
+  }> | null;
 };
 
 export type AuthPoliciesProps = {

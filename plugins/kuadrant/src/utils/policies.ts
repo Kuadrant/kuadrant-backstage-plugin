@@ -13,7 +13,7 @@
  * - The targetRef.namespace (or policy's metadata.namespace if not specified) matches the routeNamespace parameter
  */
 export const getPolicyForRoute = (
-  policies: any[],
+  policies: any[] | undefined,
   routeNamespace: string,
   routeName: string,
 ) => {

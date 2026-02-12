@@ -12,6 +12,8 @@ import {
   APIProduct,
   BulkOperationResult, ExtractedSecret, K8sList, K8sResource,
   PlanPolicy,
+  AuthPolicy,
+  RateLimitPolicy,
 } from './types/api-management';
 
 /**
@@ -227,6 +229,22 @@ export interface KuadrantAPI {
    * @returns Promise with list of all plan policies
    */
   getPlanPolicies(): Promise<KuadrantList<PlanPolicy>>;
+
+  // ===== Auth Policies =====
+
+  /**
+   * Fetch all auth policies
+   * @returns Promise with list of all auth policies
+   */
+  getAuthPolicies(): Promise<KuadrantList<AuthPolicy>>;
+
+  // ===== RateLimitPolicies =====
+
+  /**
+   * Fetch all ratelimitpolicies
+   * @returns Promise with list of all ratelimitpolicies
+   */
+  getRateLimitPolicies(): Promise<KuadrantList<RateLimitPolicy>>;
 }
 
 /**
@@ -388,7 +406,7 @@ export class KuadrantApiClient implements KuadrantAPI {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-approve`, {
       method: 'POST',
-      body: JSON.stringify({requests, reviewedBy}),
+      body: JSON.stringify({ requests, reviewedBy }),
     }, "Failed to bulk approve APIKey requests.");
   }
 
@@ -398,7 +416,7 @@ export class KuadrantApiClient implements KuadrantAPI {
     const baseUrl = await this.getBaseUrl();
     return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-reject`, {
       method: 'POST',
-      body: JSON.stringify({requests, reviewedBy}),
+      body: JSON.stringify({ requests, reviewedBy }),
     }, "Failed to bulk reject APIKey requests");
   }
 
@@ -493,6 +511,26 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/planpolicies`,
       "Failed to fetch PlanPolicies."
+    );
+  }
+
+  // ===== AuthPolicies Implementation =====
+
+  async getAuthPolicies(): Promise<KuadrantList<AuthPolicy>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/authpolicies`,
+      "Failed to fetch AuthPolicies."
+    );
+  }
+
+  // ===== RateLimitPolicies Implementation =====
+
+  async getRateLimitPolicies(): Promise<KuadrantList<RateLimitPolicy>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/ratelimitpolicies`,
+      "Failed to fetch RateLimitPolicies."
     );
   }
 }

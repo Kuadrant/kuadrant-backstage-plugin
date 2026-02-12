@@ -20,7 +20,7 @@ import {
   alertApiRef,
 } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
-import {PlanPolicyPlan} from "../../types/api-management.ts";
+import { Plan } from "../../types/api-management.ts";
 
 export interface RequestAccessDialogProps {
   open: boolean;
@@ -29,7 +29,7 @@ export interface RequestAccessDialogProps {
   apiProductName: string;
   namespace: string;
   userEmail: string;
-  plans: PlanPolicyPlan[];
+  plans: Plan[];
 }
 
 export const RequestAccessDialog = ({
@@ -141,7 +141,7 @@ export const RequestAccessDialog = ({
             onChange={(e) => setSelectedPlan(e.target.value as string)}
             disabled={creating}
           >
-            {plans.map((plan: PlanPolicyPlan) => {
+            {plans.map((plan: Plan) => {
               const limitDesc = Object.entries(plan.limits || {})
                 .map(([key, val]) => `${val} per ${key}`)
                 .join(', ');

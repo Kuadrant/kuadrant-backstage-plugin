@@ -30,7 +30,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { Progress } from '@backstage/core-components';
 import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps, RateLimitPoliciesProps } from '../ApiProductPolicies';
 import { validateURL } from '../../utils/validation';
-import {APIProduct, Plan} from "../../types/api-management.ts";
+import { APIProduct } from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
 import { getPolicyForRoute } from '../../utils/policies';
 
@@ -107,14 +107,14 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
           const planPolicyCondition = data.status?.conditions?.find(
             (c: any) => c.type === "PlanPolicyDiscovered"
-          );
+          ) || null;
           setPlanPoliciesProps({
             statusCondition: planPolicyCondition,
-            discoveredPlans: data.status.discoveredPlans || null,
+            discoveredPlans: data.status?.discoveredPlans || null,
           });
           const authPolicyCondition = data.status?.conditions?.find(
             (c: any) => c.type === "AuthPolicyDiscovered"
-          );
+          ) || null;
           // Parse the auth policy name from the AuthPolicyDiscovered condition message
           // It's the only place to get the policy name without fetching all the policies.
           // Consider enhancing the developer portal controller to provide name in an structured way
@@ -151,15 +151,8 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     value: rateLimitPolicies,
     error: rateLimitPoliciesError
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(`${backendUrl}/api/kuadrant/ratelimitpolicies`);
-
-    if (!response.ok) {
-      const error = await handleFetchError(response);
-      throw new Error(`failed to fetch RateLimitPolicies. ${error}`);
-    }
-
-    return await response.json();
-  }, [backendUrl, fetchApi, open]);
+    return await kuadrantApi.getRateLimitPolicies();
+  }, [kuadrantApi, open]);
 
   const selectedRateLimitPolicy = targetRef
     ? getPolicyForRoute(rateLimitPolicies?.items, namespace, targetRef.name)
