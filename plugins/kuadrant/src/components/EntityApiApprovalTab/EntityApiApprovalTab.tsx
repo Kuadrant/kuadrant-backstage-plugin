@@ -2,11 +2,10 @@ import React, { useState } from "react";
 import { useEntity } from "@backstage/plugin-catalog-react";
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   identityApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { useAsync } from "react-use";
 import {
   Table,
@@ -35,7 +34,6 @@ import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { APIKey } from "../../types/api-management";
 import { getApprovalQueueStatusChipStyle } from "../../utils/styles";
-import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   useCasePanel: {
@@ -176,11 +174,9 @@ const ApprovalDialog = ({
 
 export const EntityApiApprovalTab = () => {
   const { entity } = useEntity();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const identityApi = useApi(identityApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
 
   const apiProductName =
     entity.metadata.annotations?.["kuadrant.io/apiproduct"] ||
@@ -211,15 +207,7 @@ export const EntityApiApprovalTab = () => {
     const identity = await identityApi.getBackstageIdentity();
     const reviewedBy = identity.userEntityRef;
 
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/requests`,
-    );
-    if (!response.ok) {
-      const err = await handleFetchError(response);
-      throw new Error(`Failed to fetch requests. ${err}`);
-    }
-
-    const data = await response.json();
+    const data = await kuadrantApi.getRequests();
     const allRequests: APIKey[] = data.items || [];
 
     // filter to this API product only
@@ -230,7 +218,7 @@ export const EntityApiApprovalTab = () => {
     );
 
     return { requests: filtered, reviewedBy };
-  }, [backendUrl, fetchApi, identityApi, apiProductName, namespace, refresh]);
+  }, [kuadrantApi, identityApi, apiProductName, namespace, refresh]);
 
   const handleApprove = (request: APIKey) => {
     setDialogState({
@@ -255,22 +243,13 @@ export const EntityApiApprovalTab = () => {
 
     setDialogState((prev) => ({ ...prev, processing: true }));
 
-    const endpoint =
-      dialogState.action === "approve"
-        ? `${backendUrl}/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/approve`
-        : `${backendUrl}/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/reject`;
+    const isApprove = dialogState.action === "approve"
+    const requestFn = isApprove
+      ? (ns: string, n: string, r: string) => kuadrantApi.approveRequest(ns, n, r)
+      : (ns: string, n: string, r: string) => kuadrantApi.rejectRequest(ns, n, r)
 
     try {
-      const response = await fetchApi.fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewedBy: value.reviewedBy }),
-      });
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(err);
-      }
+      await requestFn(dialogState.request.metadata.namespace, dialogState.request.metadata.name, value.reviewedBy);
 
       setDialogState({
         open: false,
@@ -280,7 +259,7 @@ export const EntityApiApprovalTab = () => {
       });
       setRefresh((r) => r + 1);
       alertApi.post({
-        message: `API key ${dialogState.action === "approve" ? "approved" : "rejected"}`,
+        message: `API key ${isApprove ? "approved" : "rejected"}`,
         severity: "success",
         display: "transient",
       });

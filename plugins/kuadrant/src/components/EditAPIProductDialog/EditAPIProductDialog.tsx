@@ -23,12 +23,13 @@ import {
 } from '@material-ui/core';
 import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import AddIcon from '@material-ui/icons/Add';
-import { useApi, configApiRef, fetchApiRef } from '@backstage/core-plugin-api';
+import { useApi } from '@backstage/core-plugin-api';
+import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
 import { Progress } from '@backstage/core-components';
 import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
 import { validateURL } from '../../utils/validation';
-import { handleFetchError } from "../../utils/errors";
+import {APIProduct, Plan} from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
 
 const useStyles = makeStyles((theme) => ({
@@ -62,9 +63,7 @@ interface EditAPIProductDialogProps {
 
 export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name }: EditAPIProductDialogProps) => {
   const classes = useStyles();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
-  const backendUrl = config.getString('backend.baseUrl');
+  const kuadrantApi = useApi(kuadrantApiRef);
   const [loading, setLoading] = useState(false);
   const [displayName, setDisplayName] = useState('');
   const [description, setDescription] = useState('');
@@ -79,7 +78,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
   const [contactTeam, setContactTeam] = useState('');
   const [docsURL, setDocsURL] = useState('');
   const [openAPISpec, setOpenAPISpec] = useState('');
-  const [discoveredPlans, setdiscoveredPlans] = useState([]);
+  const [discoveredPlans, setdiscoveredPlans] = useState<Plan[]>([]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
@@ -89,21 +88,13 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     if (open && namespace && name) {
       setLoading(true);
       setError('');
-
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`)
-        .then(async res => {
-          if (!res.ok) {
-            const error = await handleFetchError(res);
-            throw new Error(`failed to load API product. ${error}`);
-          }
-          return res.json();
-        })
+      kuadrantApi.getApiProduct(namespace, name)
         .then(data => {
           setDisplayName(data.spec.displayName || '');
           setDescription(data.spec.description || '');
           setVersion(data.spec.version || 'v1');
           setPublishStatus(data.spec.publishStatus || 'Draft');
-          setLifecycle(data.metadata.labels?.lifecycle || 'production');
+          setLifecycle(data.metadata.labels?.lifecycle as Lifecycle || 'production' as Lifecycle);
           setApprovalMode(data.spec.approvalMode || 'manual');
           setTags(data.spec.tags || []);
           setTargetRef(data.spec.targetRef || null);
@@ -111,7 +102,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
           setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
-          setdiscoveredPlans(data.status.discoveredPlans || null);
+          setdiscoveredPlans(data.status?.discoveredPlans || []);
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -120,7 +111,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setLoading(false);
         });
     }
-  }, [open, namespace, name, backendUrl, fetchApi]);
+  }, [open, namespace, name, kuadrantApi]);
 
   useEffect(() => {
     if (open) {
@@ -156,7 +147,8 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
     }
 
     try {
-      const patch = {
+      const patch: Partial<APIProduct> = {
+        // @ts-ignore We are applying a partial obj, not full
         metadata: {
           labels: {
             lifecycle,
@@ -185,22 +177,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         },
       };
 
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
-        {
-          method: 'PATCH',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(patch),
-        }
-      );
-
-      if (!response.ok) {
-        const error = await handleFetchError(response);
-        throw new Error(`failed to patch APIProduct. ${error}`);
-      }
-
+      await kuadrantApi.updateApiProduct(namespace, name, patch);
       onSuccess();
       onClose();
     } catch (err) {

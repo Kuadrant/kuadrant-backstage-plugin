@@ -1,17 +1,16 @@
 import React from "react";
 import { useEntity } from "@backstage/plugin-catalog-react";
-import { useApi, configApiRef, fetchApiRef } from "@backstage/core-plugin-api";
+import { useApi } from "@backstage/core-plugin-api";
 import { Link } from "@backstage/core-components";
 import { Box, Typography } from "@material-ui/core";
 import { Alert } from "@material-ui/lab";
 import useAsync from "react-use/lib/useAsync";
+import { kuadrantApiRef } from "../../api";
 
 // Displays alerts for OpenAPI spec issues.
 export const ApiProductOpenApiAlert = () => {
   const { entity } = useEntity();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
+  const kuadrantApi = useApi(kuadrantApiRef);
 
   // Get APIProduct reference from entity annotations
   const namespace = entity.metadata.annotations?.["kuadrant.io/namespace"];
@@ -19,21 +18,17 @@ export const ApiProductOpenApiAlert = () => {
     entity.metadata.annotations?.["kuadrant.io/apiproduct"];
 
   // Fetch the full APIProduct resource to check status conditions
-    const {value: apiProduct,loading,error,} = useAsync(async () => {
+  const { value: apiProduct, loading, error } = useAsync(async () => {
     if (!namespace || !apiProductName) {
       return null;
     }
 
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${apiProductName}`,
-    );
-
-    if (!response.ok) {
+    try {
+      return await kuadrantApi.getApiProduct(namespace, apiProductName);
+    } catch {
       return null;
     }
-
-    return await response.json();
-  }, [backendUrl, fetchApi, namespace, apiProductName]);
+  }, [kuadrantApi, namespace, apiProductName]);
 
   // Don't render anything if data is missing or still loading
   if (!namespace || !apiProductName || loading || error || !apiProduct) {

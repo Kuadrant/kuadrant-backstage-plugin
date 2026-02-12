@@ -1,11 +1,10 @@
 import React, { useState, useMemo } from "react";
 import {
   useApi,
-  fetchApiRef,
   identityApiRef,
-  configApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { useAsync } from "react-use";
 import {
   Table,
@@ -35,9 +34,8 @@ import {
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
-import { APIKey } from "../../types/api-management";
+import {APIKey, BulkOperationResult} from "../../types/api-management";
 import { getApprovalQueueStatusChipStyle } from "../../utils/styles";
-import { handleFetchError } from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -284,16 +282,9 @@ const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
   );
 };
 
-interface BulkRequestResult {
-  name: string;
-  namespace: string;
-  success: boolean;
-  error: string | null;
-}
-
 interface AlertDialogProps {
   open: boolean;
-  results: BulkRequestResult[];
+  results: BulkOperationResult[];
   isApprove: boolean;
   onClose: () => void;
 }
@@ -443,11 +434,9 @@ const BulkAlertDialog = ({
 
 export const ApprovalQueueTable = () => {
   const classes = useStyles();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
   const identityApi = useApi(identityApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
+  const kuadrantApi = useApi(kuadrantApiRef);
   const [refresh, setRefresh] = useState(0);
   const [selectedRequests, setSelectedRequests] = useState<APIKey[]>([]);
   const [dialogState, setDialogState] = useState<{
@@ -474,7 +463,7 @@ export const ApprovalQueueTable = () => {
   });
   const [bulkAlertDialogState, setBulkAlertDialogState] = useState<{
     open: boolean;
-    results: BulkRequestResult[];
+    results: BulkOperationResult[];
     isApprove: boolean;
   }>({
     open: false,
@@ -508,40 +497,16 @@ export const ApprovalQueueTable = () => {
     const identity = await identityApi.getBackstageIdentity();
     const reviewedBy = identity.userEntityRef;
 
-    const [requestsResponse, apiProductsResponse] = await Promise.all([
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/requests`),
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`),
-    ]);
+    try {
+      const [apiKeyRequests, apiProducts] = await Promise.all([
+        kuadrantApi.getAllRequests(),
+        kuadrantApi.getApiProducts(),
+      ]);
 
-    if (!requestsResponse.ok) {
-      return {
-        allRequests: [] as APIKey[],
-        reviewedBy,
-        ownedApiProducts: new Set<string>(),
-      };
-    }
+      const allRequests = apiKeyRequests.items || [];
+      const ownedApiProducts = new Set<string>();
 
-    const contentType = requestsResponse.headers.get("content-type");
-    if (!contentType?.includes("application/json")) {
-      alertApi.post({
-        message: "Unexpected content-type from the server response.",
-        display: "transient",
-        severity: "warning",
-      });
-      return {
-        allRequests: [] as APIKey[],
-        reviewedBy,
-        ownedApiProducts: new Set<string>(),
-      };
-    }
-
-    const data = await requestsResponse.json();
-    const allRequests = data.items || [];
-
-    const ownedApiProducts = new Set<string>();
-    if (apiProductsResponse.ok) {
-      const apiProductsData = await apiProductsResponse.json();
-      for (const product of apiProductsData.items || []) {
+      for (const product of apiProducts.items || []) {
         const owner = product.metadata?.annotations?.["backstage.io/owner"];
         if (owner === reviewedBy) {
           ownedApiProducts.add(
@@ -549,10 +514,23 @@ export const ApprovalQueueTable = () => {
           );
         }
       }
-    }
 
-    return { allRequests, reviewedBy, ownedApiProducts };
-  }, [backendUrl, fetchApi, identityApi, refresh]);
+      return { allRequests, reviewedBy, ownedApiProducts };
+
+    } catch(err) {
+      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
+      alertApi.post({
+        message: `Failed to get resources. ${errorMessage}`,
+        display: "transient",
+        severity: "error",
+      });
+      return {
+        allRequests: [] as APIKey[],
+        reviewedBy,
+        ownedApiProducts: new Set<string>(),
+      };
+    }
+  }, [kuadrantApi, identityApi, refresh]);
 
   const filterSections: FilterSection[] = useMemo(() => {
     if (!value?.allRequests) return [];
@@ -660,22 +638,11 @@ export const ApprovalQueueTable = () => {
 
     setDialogState((prev) => ({ ...prev, processing: true }));
 
-    const endpoint =
-      dialogState.action === "approve"
-        ? `${backendUrl}/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/approve`
-        : `${backendUrl}/api/kuadrant/requests/${dialogState.request.metadata.namespace}/${dialogState.request.metadata.name}/reject`;
-
+    const apikeyRequestFn = dialogState.action === "approve"
+      ? (ns: string, n: string, r: string) => kuadrantApi.approveRequest(ns, n, r)
+      : (ns: string, n: string, r: string) => kuadrantApi.rejectRequest(ns, n, r)
     try {
-      const response = await fetchApi.fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reviewedBy: value.reviewedBy }),
-      });
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(err);
-      }
+      await apikeyRequestFn(dialogState.request.metadata.namespace, dialogState.request.metadata.name, value.reviewedBy);
 
       setDialogState({
         open: false,
@@ -737,29 +704,16 @@ export const ApprovalQueueTable = () => {
     setBulkAlertDialogState({ open: false, results: [], isApprove: true, });
 
     const isApprove = bulkDialogState.action === "approve";
-    const endpoint = isApprove
-      ? `${backendUrl}/api/kuadrant/requests/bulk-approve`
-      : `${backendUrl}/api/kuadrant/requests/bulk-reject`;
+    const apiKeyRequestsFn = isApprove
+      ? (req: { namespace: string, name: string }[], rb: string) => kuadrantApi.bulkApproveRequests(req, rb)
+      : (req: { namespace: string, name: string }[], rb: string) => kuadrantApi.bulkRejectRequests(req, rb)
 
     try {
-      const response = await fetchApi.fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          requests: bulkDialogState.requests.map((r) => ({
-            namespace: r.metadata.namespace,
-            name: r.metadata.name,
-          })),
-          reviewedBy: value.reviewedBy,
-        }),
-      });
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(err);
-      }
-      const bulkResponseRaw = await response.json();
-      const bulkResponse = bulkResponseRaw.results || [];
+      const requests = bulkDialogState.requests.map((r) => ({
+        namespace: r.metadata.namespace,
+        name: r.metadata.name,
+      }))
+      const bulkResponse = await apiKeyRequestsFn(requests, value.reviewedBy) || [];
 
       const successfulItems = bulkResponse.filter((res: any) => res.success);
       const failedItems = bulkResponse.filter((res: any) => !res.success);

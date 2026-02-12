@@ -22,6 +22,8 @@ import {
 } from '@backstage/integration-react';
 import { UserSettingsStorage } from '@backstage/plugin-user-settings';
 
+import { kuadrantApiFactory } from '@kuadrant/kuadrant-backstage-plugin-frontend';
+
 import {
   auth0AuthApiRef,
   oidcAuthApiRef,
@@ -94,6 +96,8 @@ export const apis: AnyApiFactory[] = [
     factory: ({ discoveryApi, configApi, identityApi }) =>
       new LearningPathApiClient({ discoveryApi, configApi, identityApi }),
   }),
+  // Kuadrant API
+  kuadrantApiFactory,
   // OIDC
   createApiFactory({
     api: oidcAuthApiRef,

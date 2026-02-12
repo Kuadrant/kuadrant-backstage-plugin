@@ -41,3 +41,6 @@ export {
   kuadrantApiKeyApprovePermission,
   kuadrantPermissions,
 } from './permissions';
+
+export { kuadrantApiRef, type KuadrantAPI } from './api';
+export { kuadrantApiFactory } from './apis';

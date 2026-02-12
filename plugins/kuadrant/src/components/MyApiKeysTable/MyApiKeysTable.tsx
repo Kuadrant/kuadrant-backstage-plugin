@@ -9,10 +9,9 @@ import {
 } from "@backstage/core-components";
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import useAsync from "react-use/lib/useAsync";
 import {
   Box,
@@ -41,7 +40,6 @@ import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey, APIProduct } from "../../types/api-management";
 import { getMyApiKeysStatusChipStyle } from "../../utils/styles";
-import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -110,10 +108,8 @@ const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
 export const MyApiKeysTable = () => {
   const classes = useStyles();
   const navigate = useNavigate();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
 
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
@@ -160,23 +156,13 @@ export const MyApiKeysTable = () => {
     loading,
     error,
   } = useAsync(async () => {
-    const [requestsResponse, productsResponse] = await Promise.all([
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/requests/my`),
-      fetchApi.fetch(`${backendUrl}/api/kuadrant/apiproducts`),
+    const [requestsData, productsData] = await Promise.all([
+      kuadrantApi.getRequests(),
+      kuadrantApi.getApiProducts(),
     ]);
 
-    if (!requestsResponse.ok) {
-      throw new Error("failed to fetch requests");
-    }
-
-    const requestsData = await requestsResponse.json();
     const requests: APIKey[] = requestsData.items || [];
-
-    let products: APIProduct[] = [];
-    if (productsResponse.ok) {
-      const productsData = await productsResponse.json();
-      products = productsData.items || [];
-    }
+    const products: APIProduct[] = productsData.items || [];
 
     // build owner map from products
     const ownerMap = new Map<string, string>();
@@ -187,7 +173,7 @@ export const MyApiKeysTable = () => {
     });
 
     return { requests, products, ownerMap };
-  }, [backendUrl, fetchApi, refresh]);
+  }, [kuadrantApi, refresh]);
 
   const allRequests = useMemo(() => {
     if (!data?.requests) return [];
@@ -300,14 +286,13 @@ export const MyApiKeysTable = () => {
 
     setApiKeyLoading((prev) => new Set(prev).add(key));
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apikeys/${requestNamespace}/${requestName}/secret`,
-      );
-      if (response.ok) {
-        const result = await response.json();
-        setApiKeyValues((prev) => new Map(prev).set(key, result.apiKey));
-        setAlreadyReadKeys((prev) => new Set(prev).add(key));
-      } else if (response.status === 403) {
+      const result = await kuadrantApi.getApiKeySecret(requestNamespace, requestName);
+      setApiKeyValues((prev) => new Map(prev).set(key, result.apiKey));
+      setAlreadyReadKeys((prev) => new Set(prev).add(key));
+    } catch (err) {
+      const errorMessage =
+        err instanceof Error ? err.message : "unknown error occurred";
+      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
         setAlreadyReadKeys((prev) => new Set(prev).add(key));
         alertApi.post({
           message:
@@ -315,15 +300,13 @@ export const MyApiKeysTable = () => {
           severity: "warning",
           display: "transient",
         });
+      } else {
+        alertApi.post({
+          message: `Failed to fetch api key: ${errorMessage}`,
+          severity: "error",
+          display: "transient",
+        });
       }
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : "unknown error occurred";
-      alertApi.post({
-        message: `Failed to fetch api key: ${errorMessage}`,
-        severity: "error",
-        display: "transient",
-      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -356,20 +339,12 @@ export const MyApiKeysTable = () => {
     try {
       const apiProductName = request.spec.apiProductRef?.name;
       const apiProductNamespace = request.metadata.namespace;
-      const apiProductResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${apiProductNamespace}/${apiProductName}`,
-      );
-
-      if (apiProductResponse.ok) {
-        const apiProduct = await apiProductResponse.json();
-        const plans = apiProduct.spec?.plans || [];
-        setEditDialogState({ open: true, request, plans });
-      } else {
-        setEditDialogState({ open: true, request, plans: [] });
-      }
+      const apiProduct = await kuadrantApi.getApiProduct(apiProductNamespace, apiProductName);
+      const plans = apiProduct.status?.discoveredPlans || [];
+      setEditDialogState({ open: true, request, plans });
     } catch (err) {
       console.error("Error fetching plans:", err);
-      setEditDialogState({ open: true, request, plans: [] });
+      setEditDialogState({ open: true, request: menuRequest, plans: [] });
       const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
         message: `Failed to fetch Plans. ${errorMessage}`,
@@ -396,16 +371,7 @@ export const MyApiKeysTable = () => {
     setDeleting(requestName);
 
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/requests/${request.metadata.namespace}/${request.metadata.name}`,
-        { method: "DELETE" },
-      );
-
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(`Failed to delete request. ${err}`);
-      }
-
+      await kuadrantApi.deleteRequest(request.metadata.namespace, request.metadata.name);
       setRefresh((r) => r + 1);
       alertApi.post({
         message: "API key deleted",

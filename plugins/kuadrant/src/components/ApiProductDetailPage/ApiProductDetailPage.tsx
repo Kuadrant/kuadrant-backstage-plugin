@@ -2,10 +2,9 @@ import React, { useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   useApi,
-  configApiRef,
-  fetchApiRef,
   alertApiRef,
 } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from '../../api';
 import { useAsync } from "react-use";
 import {
   Header,
@@ -49,7 +48,6 @@ import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteAllPermission,
 } from "../../permissions";
-import {handleFetchError} from "../../utils/errors.ts";
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -81,10 +79,8 @@ export const ApiProductDetailPage = () => {
   const classes = useStyles();
   const { namespace, name } = useParams<{ namespace: string; name: string }>();
   const navigate = useNavigate();
-  const config = useApi(configApiRef);
-  const fetchApi = useApi(fetchApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
-  const backendUrl = config.getString("backend.baseUrl");
 
   const [selectedTab, setSelectedTab] = useState(0);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -101,17 +97,8 @@ export const ApiProductDetailPage = () => {
     loading,
     error,
   } = useAsync(async () => {
-    const response = await fetchApi.fetch(
-      `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`
-    );
-
-    if (!response.ok) {
-      const err = await handleFetchError(response);
-      throw new Error(`Failed to fetch API product. ${err}`);
-    }
-
-    return response.json() as Promise<APIProduct>;
-  }, [namespace, name, backendUrl, fetchApi, refreshKey]);
+    return await kuadrantApi.getApiProduct(namespace!, name!) as APIProduct;
+  }, [namespace, name, kuadrantApi, refreshKey]);
 
   // fetch httproute to get hostnames
   const { value: httpRouteHostnames } = useAsync(async () => {
@@ -120,18 +107,10 @@ export const ApiProductDetailPage = () => {
     }
 
     const routeName = product.spec.targetRef.name;
-    const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/httproutes/${namespace}/${routeName}`
-    );
+    const route = await kuadrantApi.getHttpRoute(namespace!, routeName)
 
-    if (!response.ok) {
-      const err = await handleFetchError(response);
-      throw new Error(`Failed to fetch HTTPRoute. ${err}`);
-    }
-
-    const route = await response.json();
     return route?.spec?.hostnames || null;
-  }, [product, namespace, backendUrl, fetchApi]);
+  }, [product, namespace, kuadrantApi]);
 
   const handlePublishToggle = async () => {
     if (!product) return;
@@ -149,18 +128,8 @@ export const ApiProductDetailPage = () => {
     }
 
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ spec: { publishStatus: newStatus } }),
-        }
-      );
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(err);
-      }
+      // @ts-ignore since updating partially the obj
+      await kuadrantApi.updateApiProduct(namespace!, name!, { spec: { publishStatus: newStatus } });
       alertApi.post({
         message: `API Product ${newStatus === "Published" ? "published" : "unpublished"} successfully`,
         severity: "success",
@@ -191,14 +160,7 @@ export const ApiProductDetailPage = () => {
     if (!product) return;
     setDeleting(true);
     try {
-      const response = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/apiproducts/${namespace}/${name}`,
-        { method: "DELETE" }
-      );
-      if (!response.ok) {
-        const err = await handleFetchError(response);
-        throw new Error(err);
-      }
+      await kuadrantApi.deleteApiProduct(namespace!, name!);
       setDeleteDialogOpen(false);
       alertApi.post({
         message: "API Product deleted successfully",
