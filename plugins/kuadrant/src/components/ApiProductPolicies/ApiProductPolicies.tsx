@@ -54,7 +54,7 @@ export const ApiProductPolicies: React.FC<ApiProductPoliciesProps> = ({
       border={`1px solid ${theme.palette.divider}`}
     >
       <Grid container spacing={2}>
-        {/* planpolicy chip shown when either plan exist or ratelimitpolicy does not exit*/}
+        {/* planpolicy chip shown when either plan exist or ratelimitpolicy does not exist*/}
         {((planPolicy?.statusCondition && planPolicy.statusCondition.status === "True") || !rateLimitPolicy?.statusCondition) ? (
           <Grid item xs={12} md={6}>
             <Typography variant="body2" color="textSecondary" gutterBottom>

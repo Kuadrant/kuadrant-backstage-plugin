@@ -1623,11 +1623,11 @@ export async function createRouter({
 
       res.json(filtered);
     } catch (error) {
-      console.error('error fetching authpolicies:', error);
+      console.error('error fetching ratelimitpolicies:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
       } else {
-        res.status(500).json({ error: 'failed to fetch authpolicies' });
+        res.status(500).json({ error: 'failed to fetch ratelimitpolicies' });
       }
     }
   });

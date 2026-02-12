@@ -122,7 +122,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
             const parts = value.split(' ');
             return parts.length >= 3 ? parts[2] : '';
           };
-          const authPolicyName = authPolicyCondition?.status === "True" ? parseNameFromMessage(authPolicyCondition.message) : "";
+          const authPolicyName = authPolicyCondition?.status === "True" ? parseNameFromMessage(authPolicyCondition.message ?? "") : "";
           setAuthPolicyProps({
             statusCondition: authPolicyCondition,
             namespacedName: {
