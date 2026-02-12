@@ -39,6 +39,8 @@ export {
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
   kuadrantApiKeyApprovePermission,
+  kuadrantAuthPolicyListPermission,
+  kuadrantRateLimitPolicyListPermission,
   kuadrantPermissions,
 } from './permissions';
 

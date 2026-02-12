@@ -26,11 +26,13 @@ import AddIcon from '@material-ui/icons/Add';
 import { useApi } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
+import useAsync from 'react-use/lib/useAsync';
 import { Progress } from '@backstage/core-components';
-import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
+import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps, RateLimitPoliciesProps } from '../ApiProductPolicies';
 import { validateURL } from '../../utils/validation';
-import {APIProduct, Plan} from "../../types/api-management.ts";
+import { APIProduct } from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
+import { getPolicyForRoute } from '../../utils/policies';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -78,7 +80,8 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
   const [contactTeam, setContactTeam] = useState('');
   const [docsURL, setDocsURL] = useState('');
   const [openAPISpec, setOpenAPISpec] = useState('');
-  const [discoveredPlans, setdiscoveredPlans] = useState<Plan[]>([]);
+  const [planPolicyProps, setPlanPoliciesProps] = useState<PlanPoliciesProps | null>(null);
+  const [authPolicyProps, setAuthPolicyProps] = useState<AuthPoliciesProps | null>(null);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
   const [openAPISpecError, setOpenAPISpecError] = useState<string | null>(null);
@@ -102,7 +105,31 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           setContactTeam(data.spec.contact?.team || '');
           setDocsURL(data.spec.documentation?.docsURL || '');
           setOpenAPISpec(data.spec.documentation?.openAPISpecURL || '');
-          setdiscoveredPlans(data.status?.discoveredPlans || []);
+          const planPolicyCondition = data.status?.conditions?.find(
+            (c: any) => c.type === "PlanPolicyDiscovered"
+          ) || null;
+          setPlanPoliciesProps({
+            statusCondition: planPolicyCondition,
+            discoveredPlans: data.status?.discoveredPlans || null,
+          });
+          const authPolicyCondition = data.status?.conditions?.find(
+            (c: any) => c.type === "AuthPolicyDiscovered"
+          ) || null;
+          // Parse the auth policy name from the AuthPolicyDiscovered condition message
+          // It's the only place to get the policy name without fetching all the policies.
+          // Consider enhancing the developer portal controller to provide name in an structured way
+          const parseNameFromMessage = (value: string) => {
+            const parts = value.split(' ');
+            return parts.length >= 3 ? parts[2] : '';
+          };
+          const authPolicyName = authPolicyCondition?.status === "True" ? parseNameFromMessage(authPolicyCondition.message ?? "") : "";
+          setAuthPolicyProps({
+            statusCondition: authPolicyCondition,
+            namespacedName: {
+              name: authPolicyName,
+              namespace: data.metadata.namespace,
+            },
+          });
           setOpenAPISpecError(null);
           setLoading(false);
         })
@@ -118,6 +145,28 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
       setOpenAPISpecError(null);
     }
   }, [open]);
+
+  // load ratelimitpolicies
+  const {
+    value: rateLimitPolicies,
+    error: rateLimitPoliciesError
+  } = useAsync(async () => {
+    return await kuadrantApi.getRateLimitPolicies();
+  }, [kuadrantApi, open]);
+
+  const selectedRateLimitPolicy = targetRef
+    ? getPolicyForRoute(rateLimitPolicies?.items, namespace, targetRef.name)
+    : null;
+  const rateLimitPolicyAcceptedCondition = selectedRateLimitPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const rateLimitPolicyProps: RateLimitPoliciesProps = {
+    namespacedName: {
+      namespace: selectedRateLimitPolicy?.metadata.namespace,
+      name: selectedRateLimitPolicy?.metadata.name,
+    },
+    statusCondition: rateLimitPolicyAcceptedCondition,
+  }
 
   const handleOpenAPISpecChange = (value: string) => {
     setOpenAPISpec(value);
@@ -194,6 +243,11 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
         {error && (
           <Alert severity="error" style={{ marginBottom: 16 }}>
             {error}
+          </Alert>
+        )}
+        {rateLimitPoliciesError && (
+          <Alert severity="error" style={{ marginBottom: 16 }}>
+            <strong>Failed to load RateLimitPolicies:</strong> {rateLimitPoliciesError.message}
           </Alert>
         )}
         {loading ? (
@@ -365,10 +419,10 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                     <InfoOutlinedIcon className={classes.infoIcon} />
                   </Tooltip>
                 </Box>
-                <PlanPolicyDetails
-                  discoveredPlans={discoveredPlans}
-                  alertSeverity="info"
-                  alertMessage="No PlanPolicy found for this HTTPRoute."
+                <ApiProductPolicies
+                  planPolicy={planPolicyProps}
+                  authPolicy={authPolicyProps}
+                  rateLimitPolicy={rateLimitPolicyProps}
                   includeTopMargin={false}
                 />
               </>

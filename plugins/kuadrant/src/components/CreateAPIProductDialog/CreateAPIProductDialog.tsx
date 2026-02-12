@@ -27,10 +27,11 @@ import { useApi } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { Alert } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
-import { PlanPolicyDetails } from '../PlanPolicyDetailsCard';
+import { ApiProductPolicies } from '../ApiProductPolicies';
 import { validateKubernetesName, validateURL } from '../../utils/validation';
-import {APIProduct} from "../../types/api-management.ts";
+import { APIProduct } from "../../types/api-management.ts";
 import { Lifecycle } from '../../types/api-management';
+import { getPolicyForRoute } from '../../utils/policies';
 
 const useStyles = makeStyles((theme) => ({
   asterisk: {
@@ -101,24 +102,74 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
     return await kuadrantApi.getPlanPolicies();
   }, [kuadrantApi, open]);
 
+  // load authpolicies
+  const {
+    value: authPolicies,
+    error: authPoliciesError
+  } = useAsync(async () => {
+    return await kuadrantApi.getAuthPolicies();
+  }, [kuadrantApi, open]);
+
+  // load ratelimitpolicies
+  const {
+    value: rateLimitPolicies,
+    error: rateLimitPoliciesError
+  } = useAsync(async () => {
+    return await kuadrantApi.getRateLimitPolicies();
+  }, [kuadrantApi, open]);
+
   // find planpolicy associated with selected httproute
   const getPlanPolicyForRoute = (routeNamespace: string, routeName: string) => {
-    if (!planPolicies?.items) return null;
+    return getPolicyForRoute(planPolicies?.items, routeNamespace, routeName);
+  };
 
-    return planPolicies.items.find((pp: any) => {
-      const ref = pp.targetRef;
-      return (
-        ref?.kind === 'HTTPRoute' &&
-        ref?.name === routeName &&
-        (!ref?.namespace || ref?.namespace === routeNamespace)
-      );
-    });
+  // find authpolicy associated with selected httproute
+  const getAuthPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    return getPolicyForRoute(authPolicies?.items, routeNamespace, routeName);
+  };
+
+  // find ratelimitpolicy associated with selected httproute
+  const getRateLimitPolicyForRoute = (routeNamespace: string, routeName: string) => {
+    return getPolicyForRoute(rateLimitPolicies?.items, routeNamespace, routeName);
   };
 
   const selectedRouteInfo = selectedHTTPRoute ? selectedHTTPRoute.split('/') : null;
-  const selectedPolicy = selectedRouteInfo
+  const selectedPlanPolicy = selectedRouteInfo
     ? getPlanPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
     : null;
+  const planPolicyAcceptedCondition = selectedPlanPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const selectedAuthPolicy = selectedRouteInfo
+    ? getAuthPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
+  const authPolicyAcceptedCondition = selectedAuthPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const selectedRateLimitPolicy = selectedRouteInfo
+    ? getRateLimitPolicyForRoute(selectedRouteInfo[0], selectedRouteInfo[1])
+    : null;
+  const rateLimitPolicyAcceptedCondition = selectedRateLimitPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const planPolicyProps = {
+    statusCondition: planPolicyAcceptedCondition,
+    discoveredPlans: selectedPlanPolicy?.spec.plans,
+  }
+  const authPolicyProps = {
+    namespacedName: {
+      namespace: selectedAuthPolicy?.metadata.namespace,
+      name: selectedAuthPolicy?.metadata.name,
+    },
+    statusCondition: authPolicyAcceptedCondition,
+  }
+  const rateLimitPolicyProps = {
+    namespacedName: {
+      namespace: selectedRateLimitPolicy?.metadata.namespace,
+      name: selectedRateLimitPolicy?.metadata.name,
+    },
+    statusCondition: rateLimitPolicyAcceptedCondition,
+  }
 
   // format tier info for dropdown display
   const formatTierInfo = (policy: any): string => {
@@ -296,6 +347,16 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
             <Typography variant="body2" style={{ marginTop: 8 }}>
               You can still create the API Product, but plan information may be incomplete.
             </Typography>
+          </Alert>
+        )}
+        {authPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load AuthPolicies:</strong> {authPoliciesError.message}
+          </Alert>
+        )}
+        {rateLimitPoliciesError && (
+          <Alert severity="warning" style={{ marginBottom: 16 }}>
+            <strong>Failed to load RateLimitPolicies:</strong> {rateLimitPoliciesError.message}
           </Alert>
         )}
         {/* API product info section */}
@@ -561,29 +622,29 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                   }
                 })
                 .map((route: any) => {
-                const routeNs = route.metadata.namespace;
-                const routeName = route.metadata.name;
-                const policyInfo = getPolicyInfoForRoute(routeNs, routeName);
-                return (
-                  <MenuItem
-                    key={`${routeNs}/${routeName}`}
-                    value={`${routeNs}/${routeName}`}
-                  >
-                    <Box>
-                      <Typography variant="body1">{routeName}</Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        Associated PlanPolicy: {policyInfo}
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                );
-              })}
+                  const routeNs = route.metadata.namespace;
+                  const routeName = route.metadata.name;
+                  const policyInfo = getPolicyInfoForRoute(routeNs, routeName);
+                  return (
+                    <MenuItem
+                      key={`${routeNs}/${routeName}`}
+                      value={`${routeNs}/${routeName}`}
+                    >
+                      <Box>
+                        <Typography variant="body1">{routeName}</Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          Associated PlanPolicy: {policyInfo}
+                        </Typography>
+                      </Box>
+                    </MenuItem>
+                  );
+                })}
             </TextField>
           </Grid>
         </Grid>
 
         {/* HTTPRoute policies section */}
-        {selectedHTTPRoute && selectedPolicy && (
+        {selectedHTTPRoute && (
           <>
             <Box className={classes.sectionHeader}>
               <Typography variant="subtitle1"><strong>HTTPRoute policies</strong></Typography>
@@ -591,10 +652,10 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
                 <InfoOutlinedIcon className={classes.infoIcon} />
               </Tooltip>
             </Box>
-            <PlanPolicyDetails
-              discoveredPlans={selectedPolicy.spec?.plans}
-              alertSeverity="warning"
-              alertMessage="No PlanPolicy found for this HTTPRoute. API keys and rate limiting may not be available."
+            <ApiProductPolicies
+              planPolicy={planPolicyProps}
+              authPolicy={authPolicyProps}
+              rateLimitPolicy={rateLimitPolicyProps}
               includeTopMargin={false}
             />
           </>

@@ -269,33 +269,33 @@ export const ApiProductDetails = ({
 
         {(product.spec?.documentation?.docsURL ||
           product.spec?.documentation?.openAPISpecURL) && (
-          <Grid item xs={12} md={6}>
-            <Typography variant="caption" className={classes.label}>
-              Documentation
-            </Typography>
-            <Box mt={1}>
-              {product.spec.documentation.docsURL && (
-                <Typography variant="body2">
-                  <strong>Docs:</strong>{" "}
-                  <Link to={product.spec.documentation.docsURL} target="_blank">
-                    View Documentation
-                  </Link>
-                </Typography>
-              )}
-              {product.spec.documentation.openAPISpecURL && (
-                <Typography variant="body2">
-                  <strong>OpenAPI Spec:</strong>{" "}
-                  <Link
-                    to={product.spec.documentation.openAPISpecURL}
-                    target="_blank"
-                  >
-                    View Spec
-                  </Link>
-                </Typography>
-              )}
-            </Box>
-          </Grid>
-        )}
+            <Grid item xs={12} md={6}>
+              <Typography variant="caption" className={classes.label}>
+                Documentation
+              </Typography>
+              <Box mt={1}>
+                {product.spec.documentation.docsURL && (
+                  <Typography variant="body2">
+                    <strong>Docs:</strong>{" "}
+                    <Link to={product.spec.documentation.docsURL} target="_blank">
+                      View Documentation
+                    </Link>
+                  </Typography>
+                )}
+                {product.spec.documentation.openAPISpecURL && (
+                  <Typography variant="body2">
+                    <strong>OpenAPI Spec:</strong>{" "}
+                    <Link
+                      to={product.spec.documentation.openAPISpecURL}
+                      target="_blank"
+                    >
+                      View Spec
+                    </Link>
+                  </Typography>
+                )}
+              </Box>
+            </Grid>
+          )}
       </Grid>
     </>
   );

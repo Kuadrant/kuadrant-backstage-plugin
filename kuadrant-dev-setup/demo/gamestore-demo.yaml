@@ -98,6 +98,22 @@ spec:
         jwt:
           issuerUrl: https://oidc.example.com/realms/demo
 ---
+apiVersion: kuadrant.io/v1
+kind: RateLimitPolicy
+metadata:
+  name: gamestore
+  namespace: gamestore
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: gamestore
+  limits:
+    "basic":
+      rates:
+      - limit: 100
+        window: 60s
+---
 apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct
 metadata:
@@ -220,3 +236,26 @@ spec:
     team: api-owners
     email: api-owners@example.com
     slack: "#api-support"
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: policy-free
+  namespace: gamestore
+  annotations:
+    info: This HTTPRoute should not be affected by any policy
+spec:
+  parentRefs:
+    - name: external
+      namespace: gamestore
+  hostnames:
+    - policy-free.gamestore.example.com
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /
+          method: GET
+      backendRefs:
+        - name: gamestore
+          port: 80

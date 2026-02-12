@@ -48,6 +48,18 @@ export const kuadrantPlanPolicyListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+// authpolicy permissions
+export const kuadrantAuthPolicyListPermission = createPermission({
+  name: 'kuadrant.authpolicy.list',
+  attributes: { action: 'read' },
+});
+
+// ratelimitpolicy permissions
+export const kuadrantRateLimitPolicyListPermission = createPermission({
+  name: 'kuadrant.ratelimitpolicy.list',
+  attributes: { action: 'read' },
+});
+
 // apiproduct permissions
 
 /**
@@ -225,4 +237,6 @@ export const kuadrantPermissions = [
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantApiKeyDeleteAllPermission,
   kuadrantApiKeyApprovePermission,
+  kuadrantAuthPolicyListPermission,
+  kuadrantRateLimitPolicyListPermission,
 ];

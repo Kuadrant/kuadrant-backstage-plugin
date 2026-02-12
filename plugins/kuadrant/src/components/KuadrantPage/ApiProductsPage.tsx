@@ -188,7 +188,7 @@ const ResourceList = () => {
     if (!targetRef) return null;
 
     const policy = planPolicies.items.find((pp: PlanPolicy) => {
-      const ref = (pp as any).targetRef;
+      const ref = (pp as any).spec.targetRef;
       return (
         ref?.kind === "HTTPRoute" &&
         ref?.name === targetRef.name &&
