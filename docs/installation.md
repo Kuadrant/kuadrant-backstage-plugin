@@ -50,6 +50,7 @@ The plugins require a Kubernetes cluster with Kuadrant installed. You can either
 Create a service account with permissions to manage Kuadrant resources:
 
 ```yaml
+kubectl apply -f - <<EOF
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -69,7 +70,7 @@ rules:
   - apiGroups: ["devportal.kuadrant.io"]
     resources: ["apiproducts", "apikeys"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["kuadrant.io"]
+  - apiGroups: ["extensions.kuadrant.io"]
     resources: ["planpolicies"]
     verbs: ["get", "list", "watch"]
   - apiGroups: [""]
@@ -91,6 +92,7 @@ subjects:
   - kind: ServiceAccount
     name: rhdh-kuadrant
     namespace: rhdh
+EOF
 ```
 
 Generate a long-lived token:
@@ -170,6 +172,15 @@ npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic dist.integrity
 Add to `configs/app-config/app-config.yaml`:
 
 ```yaml
+# Testing only: enables guest access for rhdh-local.
+# In production, configure your own identity provider and map roles/permissions to your users or groups.
+auth:
+  environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+      userEntityRef: user:default/guest
+
 kubernetes:
   serviceLocatorMethod:
     type: multiTenant
@@ -185,7 +196,16 @@ kubernetes:
 
 > **Note**: Use `host.docker.internal` to access the host machine's kind cluster from Docker. Get the port with `kubectl cluster-info`.
 
-### 3. Configure RBAC
+### 3. Configure Catalog Rules
+
+Add APIProduct to `app-config.local.yaml`:
+
+```yaml
+catalog:
+  rules:
+    - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
+```
+### 4. Configure RBAC
 
 Add to `configs/app-config/app-config.yaml`:
 
@@ -199,7 +219,7 @@ permission:
 
 Create `configs/rbac-policy.csv` with the [RBAC policy content](#rbac-policy).
 
-### 4. Start RHDH
+### 5. Start RHDH
 
 ```bash
 docker compose up
@@ -227,10 +247,21 @@ For production RHDH deployments (Operator or Helm), the configuration is the sam
      name: dynamic-plugins-rhdh
    data:
      dynamic-plugins.yaml: |
-       # Same content as dynamic-plugins.override.yaml
+       # Same content as dynamic-plugins.override.yaml (section 1 above)
    ```
 
-2. **Backstage CR reference:**
+2. **App-config ConfigMap:**
+   ```yaml
+   kind: ConfigMap
+   apiVersion: v1
+   metadata:
+     name: app-config-rhdh
+   data:
+     app-config-kuadrant.yaml: |
+       # Same content as sections 2-4 above (Kubernetes Access, Catalog Rules, RBAC)
+   ```
+
+3. **Backstage CR reference:**
    ```yaml
    apiVersion: rhdh.redhat.com/v1alpha3
    kind: Backstage
@@ -239,9 +270,12 @@ For production RHDH deployments (Operator or Helm), the configuration is the sam
    spec:
      application:
        dynamicPluginsConfigMapName: dynamic-plugins-rhdh
+       appConfig:
+         configMaps:
+           - name: app-config-rhdh
    ```
 
-3. **Kubernetes credentials as Secret:**
+4. **Kubernetes credentials as Secret:**
    ```yaml
    apiVersion: v1
    kind: Secret
@@ -262,11 +296,11 @@ For production RHDH deployments (Operator or Helm), the configuration is the sam
            - name: rhdh-k8s-credentials
    ```
 
-4. **Cluster URL**: Use the actual cluster API URL instead of `host.docker.internal`.
+5. **Cluster URL**: Use the actual cluster API URL instead of `host.docker.internal`.
 
-5. **TLS**: Set `skipTLSVerify: false` and configure proper TLS certificates.
+6. **TLS**: Set `skipTLSVerify: false` and configure proper TLS certificates.
 
-6. **Verify installation** at `<rhdh-url>/api/dynamic-plugins-info/loaded-plugins`.
+7. **Verify installation** at `<RHDH-URL>/api/dynamic-plugins-info/loaded-plugins`.
 
 ---
 
@@ -359,7 +393,22 @@ import ExtensionIcon from '@material-ui/icons/Extension';
 <SidebarItem icon={ExtensionIcon} to="kuadrant" text="Kuadrant" />
 ```
 
-### 5. Configure Kubernetes Access
+### 5. Configure Auth
+
+Add to `app-config.yaml`. The `userEntityRef` ensures the guest user identity matches the RBAC policy:
+
+```yaml
+# Testing only: enables guest access for local development.
+# In production, configure your own identity provider and map roles/permissions to your users or groups.
+auth:
+  environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+      userEntityRef: user:default/guest
+```
+
+### 6. Configure Kubernetes Access
 
 Add to `app-config.yaml`:
 
@@ -377,7 +426,7 @@ kubernetes:
           skipTLSVerify: true
 ```
 
-### 6. Configure Catalog Rules
+### 7. Configure Catalog Rules
 
 Add to `app-config.yaml`:
 
@@ -387,19 +436,51 @@ catalog:
     - allow: [Component, System, API, APIProduct, Resource, Location]
 ```
 
-### 7. Configure Permissions
+### 8. Configure Permissions and RBAC
 
 Add to `app-config.yaml`:
 
 ```yaml
 permission:
   enabled: true
+  rbac:
+    policies-csv-file: ./configs/rbac-policy.csv
+    policyFileReload: true
 ```
 
-### 8. Start Backstage
+Then create the RBAC policy file at `configs/rbac-policy.csv` in your project root. See the [RBAC Policy](#rbac-policy) section for the full file contents.
+
+For example, to grant the guest user admin access:
 
 ```bash
-yarn dev
+mkdir -p configs
+```
+
+Create `configs/rbac-policy.csv` with the policies from the [RBAC Policy](#rbac-policy) section.
+
+### 9. Register RBAC Backend Plugin
+
+The default Backstage permission backend uses an allow-all policy. To use the RBAC CSV policies, replace it with the community RBAC plugin.
+
+In `packages/backend/src/index.ts`, replace:
+
+```typescript
+backend.add(
+  import('@backstage/plugin-permission-backend-module-allow-all-policy'),
+);
+```
+
+with:
+
+```typescript
+// RBAC permission policy
+backend.add(import('@backstage-community/plugin-rbac-backend'));
+```
+
+### 10. Start Backstage
+
+```bash
+yarn start
 ```
 
 Visit http://localhost:3000/kuadrant
@@ -454,6 +535,10 @@ p, role:default/api-admin, catalog.entity.read, read, allow
 g, group:default/api-consumers, role:default/api-consumer
 g, group:default/api-owners, role:default/api-owner
 g, group:default/api-admins, role:default/api-admin
+
+# Development/testing only: assign guest user to admin role.
+# For production, remove this line and assign roles to your actual users or groups.
+g, user:default/guest, role:default/api-admin
 ```
 
 ---
