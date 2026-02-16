@@ -1,6 +1,7 @@
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import AddCircle from '@mui/icons-material/AddCircleOutline';
 import Api from '@mui/icons-material/ApiOutlined';
+import Approval from '@mui/icons-material/ApprovalOutlined';
 import Bookmarks from '@mui/icons-material/BookmarksOutlined';
 import Business from '@mui/icons-material/BusinessOutlined';
 import Category from '@mui/icons-material/CategoryOutlined';
@@ -68,6 +69,7 @@ const CommonIcons: {
   admin: AdminIcon,
   key: Key,
   api: Api,
+  approval: Approval,
   kuadrant: Kuadrant,
 };
 
