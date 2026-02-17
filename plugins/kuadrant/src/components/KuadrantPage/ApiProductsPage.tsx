@@ -30,6 +30,7 @@ import {
   alertApiRef,
   identityApiRef,
 } from "@backstage/core-plugin-api";
+import { catalogApiRef } from "@backstage/plugin-catalog-react";
 import {kuadrantApiRef, KuadrantList} from "../../api";
 import { PermissionGate } from "../PermissionGate";
 import { CreateAPIProductDialog } from "../CreateAPIProductDialog";
@@ -94,6 +95,7 @@ const ResourceList = () => {
   const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
   const identityApi = useApi(identityApiRef);
+  const catalogApi = useApi(catalogApiRef);
   const [userEntityRef, setUserEntityRef] = useState<string>("");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -181,6 +183,36 @@ const ResourceList = () => {
     return kuadrantApi.getPlanPolicies();
   }, [kuadrantApi, refreshTrigger, canListPlanPolicies]);
 
+  // fetch catalog entities synced from apiproducts to get lifecycle
+  const { value: catalogEntities } = useAsync(async () => {
+    const response = await catalogApi.getEntities({
+      filter: {
+        kind: 'API',
+        'metadata.labels.kuadrant.io/synced': 'true',
+      },
+      fields: ['metadata.name', 'spec.lifecycle'],
+    });
+    return response.items;
+  }, [catalogApi, refreshTrigger]);
+
+  // build name -> lifecycle lookup from catalog entities
+  const lifecycleByName = useMemo(() => {
+    const map = new Map<string, string>();
+    if (catalogEntities) {
+      for (const entity of catalogEntities) {
+        const lifecycle = (entity.spec as any)?.lifecycle;
+        if (lifecycle) {
+          map.set(entity.metadata.name, lifecycle);
+        }
+      }
+    }
+    return map;
+  }, [catalogEntities]);
+
+  const getLifecycle = useCallback((product: APIProduct): string | undefined => {
+    return lifecycleByName.get(product.metadata.name);
+  }, [lifecycleByName]);
+
   // helper to find policy for a given route
   const getPolicyForProduct = useCallback((product: APIProduct): string | null => {
     if (!planPolicies?.items) return null;
@@ -254,8 +286,10 @@ const ResourceList = () => {
       const status = p.spec?.publishStatus || "Draft";
       statusCounts[status as keyof typeof statusCounts]++;
 
-      const lifecycle = p.metadata.labels?.lifecycle || "production";
-      lifecycleCounts.set(lifecycle, (lifecycleCounts.get(lifecycle) || 0) + 1);
+      const lifecycle = getLifecycle(p);
+      if (lifecycle) {
+        lifecycleCounts.set(lifecycle, (lifecycleCounts.get(lifecycle) || 0) + 1);
+      }
 
       const policy = getPolicyForProduct(p) || "N/A";
       policyCounts.set(policy, (policyCounts.get(policy) || 0) + 1);
@@ -351,7 +385,7 @@ const ResourceList = () => {
     }
 
     return sections;
-  }, [allProducts, getPolicyForProduct, getAuthSchemes, canListPlanPolicies]);
+  }, [allProducts, getPolicyForProduct, getAuthSchemes, getLifecycle, canListPlanPolicies]);
 
   const filteredProducts = useMemo(() => {
     return allProducts.filter((p: APIProduct) => {
@@ -361,8 +395,8 @@ const ResourceList = () => {
       }
 
       if (filters.lifecycle && filters.lifecycle.length > 0) {
-        const lifecycle = p.metadata.labels?.lifecycle || "production";
-        if (!filters.lifecycle.includes(lifecycle)) return false;
+        const lifecycle = getLifecycle(p);
+        if (!lifecycle || !filters.lifecycle.includes(lifecycle)) return false;
       }
 
       if (filters.authentication.length > 0) {
@@ -391,7 +425,7 @@ const ResourceList = () => {
 
       return true;
     });
-  }, [allProducts, filters, getPolicyForProduct, getAuthSchemes]);
+  }, [allProducts, filters, getPolicyForProduct, getAuthSchemes, getLifecycle]);
 
   const handleCreateSuccess = (productInfo: { namespace: string; name: string; displayName: string }) => {
     setRefreshTrigger((prev) => prev + 1);
@@ -488,10 +522,8 @@ const ResourceList = () => {
     const displayName = row.spec?.displayName || name;
     const currentStatus = row.spec?.publishStatus || "Draft";
     const newStatus = currentStatus === "Published" ? "Draft" : "Published";
-    const lifecycle = row.metadata.labels?.lifecycle;
-
     // prevent publishing retired APIs
-    if (newStatus === "Published" && lifecycle === "retired") {
+    if (newStatus === "Published" && getLifecycle(row) === "retired") {
       alertApi.post({
         message: `Cannot publish a retired API product. Please change the lifecycle status first.`,
         severity: "error",
@@ -595,9 +627,8 @@ const ResourceList = () => {
     },
     {
       title: "Lifecycle",
-      field: "metadata.labels.lifecycle",
       render: (row: any) => {
-        const lifecycle = row.metadata.labels?.lifecycle;
+        const lifecycle = getLifecycle(row);
         if (!lifecycle) return "-";
         return (
           <Chip

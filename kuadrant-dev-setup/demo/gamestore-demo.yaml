@@ -120,7 +120,7 @@ metadata:
   name: gamestore-api
   namespace: gamestore
   annotations:
-    backstage.io/owner: user:default/guest
+    backstage.io/owner: user:default/owner2
 spec:
   displayName: Gamestore API
   description: Simple game store api for demonstration
@@ -213,7 +213,7 @@ metadata:
   name: gamestore-admin
   namespace: gamestore
   annotations:
-    backstage.io/owner: user:default/guest
+    backstage.io/owner: user:default/admin
 spec:
   displayName: Gamestore Admin API
   description: Simple game store admin api for demonstration
