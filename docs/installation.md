@@ -27,7 +27,10 @@ In short: frontend plugins are bundled by the consuming app (so source is fine),
 
 The plugins require a Kubernetes cluster with Kuadrant installed. You can either:
 
-1. **Use the development setup** (recommended for testing):
+1. **Use an existing cluster** with:
+   - [Kuadrant operator 1.4+](https://docs.kuadrant.io/latest/getting-started/) installed
+
+2. **Use the development setup** (recommended for testing):
    ```bash
    cd kuadrant-dev-setup
    make kind-create
@@ -40,46 +43,202 @@ The plugins require a Kubernetes cluster with Kuadrant installed. You can either
    - Demo resources (toystore)
    - RHDH service account with proper RBAC
 
-2. **Use an existing cluster** with:
-   - [Kuadrant operator](https://docs.kuadrant.io/latest/getting-started/) installed
-   - Gateway API CRDs
-   - Developer Portal controller (included in Kuadrant)
+## Installation on Red Hat Developer Hub (RHDH)
 
-### Service Account Setup
+This section covers installing the Kuadrant plugins on a Red Hat Developer Hub deployment in a Kubernetes/Openshift cluster.
 
-Create a service account with permissions to manage Kuadrant resources:
+### Prerequisites
+
+* Red Hat Developer Hub
+
+The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.6** (based on Backstage 1.45.3).
+
+**Installation guide:**
+- [Installing Red Hat Developer Hub](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/)
+
+Choose your preferred deployment method:
+- Operator-based deployment (recommended for production)
+- Helm-based deployment
+
+### Provisioning your custom Developer Hub configuration
+
+Set the following environment variables used for convenience in this tutorial:
+
+```sh
+# Your backstage instance namespace. Choose your own.
+export RHDH_NS=rhdh
+export KUADRANT_PLUGIN_VERSION=v0.1.0
+export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION dist.integrity)
+export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION dist.integrity)
+# base hostname of the cluster.
+# In openshift, this can be easily read with the following command
+#  oc get ingress.config.openshift.io cluster -o jsonpath='{.spec.domain}'
+export CLUSTER_HOSTNAME=apps.example.com
+```
+
+#### Backstage Namespace
+
+Create namespace for the backstage instance
+
+```sh
+kubectl create namespace $RHDH_NS
+```
+
+#### Dynamic Plugin configmap
+
+Create a config map with the dynamic plugin configuration required to load kuadrant backstage plugins as dynamic plugins.
+
+Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named, for example , `dynamic-plugins-rhdh.yaml`. Then, create `dynamnic-plugins-rhdh` configmap from that file.
+
+
+```sh
+kubectl create configmap dynamnic-plugins-rhdh --from-file=dynamnic-plugins-rhdh.yamnl --namespace=$RHDH_NS
+```
+
+#### Backstage app-config.yaml
+
+This is the main backstage application level configuration.
+
+1. **Enable authentication and the permission framework**
+
+Kuadrant backstage plugin requires that the permissions framework is setup and configured properly.
+
+Set the `permissions.enabled` to true in `app-config.yaml`
+
+```yaml
+permission:
+  enabled: true
+```
+
+Additionally, setup some [authentication in backstage](https://backstage.io/docs/auth/).
+
+```yaml
+auth:
+  providers: {}
+```
+
+2. **Setup RBAC for the kuadrant plugin functionality**
+
+This configuration will define kuadrant plugin user roles and permissions on those roles. Basically, who can do what withing the plugin.
+The kuadrant backstage plugin permission model is detailed in [RBAC and Permissions doc](/docs/rbac-permissions.md).
+
+Create `rbac-policy.csv` file with the kuadrant's plugin permission definition.
+You can start with [this RBAC policy content sample](#rbac-policy) that includes three roles `[api-consumer, api-owner, api-admin]`. Then, create `rbac-policies` configmap from that file.
+
+```sh
+kubectl create configmap rbac-policies --from-file=rbac-policy.csv --namespace=$RHDH_NS
+```
+
+Add reference to `rbac-policy.csv` file in the `permissions.rbac.policies-csv-file` section of the `app-config.yaml`
+
+```yaml
+permission:
+  rbac:
+    policies-csv-file: /opt/app-root/etc/rbac-policy.csv
+    policyFileReload: true
+```
+> The mounting path is configured later in the Backstage CR.
+
+* **Configure kubernetes access**
+
+Kubernetes access is configures in `app-config.yaml`.
+
+The recommended approach is so called `in-cluster` mode. In this mode, the backstage application running inside a Kubernetes pod authenticates to the Kubernetes API server using the service account automatically provided by Kubernetes.
+
+The `in-cluster` mode can be configured in two ways:
+
+1. No `kubernetes` section in `app-config.yaml`
+```yaml
+kubernetes: null
+```
+2. When `serviceAccountToken` is being ommited.
+```yaml
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: local-cluster
+          url: ignored
+          authProvider: serviceAccount
+```
+
+The kuadrant backstage plugin also supports the cluster locator method [config](https://backstage.io/docs/features/kubernetes/configuration#config). With this method, the kuadrant plugin will read cluster information, tipically cluster URL and cluster access token (which usually expires), from the `app-config.yaml` file.
+
+```yaml
+kubernetes:
+  serviceLocatorMethod:
+    type: multiTenant
+  clusterLocatorMethods:
+    - type: config
+      clusters:
+        - name: remote-cluster
+          url: https://example.com
+          authProvider: serviceAccount
+          serviceAccountToken: ${K8S_ACCESS_TOKEN}
+```
+
+* **Configure Catalog Rules**
+
+Add `APIProduct` to `catalog.rules`  in `app-config.yaml`:
+
+```yaml
+catalog:
+  rules:
+    - allow: [Component, System, API, APIProduct, Resource, Location]
+```
+
+Follow the steps in [Provisioning your custom Red Hat Developer Hub configuration](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/html/installing_red_hat_developer_hub_on_openshift_container_platform/assembly-install-rhdh-ocp-operator) for the full procedure.
+
+<details><summary>A full example for "app-config.yaml"</summary>
+
+```yaml
+app:
+  title: Red Hat Developer Hub
+  baseUrl: https://frontend.$CLUSTER_HOSTNAME
+
+# Testing only: enables guest access for rhdh-local.
+# In production, configure your own identity provider and map roles/permissions to your users or groups.
+auth:
+  environment: development
+  providers:
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+      userEntityRef: user:default/guest
+
+kubernetes: null
+
+catalog:
+  rules:
+    - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
+
+permission:
+  enabled: true
+  rbac:
+    policies-csv-file: /opt/app-root/etc/rbac-policy.csv
+    policyFileReload: true
+```
+
+</details>
+
+Finally, create a config map from the `app-config.yaml` file.
+
+```sh
+kubectl create configmap rhdh-app-config --from-file=app-config.yamnl --namespace=$RHDH_NS
+```
+
+### RBAC for Kuadrant CRDs
+
+This step grants permissions to the backstage application to manage kuadrant CRD's existing in the cluster. It consist on two steps: creating the clusterRole and then the ClusterRoleBinding.
+
+First, create the [ClusterRole](#clusterrole) which defines permissions on the kuadrant CRD's.
+
+By default, backstage application will run with the `default` service account of the namespace.
+Thus, secondly, we need to bind that cluster role to this service account with cluster wide scope. Therefore, create *CluterRoleBinding* as follows:
 
 ```yaml
 kubectl apply -f - <<EOF
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: rhdh
----
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: rhdh-kuadrant
-  namespace: rhdh
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: rhdh-kuadrant
-rules:
-  - apiGroups: ["devportal.kuadrant.io"]
-    resources: ["apiproducts", "apikeys"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: ["extensions.kuadrant.io"]
-    resources: ["planpolicies"]
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list", "create", "delete"]
-  - apiGroups: [""]
-    resources: ["namespaces"]
-    verbs: ["get", "list"]
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -90,20 +249,104 @@ roleRef:
   name: rhdh-kuadrant
 subjects:
   - kind: ServiceAccount
-    name: rhdh-kuadrant
-    namespace: rhdh
+    name: default
+    namespace: $RHDH_NS
 EOF
 ```
 
-Generate a long-lived token:
+You can verify permissions with the following command:
 
-```bash
-kubectl create token rhdh-kuadrant -n rhdh --duration=8760h
+```sh
+kubectl auth can-i update apikeys.devportal.kuadrant.io --as=system:serviceaccount:$RHDH_NS:default
 ```
 
----
+### Backstage instance
 
-## Installation on Red Hat Developer Hub (RHDH)
+The Backstage CR represents one backstage instance. It is where all preparation comes into one place and takes effect.
+
+* Link the dynamic plugin configmap
+
+```yaml
+spec:
+  application:
+    dynamicPluginsConfigMapName: dynamic-plugins-rhdh
+```
+
+* Link the main `rhdh-app-config` configmap
+
+```yaml
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+      configMaps:
+         - name: rhdh-app-config
+```
+
+* Link the RBAC policies from the `rbac-policies` configmap
+
+```yaml
+spec:
+  application:
+    extraFiles:
+      mountPath: /opt/app-root/etc
+      configMaps:
+         - name: rbac-policies
+```
+> The mounting path is referenced from `app-config.yaml`, RBAC for the kuadrant functionality section. Ensure they match.
+
+* [Optional] Enable serviceaccount token automount
+
+Only required for kubernetes access *in-cluster* mode.
+
+```yaml
+spec:
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            automountServiceAccountToken: true
+```
+
+<details><summary>A full example for "rhdh" Backstage instance</summary>
+
+```yaml
+# https://github.com/redhat-developer/rhdh-operator/blob/main/api/v1alpha3/backstage_types.go
+apiVersion: rhdh.redhat.com/v1alpha3
+kind: Backstage
+metadata:
+  name: rhdh
+  namespace: $RHDH_NS
+spec:
+  application:
+    appConfig:
+      mountPath: /opt/app-root/src
+      configMaps:
+         - name: rhdh-app-config
+    extraFiles:
+      mountPath: /opt/app-root/etc
+      configMaps:
+         - name: rbac-policies
+    route:
+      enabled: true
+      subdomain: frontend
+    dynamicPluginsConfigMapName: dynamic-plugins-rhdh
+  database:
+    enableLocalDb: true
+  deployment:
+    patch:
+      spec:
+        template:
+          spec:
+            automountServiceAccountToken: true
+```
+
+</details>
+
+Go to [backstage_types.go for v1alpha3](https://github.com/redhat-developer/rhdh-operator/blob/main/api/v1alpha3/backstage_types.go) for full reference on the Backstage CRD.
+
+## Installation on Red Hat Developer Hub (RHDH) Local
 
 This section covers installing the plugins using [rhdh-local](https://github.com/redhat-developer/rhdh-local) for local development with Docker Compose. For production RHDH deployments, see [Deploying to Production RHDH](#deploying-to-production-rhdh).
 
@@ -172,15 +415,6 @@ npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic dist.integrity
 Add to `configs/app-config/app-config.yaml`:
 
 ```yaml
-# Testing only: enables guest access for rhdh-local.
-# In production, configure your own identity provider and map roles/permissions to your users or groups.
-auth:
-  environment: development
-  providers:
-    guest:
-      dangerouslyAllowOutsideDevelopment: true
-      userEntityRef: user:default/guest
-
 kubernetes:
   serviceLocatorMethod:
     type: multiTenant
@@ -196,16 +430,7 @@ kubernetes:
 
 > **Note**: Use `host.docker.internal` to access the host machine's kind cluster from Docker. Get the port with `kubectl cluster-info`.
 
-### 3. Configure Catalog Rules
-
-Add APIProduct to `app-config.local.yaml`:
-
-```yaml
-catalog:
-  rules:
-    - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
-```
-### 4. Configure RBAC
+### 3. Configure RBAC
 
 Add to `configs/app-config/app-config.yaml`:
 
@@ -219,7 +444,7 @@ permission:
 
 Create `configs/rbac-policy.csv` with the [RBAC policy content](#rbac-policy).
 
-### 5. Start RHDH
+### 4. Start RHDH
 
 ```bash
 docker compose up
@@ -247,7 +472,7 @@ For production RHDH deployments (Operator or Helm), the configuration is the sam
      name: dynamic-plugins-rhdh
    data:
      dynamic-plugins.yaml: |
-       # Same content as dynamic-plugins.override.yaml (section 1 above)
+       # Same content as dynamic-plugins.override.yaml
    ```
 
 2. **App-config ConfigMap:**
@@ -487,7 +712,61 @@ Visit http://localhost:3000/kuadrant
 
 ---
 
-## RBAC Policy
+## Assets
+
+### Dynamic Plugins
+
+```yaml
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  # Kuadrant Backend
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION"
+    disabled: false
+    integrity: $KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256
+
+  # Kuadrant Frontend
+  - package: "@kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION"
+    integrity: $KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          internal.plugin-kuadrant:
+            appIcons:
+              - name: kuadrantIcon
+                importName: KuadrantIcon
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: Kuadrant
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+            mountPoints:
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiKeyManagementTab
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiProductInfoContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+```
+
+### RBAC Policy
 
 Example `rbac-policy.csv` for Kuadrant permissions:
 
@@ -539,6 +818,51 @@ g, group:default/api-admins, role:default/api-admin
 # Development/testing only: assign guest user to admin role.
 # For production, remove this line and assign roles to your actual users or groups.
 g, user:default/guest, role:default/api-admin
+```
+
+### ClusterRole
+
+Permissions to manage resources from kuadrant CRDs.
+
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: rhdh-kuadrant
+rules:
+  - apiGroups: ["kuadrant.io"]
+    resources:
+      - authpolicies
+      - ratelimitpolicies
+      - dnspolicies
+      - tlspolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["extensions.kuadrant.io"]
+    resources:
+      - planpolicies
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources:
+      - apiproducts
+      - apikeys
+    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources:
+      - apikeys/status
+    verbs: ["get", "patch", "update"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
+      - gateways
+      - httproutes
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - namespaces
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources:
+      - secrets
+    verbs: ["get", "list", "watch", "create", "delete"]
 ```
 
 ---
