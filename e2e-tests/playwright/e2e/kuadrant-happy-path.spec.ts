@@ -15,7 +15,7 @@ import {
  * 2. Consumer discovers the new API in catalog
  * 3. Consumer requests access to toystore-api (has plans configured)
  * 4. Admin sees the request in approval queue
- * 5. Owner1 cannot see toystore requests (ownership filtering)
+ * 5. Owner2 cannot see toystore requests (ownership filtering)
  * 6. Admin approves consumer1's request
  * 7. Consumer sees their approved API key
  * 8. Consumer views API key detail page
@@ -265,20 +265,20 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     ).toBeVisible({ timeout: TIMEOUTS.SLOW });
   });
 
-  test("5. owner1 cannot see toystore requests (owned by guest)", async ({
+  test("5. owner2 cannot see toystore requests (owned by owner1)", async ({
     page,
   }) => {
     const common = new Common(page);
-    await common.dexQuickLogin("owner1@kuadrant.local");
+    await common.dexQuickLogin("owner2@kuadrant.local");
     await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
 
-    // owner1 should NOT see toystore requests (toystore is owned by guest)
+    // owner2 should NOT see toystore requests (toystore is owned by owner1)
     // verify the table shows no API keys
     const noApiKeysMessage = page.getByText(/no api keys found/i);
     await expect(
       noApiKeysMessage,
-      "Owner1 should see 'No API keys found' (toystore owned by guest)",
+      "Owner2 should see 'No API keys found' (toystore owned by owner1)",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
