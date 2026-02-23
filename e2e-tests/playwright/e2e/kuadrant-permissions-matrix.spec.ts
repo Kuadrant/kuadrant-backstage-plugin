@@ -155,20 +155,20 @@ test.describe("Kuadrant Permissions Matrix", () => {
         timeout: TIMEOUTS.DEFAULT,
       });
 
-      // find Toystore API row specifically (owned by guest, not owner1)
-      const toystoreRow = page
+      // find Gamestore API row specifically (owned by owner2, not owner1)
+      const gamestoreRow = page
         .locator("tr")
-        .filter({ hasText: "Toystore API" })
+        .filter({ hasText: "Gamestore API" })
         .first();
-      const toystoreVisible = await toystoreRow.isVisible().catch(() => false);
+      const gamestoreVisible = await gamestoreRow.isVisible().catch(() => false);
 
-      if (toystoreVisible) {
-        // owner1 should NOT see edit button on Toystore API (owned by guest)
-        const toystoreEditBtn = toystoreRow.getByRole("button", {
+      if (gamestoreVisible) {
+        // owner1 should NOT see edit button on Gamestore API (owned by owner2)
+        const gamestoreEditBtn = gamestoreRow.getByRole("button", {
           name: /edit api product/i,
         });
         await expect(
-          toystoreEditBtn,
+          gamestoreEditBtn,
           "Owner should NOT see edit button on other's products",
         ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
       }
@@ -378,7 +378,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
   // ==========================================
 
   test.describe("Cross-Ownership Enforcement", () => {
-    test("owner2 CANNOT edit toystore API (owned by system)", async ({
+    test("owner2 CANNOT edit toystore API (owned by owner1)", async ({
       page,
     }) => {
       const common = new Common(page);
@@ -386,7 +386,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      // Toystore API must exist for this test (owned by guest)
+      // Toystore API must exist for this test (owned by owner1)
       const toystoreRow = page
         .locator("tr")
         .filter({ hasText: "Toystore API" })
@@ -406,7 +406,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
-    test("owner2 CANNOT delete toystore API (owned by system)", async ({
+    test("owner2 CANNOT delete toystore API (owned by owner1)", async ({
       page,
     }) => {
       const common = new Common(page);
@@ -414,7 +414,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
-      // Toystore API must exist for this test (owned by guest)
+      // Toystore API must exist for this test (owned by owner1)
       const toystoreRow = page
         .locator("tr")
         .filter({ hasText: "Toystore API" })

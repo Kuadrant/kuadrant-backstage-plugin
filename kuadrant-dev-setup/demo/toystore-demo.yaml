@@ -170,7 +170,7 @@ metadata:
   name: toystore-api
   namespace: toystore
   annotations:
-    backstage.io/owner: user:default/guest
+    backstage.io/owner: user:default/owner1
 spec:
   displayName: Toystore API
   description: simple toy store api for demonstration
