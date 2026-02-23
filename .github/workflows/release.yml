@@ -1,8 +1,6 @@
 name: Release
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
 
 jobs:
@@ -28,36 +26,19 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
-      - name: Determine version and validate
+      - name: Determine version
         id: version
         run: |
-          if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
-            # Release created manually - extract version from release tag
-            VERSION=${GITHUB_REF#refs/tags/}
-            VERSION=${VERSION#v}
-            echo "Manual release detected: $VERSION"
-          else
-            # Manual workflow dispatch - use version from package.json
-            VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
-            echo "Manual workflow dispatch: $VERSION"
-
-            # Check if tag already exists
-            if git rev-parse "v$VERSION" >/dev/null 2>&1; then
-              echo "ERROR: Tag v$VERSION already exists"
-              echo "Please update version in package.json or delete the existing tag:"
-              echo "  git tag -d v$VERSION"
-              echo "  git push origin :refs/tags/v$VERSION"
-              exit 1
-            fi
-
-            # Create and push tag
-            git tag "v$VERSION"
-            git push origin "v$VERSION"
-            echo "Created and pushed tag: v$VERSION"
-          fi
-
+          VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "tag=v$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "ERROR: Tag v$VERSION already exists"
+            echo "Update version in package.json or delete the existing tag"
+            exit 1
+          fi
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -65,21 +46,32 @@ jobs:
       - name: Build packages
         run: yarn build
 
+      - name: Export dynamic plugins
+        run: |
+          cd plugins/kuadrant
+          yarn export-dynamic
+
+          cd ../kuadrant-backend
+          yarn export-dynamic
+
       - name: Create plugin artifacts
         run: |
           VERSION="${{ steps.version.outputs.version }}"
 
-          # Build frontend tarball
           cd plugins/kuadrant
           npm pack
           mv kuadrant-kuadrant-backstage-plugin-frontend-*.tgz ../../kuadrant-backstage-plugin-frontend-${VERSION}.tgz
           cd ../..
 
-          # Build backend tarball
           cd plugins/kuadrant-backend
           npm pack
           mv kuadrant-kuadrant-backstage-plugin-backend-*.tgz ../../kuadrant-backstage-plugin-backend-${VERSION}.tgz
           cd ../..
+
+          cd plugins/kuadrant-backend/dist-dynamic
+          npm pack
+          mv kuadrant-kuadrant-backstage-plugin-backend-dynamic-*.tgz ../../../kuadrant-backstage-plugin-backend-dynamic-${VERSION}.tgz
+          cd ../../..
 
           echo "Created artifacts:"
           ls -lh *.tgz
@@ -88,20 +80,17 @@ jobs:
         id: changelog
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          TAG="v$VERSION"
 
-          # Get previous tag
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          PREV_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
 
           if [ -z "$PREV_TAG" ]; then
             echo "First release - showing all commits"
-            COMMITS=$(git log --pretty=format:"- %s (%h)" HEAD)
+            COMMITS=$(git log --pretty=format:"- %s (%h)")
           else
             echo "Changes since $PREV_TAG"
             COMMITS=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD)
           fi
 
-          # Create changelog
           cat > CHANGELOG.md << EOF
           ## What's Changed
 
@@ -112,41 +101,35 @@ jobs:
           ### Using npm/yarn
 
           \`\`\`bash
-          # Frontend Plugin
+          # Frontend plugin
           yarn add @kuadrant/kuadrant-backstage-plugin-frontend@${VERSION}
 
-          # Backend Plugin
+          # Backend plugin (static)
           yarn add @kuadrant/kuadrant-backstage-plugin-backend@${VERSION}
-          \`\`\`
 
-          ### Using tarball artifacts (attached below)
-
-          \`\`\`bash
-          # Frontend Plugin
-          yarn add ./kuadrant-backstage-plugin-frontend-${VERSION}.tgz
-
-          # Backend Plugin
-          yarn add ./kuadrant-backstage-plugin-backend-${VERSION}.tgz
+          # Backend plugin (dynamic, for RHDH)
+          # Use the tarball artifact or npm package:
+          yarn add @kuadrant/kuadrant-backstage-plugin-backend-dynamic@${VERSION}
           \`\`\`
 
           ## Links
 
-          - [Frontend Plugin on npm](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend/v/${VERSION})
-          - [Backend Plugin on npm](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend/v/${VERSION})
+          - [Frontend plugin on npm](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend/v/${VERSION})
+          - [Backend plugin on npm](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend/v/${VERSION})
+          - [Backend dynamic plugin on npm](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-dynamic/v/${VERSION})
           - [Documentation](https://github.com/Kuadrant/kuadrant-backstage-plugin/blob/main/README.md)
-          - [Frontend Plugin README](https://github.com/Kuadrant/kuadrant-backstage-plugin/blob/main/plugins/kuadrant/README.md)
-          - [Backend Plugin README](https://github.com/Kuadrant/kuadrant-backstage-plugin/blob/main/plugins/kuadrant-backend/README.md)
           EOF
 
           cat CHANGELOG.md
 
-      - name: Create or update GitHub Release
-        uses: softprops/action-gh-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
           name: Release ${{ steps.version.outputs.tag }}
           body_path: CHANGELOG.md
           draft: false
+          make_latest: true
           files: |
             *.tgz
         env:
@@ -164,7 +147,9 @@ jobs:
           echo "**Artifacts:**" >> $GITHUB_STEP_SUMMARY
           echo "- kuadrant-backstage-plugin-frontend-${VERSION}.tgz" >> $GITHUB_STEP_SUMMARY
           echo "- kuadrant-backstage-plugin-backend-${VERSION}.tgz" >> $GITHUB_STEP_SUMMARY
+          echo "- kuadrant-backstage-plugin-backend-dynamic-${VERSION}.tgz" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**NPM Packages:**" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-frontend@${VERSION}](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend/v/${VERSION})" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-backend@${VERSION}](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend/v/${VERSION})" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-dynamic@${VERSION}](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-dynamic/v/${VERSION})" >> $GITHUB_STEP_SUMMARY
