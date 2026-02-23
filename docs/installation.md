@@ -45,7 +45,7 @@ The plugins require a Kubernetes cluster with Kuadrant installed. You can either
 
 ## Installation on Red Hat Developer Hub (RHDH)
 
-This section covers installing the Kuadrant plugins on a Red Hat Developer Hub deployment in a Kubernetes/Openshift cluster.
+This section covers installing the Kuadrant plugins on a Red Hat Developer Hub deployment in a Kubernetes/OpenShift cluster.
 
 ### Prerequisites
 
@@ -60,7 +60,7 @@ Choose your preferred deployment method:
 - Operator-based deployment (recommended for production)
 - Helm-based deployment
 
-### Provisioning your custom Developer Hub configuration
+### Configure Red Hat Developer Hub
 
 Set the following environment variables used for convenience in this tutorial:
 
@@ -84,52 +84,52 @@ Create namespace for the backstage instance
 kubectl create namespace $RHDH_NS
 ```
 
-#### Dynamic Plugin configmap
+#### Dynamic Plugin ConfigMap
 
 Create a config map with the dynamic plugin configuration required to load kuadrant backstage plugins as dynamic plugins.
 
-Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named, for example , `dynamic-plugins-rhdh.yaml`. Then, create `dynamnic-plugins-rhdh` configmap from that file.
+Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named, for example, `dynamic-plugins-rhdh.yaml`. Replace the environment variables with their actual values. Then, create `dynamic-plugins-rhdh` configmap from that file.
 
 
 ```sh
-kubectl create configmap dynamnic-plugins-rhdh --from-file=dynamnic-plugins-rhdh.yamnl --namespace=$RHDH_NS
+kubectl create configmap dynamic-plugins-rhdh --from-file=dynamic-plugins-rhdh.yaml --namespace=$RHDH_NS
 ```
 
 #### Backstage app-config.yaml
 
 This is the main backstage application level configuration.
 
-1. **Enable authentication and the permission framework**
+**1. Enable authentication and the permission framework**
 
-Kuadrant backstage plugin requires that the permissions framework is setup and configured properly.
+The Kuadrant backstage plugin requires that the permissions framework is set up and configured properly.
 
-Set the `permissions.enabled` to true in `app-config.yaml`
+Set `permissions.enabled` to true in `app-config.yaml`:
 
 ```yaml
 permission:
   enabled: true
 ```
 
-Additionally, setup some [authentication in backstage](https://backstage.io/docs/auth/).
+Additionally, set up some [authentication in backstage](https://backstage.io/docs/auth/).
 
 ```yaml
 auth:
   providers: {}
 ```
 
-2. **Setup RBAC for the kuadrant plugin functionality**
+**2. Set up RBAC for the kuadrant plugin functionality**
 
-This configuration will define kuadrant plugin user roles and permissions on those roles. Basically, who can do what withing the plugin.
+This configuration will define kuadrant plugin user roles and permissions on those roles. Basically, who can do what within the plugin.
 The kuadrant backstage plugin permission model is detailed in [RBAC and Permissions doc](/docs/rbac-permissions.md).
 
-Create `rbac-policy.csv` file with the kuadrant's plugin permission definition.
+Create `rbac-policy.csv` file with the kuadrant plugin's permission definition.
 You can start with [this RBAC policy content sample](#rbac-policy) that includes three roles `[api-consumer, api-owner, api-admin]`. Then, create `rbac-policies` configmap from that file.
 
 ```sh
 kubectl create configmap rbac-policies --from-file=rbac-policy.csv --namespace=$RHDH_NS
 ```
 
-Add reference to `rbac-policy.csv` file in the `permissions.rbac.policies-csv-file` section of the `app-config.yaml`
+Add reference to `rbac-policy.csv` file in the `permissions.rbac.policies-csv-file` section of the `app-config.yaml`:
 
 ```yaml
 permission:
@@ -137,34 +137,36 @@ permission:
     policies-csv-file: /opt/app-root/etc/rbac-policy.csv
     policyFileReload: true
 ```
-> The mounting path is configured later in the Backstage CR.
 
-* **Configure kubernetes access**
+> **Note:** The mounting path `/opt/app-root/etc` is configured later in the Backstage CR. Ensure they match.
 
-Kubernetes access is configures in `app-config.yaml`.
+**3. Configure Kubernetes access**
 
-The recommended approach is so called `in-cluster` mode. In this mode, the backstage application running inside a Kubernetes pod authenticates to the Kubernetes API server using the service account automatically provided by Kubernetes.
+Kubernetes access is configured in `app-config.yaml`.
 
-The `in-cluster` mode can be configured in two ways:
+The recommended approach is so-called `in-cluster` mode. In this mode, the backstage application running inside a Kubernetes pod authenticates to the Kubernetes API server using the service account automatically provided by Kubernetes.
 
-1. No `kubernetes` section in `app-config.yaml`
-```yaml
-kubernetes: null
-```
-2. When `serviceAccountToken` is being ommited.
-```yaml
-kubernetes:
-  serviceLocatorMethod:
-    type: multiTenant
-  clusterLocatorMethods:
-    - type: config
-      clusters:
-        - name: local-cluster
-          url: ignored
-          authProvider: serviceAccount
-```
+The `in-cluster` mode can be configured by either:
 
-The kuadrant backstage plugin also supports the cluster locator method [config](https://backstage.io/docs/features/kubernetes/configuration#config). With this method, the kuadrant plugin will read cluster information, tipically cluster URL and cluster access token (which usually expires), from the `app-config.yaml` file.
+- Omitting the `kubernetes` section entirely (setting it to null):
+  ```yaml
+  kubernetes: null
+  ```
+
+- Omitting the `serviceAccountToken` when configuring clusters:
+  ```yaml
+  kubernetes:
+    serviceLocatorMethod:
+      type: multiTenant
+    clusterLocatorMethods:
+      - type: config
+        clusters:
+          - name: local-cluster
+            url: ignored
+            authProvider: serviceAccount
+  ```
+
+Alternatively, the kuadrant backstage plugin also supports the cluster locator method [config](https://backstage.io/docs/features/kubernetes/configuration#config). With this method, the kuadrant plugin will read cluster information, typically cluster URL and cluster access token (which usually expires), from the `app-config.yaml` file.
 
 ```yaml
 kubernetes:
@@ -179,9 +181,9 @@ kubernetes:
           serviceAccountToken: ${K8S_ACCESS_TOKEN}
 ```
 
-* **Configure Catalog Rules**
+**4. Configure Catalog Rules**
 
-Add `APIProduct` to `catalog.rules`  in `app-config.yaml`:
+Add `APIProduct` to `catalog.rules` in `app-config.yaml`:
 
 ```yaml
 catalog:
@@ -225,7 +227,7 @@ permission:
 Finally, create a config map from the `app-config.yaml` file.
 
 ```sh
-kubectl create configmap rhdh-app-config --from-file=app-config.yamnl --namespace=$RHDH_NS
+kubectl create configmap rhdh-app-config --from-file=app-config.yaml --namespace=$RHDH_NS
 ```
 
 ### RBAC for Kuadrant CRDs
