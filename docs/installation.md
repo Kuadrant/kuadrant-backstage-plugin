@@ -348,61 +348,11 @@ Go to [backstage_types.go for v1alpha3](https://github.com/redhat-developer/rhdh
 
 ## Installation on Red Hat Developer Hub (RHDH) Local
 
-This section covers installing the plugins using [rhdh-local](https://github.com/redhat-developer/rhdh-local) for local development with Docker Compose. For production RHDH deployments, see [Deploying to Production RHDH](#deploying-to-production-rhdh).
+This section covers installing the plugins using [rhdh-local](https://github.com/redhat-developer/rhdh-local) for local development with Docker Compose.
 
 ### 1. Configure Dynamic Plugins
 
-Add the plugins to `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
-
-```yaml
-includes:
-  - dynamic-plugins.default.yaml
-
-plugins:
-  # Kuadrant Backend
-  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic"
-    disabled: false
-    integrity: <sha512-integrity-hash>
-
-  # Kuadrant Frontend
-  - package: "@kuadrant/kuadrant-backstage-plugin-frontend"
-    integrity: <sha512-integrity-hash>
-    disabled: false
-    pluginConfig:
-      dynamicPlugins:
-        frontend:
-          internal.plugin-kuadrant:
-            appIcons:
-              - name: kuadrantIcon
-                importName: KuadrantIcon
-            dynamicRoutes:
-              - path: /kuadrant
-                importName: KuadrantPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: Kuadrant
-              - path: /kuadrant/api-products/:namespace/:name
-                importName: ApiProductDetailPage
-              - path: /kuadrant/api-keys/:namespace/:name
-                importName: ApiKeyDetailPage
-            mountPoints:
-              - mountPoint: entity.page.api/cards
-                importName: EntityKuadrantApiKeyManagementTab
-                config:
-                  layout:
-                    gridColumn: "1 / -1"
-                  if:
-                    allOf:
-                      - isKind: api
-              - mountPoint: entity.page.api/cards
-                importName: EntityKuadrantApiProductInfoContent
-                config:
-                  layout:
-                    gridColumn: "1 / -1"
-                  if:
-                    allOf:
-                      - isKind: api
-```
+Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
 
 To get the integrity hash:
 ```bash
@@ -444,90 +394,63 @@ permission:
 
 Create `configs/rbac-policy.csv` with the [RBAC policy content](#rbac-policy).
 
-### 4. Start RHDH
+### 4. Service Account Setup
+
+Create a service account with permissions to manage Kuadrant resources
+
+#### ClusterRole
+
+Create the [ClusterRole](#clusterrole) which defines permissions on the kuadrant CRD's.
+
+#### Namespace
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rhdh
+EOF
+```
+
+#### ServiceAccount
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rhdh-kuadrant
+  namespace: rhdh
+EOF
+```
+
+#### ClusterRoleBinding
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhdh-kuadrant
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rhdh-kuadrant
+subjects:
+  - kind: ServiceAccount
+    name: rhdh-kuadrant
+    namespace: rhdh
+EOF
+```
+
+### 5. Start RHDH
 
 ```bash
 docker compose up
 ```
 
 Visit http://localhost:7007/kuadrant
-
-### Deploying to Production RHDH
-
-For production RHDH deployments (Operator or Helm), the configuration is the same but stored in Kubernetes ConfigMaps instead of local files:
-
-| rhdh-local File | Production RHDH |
-|-----------------|-----------------|
-| `configs/dynamic-plugins/dynamic-plugins.override.yaml` | ConfigMap referenced by `spec.application.dynamicPluginsConfigMapName` in Backstage CR |
-| `configs/app-config/app-config.yaml` | ConfigMap referenced by `spec.application.appConfig` in Backstage CR |
-| `configs/rbac-policy.csv` | ConfigMap mounted as a volume |
-
-**Key differences:**
-
-1. **Dynamic Plugins ConfigMap:**
-   ```yaml
-   kind: ConfigMap
-   apiVersion: v1
-   metadata:
-     name: dynamic-plugins-rhdh
-   data:
-     dynamic-plugins.yaml: |
-       # Same content as dynamic-plugins.override.yaml
-   ```
-
-2. **App-config ConfigMap:**
-   ```yaml
-   kind: ConfigMap
-   apiVersion: v1
-   metadata:
-     name: app-config-rhdh
-   data:
-     app-config-kuadrant.yaml: |
-       # Same content as sections 2-4 above (Kubernetes Access, Catalog Rules, RBAC)
-   ```
-
-3. **Backstage CR reference:**
-   ```yaml
-   apiVersion: rhdh.redhat.com/v1alpha3
-   kind: Backstage
-   metadata:
-     name: my-rhdh
-   spec:
-     application:
-       dynamicPluginsConfigMapName: dynamic-plugins-rhdh
-       appConfig:
-         configMaps:
-           - name: app-config-rhdh
-   ```
-
-4. **Kubernetes credentials as Secret:**
-   ```yaml
-   apiVersion: v1
-   kind: Secret
-   metadata:
-     name: rhdh-k8s-credentials
-   type: Opaque
-   stringData:
-     K8S_CLUSTER_URL: "https://<cluster-api-url>"
-     K8S_CLUSTER_TOKEN: "<service-account-token>"
-   ```
-
-   Reference in Backstage CR:
-   ```yaml
-   spec:
-     application:
-       extraEnvs:
-         secrets:
-           - name: rhdh-k8s-credentials
-   ```
-
-5. **Cluster URL**: Use the actual cluster API URL instead of `host.docker.internal`.
-
-6. **TLS**: Set `skipTLSVerify: false` and configure proper TLS certificates.
-
-7. **Verify installation** at `<RHDH-URL>/api/dynamic-plugins-info/loaded-plugins`.
-
----
 
 ## Installation on Backstage
 
@@ -702,7 +625,57 @@ with:
 backend.add(import('@backstage-community/plugin-rbac-backend'));
 ```
 
-### 10. Start Backstage
+### 10. Service Account Setup
+
+Create a service account with permissions to manage Kuadrant resources
+
+#### ClusterRole
+
+Create the [ClusterRole](#clusterrole) which defines permissions on the kuadrant CRD's.
+
+#### Namespace
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: rhdh
+EOF
+```
+
+#### ServiceAccount
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: rhdh-kuadrant
+  namespace: rhdh
+EOF
+```
+
+#### ClusterRoleBinding
+
+```yaml
+kubectl apply -f - <<EOF
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: rhdh-kuadrant
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: rhdh-kuadrant
+subjects:
+  - kind: ServiceAccount
+    name: rhdh-kuadrant
+    namespace: rhdh
+EOF
+```
+
+### 11. Start Backstage
 
 ```bash
 yarn start
