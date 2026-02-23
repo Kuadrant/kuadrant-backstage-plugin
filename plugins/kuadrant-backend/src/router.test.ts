@@ -20,6 +20,7 @@ describe('createRouter', () => {
     // Create mock k8s client instance
     mockK8sClient = {
       getCustomResource: jest.fn(),
+      patchCustomResource: jest.fn(),
       getSecret: jest.fn(),
       patchCustomResourceStatus: jest.fn(),
       listCustomResources: jest.fn(),
@@ -1051,6 +1052,90 @@ describe('createRouter', () => {
         success: false,
         error: expect.any(String),
       });
+    });
+  });
+
+  describe('PATCH /apiproducts/:namespace/:name', () => {
+    const namespace = 'toystore';
+    const name = 'toystore-api';
+
+    const mockAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name,
+        namespace,
+        annotations: {
+          'backstage.io/owner': mockUserEntityRef,
+        },
+      },
+      spec: {
+        displayName: 'Toystore API',
+        description: 'API for toystore',
+        publishStatus: 'Draft',
+      },
+    };
+
+    it('allows owner to update their own API product', async () => {
+      // Mock permission check - user has updateOwn permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY }, // updateAll denied
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
+      ]);
+
+      // Mock k8s client responses
+      mockK8sClient.getCustomResource.mockResolvedValue(mockAPIProduct);
+
+      const updatedAPIProduct = {
+        ...mockAPIProduct,
+        spec: {
+          ...mockAPIProduct.spec,
+          displayName: 'Updated Toystore API',
+          documentation: {
+            openAPISpecURL: 'https://example.com',
+          },
+        },
+      };
+
+      mockK8sClient.patchCustomResource.mockResolvedValue(updatedAPIProduct);
+
+      const patchData = {
+        spec: {
+          displayName: 'Updated Toystore API',
+          documentation: {
+            openAPISpecURL: 'https://example.com',
+          },
+        },
+      };
+
+      const response = await request(app)
+        .patch(`/apiproducts/${namespace}/${name}`)
+        .send(patchData)
+        .expect(200);
+
+      // Verify response
+      expect(response.body.spec.displayName).toBe('Updated Toystore API');
+      expect(response.body.spec.documentation.openAPISpecURL).toBe('https://example.com');
+
+      // Verify k8s client was called correctly
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apiproducts',
+        name,
+      );
+
+      expect(mockK8sClient.patchCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        namespace,
+        'apiproducts',
+        name,
+        patchData,
+      );
     });
   });
 });
