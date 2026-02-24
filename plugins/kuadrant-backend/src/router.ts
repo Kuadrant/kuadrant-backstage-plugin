@@ -491,7 +491,7 @@ export async function createRouter({
         }).partial().optional(),
         documentation: z.object({
           docsURL: z.string().optional(),
-          openAPISpec: z.string().optional(),
+          openAPISpecURL: z.string().optional(),
         }).partial().optional(),
       }).partial(),
     });
