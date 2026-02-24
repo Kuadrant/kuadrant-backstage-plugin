@@ -3,18 +3,17 @@ name: Publish to NPM
 on:
   release:
     types: [published]
-  pull_request:
-    types: [closed]
-    branches:
-      - main
   workflow_dispatch:
+    inputs:
+      tag:
+        description: 'npm dist-tag (latest or dev)'
+        required: false
+        default: 'dev'
 
 jobs:
   publish:
     name: Publish Packages
     runs-on: ubuntu-latest
-
-    if: github.event_name == 'release' || github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.merged == true)
 
     permissions:
       contents: write
@@ -45,11 +44,9 @@ jobs:
         id: version
         run: |
           if [[ "$GITHUB_EVENT_NAME" == "release" ]]; then
-            # Release: use tag version
             VERSION=${GITHUB_REF#refs/tags/v}
             TAG="latest"
           else
-            # Dev: use package.json + git SHA
             BASE_VERSION=$(node -p "require('./plugins/kuadrant/package.json').version")
             GIT_SHA=$(git rev-parse --short HEAD)
             VERSION="${BASE_VERSION}-${GIT_SHA}"
@@ -84,15 +81,25 @@ jobs:
           cd ../kuadrant-backend
           yarn export-dynamic
 
+      - name: Update dynamic plugin version
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          cd plugins/kuadrant-backend/dist-dynamic
+          npm pkg set version=$VERSION
+
       - name: Publish frontend
         run: |
           cd plugins/kuadrant
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
 
-      - name: Publish backend
+      - name: Publish backend (static)
         run: |
           cd plugins/kuadrant-backend
-          cd dist-dynamic
+          npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
+
+      - name: Publish backend (dynamic)
+        run: |
+          cd plugins/kuadrant-backend/dist-dynamic
           npm publish --provenance --access public --tag ${{ steps.version.outputs.tag }}
 
       - name: Summary
@@ -107,3 +114,4 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-frontend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-frontend)" >> $GITHUB_STEP_SUMMARY
           echo "- [@kuadrant/kuadrant-backstage-plugin-backend@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend)" >> $GITHUB_STEP_SUMMARY
+          echo "- [@kuadrant/kuadrant-backstage-plugin-backend-dynamic@$VERSION](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-dynamic)" >> $GITHUB_STEP_SUMMARY
