@@ -9,7 +9,6 @@ import { useAsync } from "react-use";
 import {
   Table,
   TableColumn,
-  Progress,
   ResponseErrorPanel,
   Link,
 } from "@backstage/core-components";
@@ -31,6 +30,7 @@ import {
   TextField,
   makeStyles,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import CheckCircleIcon from "@material-ui/icons/CheckCircle";
 import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
@@ -893,7 +893,15 @@ export const ApprovalQueueTable = () => {
   );
 
   if (loading || updatePermissionLoading) {
-    return <Progress />;
+    return (
+      <Box p={2}>
+        {[...Array(5)].map((_, i) => (
+          <Box key={i} p={2}>
+            <Skeleton variant="text" width="100%" />
+          </Box>
+        ))}
+      </Box>
+    );
   }
 
   if (error) {
