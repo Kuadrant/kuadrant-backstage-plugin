@@ -1,4 +1,4 @@
-.PHONY: help kind-create kind-delete kuadrant-install controller-deploy demo-install demo-uninstall clean
+.PHONY: help kind-create kind-delete kuadrant-install metallb-install demo-install demo-uninstall clean
 
 CLUSTER_NAME ?= local-cluster
 LOCALBIN ?= $(shell pwd)/bin
@@ -16,7 +16,8 @@ help:
 	@echo "  make kind-delete    - delete kind cluster"
 	@echo ""
 	@echo "kuadrant:"
-	@echo "  make kuadrant-install   - install kuadrant"
+	@echo "  make kuadrant-install   - install metallb + kuadrant"
+	@echo "  make metallb-install    - install metallb (for loadbalancer IPs)"
 	@echo "  make demo-install       - install toystore demo"
 	@echo "  make demo-uninstall     - remove toystore demo"
 	@echo ""
@@ -55,7 +56,13 @@ kind-delete: $(KIND)
 	@echo "deleting kind cluster: $(CLUSTER_NAME)"
 	$(KIND) delete cluster --name $(CLUSTER_NAME)
 
+metallb-install:
+	@echo "installing metallb..."
+	@./scripts/metallb-setup.sh
+	@echo ""
+
 kuadrant-install: $(HELM) $(KUSTOMIZE)
+	@$(MAKE) metallb-install
 	@echo "installing gateway api crds..."
 	@kubectl apply -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.2.0/standard-install.yaml
 	@echo ""
