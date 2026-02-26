@@ -48,10 +48,8 @@ export const ApiProductPolicies: React.FC<ApiProductPoliciesProps> = ({
   return (
     <Box
       mt={includeTopMargin ? 1 : 0}
-      p={2}
+      p={0}
       bgcolor={theme.palette.background.default}
-      borderRadius={1}
-      border={`1px solid ${theme.palette.divider}`}
     >
       <Grid container spacing={2}>
         {/* planpolicy chip shown when either plan exist or ratelimitpolicy does not exist*/}
