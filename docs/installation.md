@@ -51,7 +51,7 @@ This section covers installing the Kuadrant plugins on a Red Hat Developer Hub d
 
 * Red Hat Developer Hub
 
-The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.6** (based on Backstage 1.45.3).
+The Kuadrant v0.1.0 plugins are tested and supported on **Red Hat Developer Hub 1.6** (based on Backstage 1.45.3).
 
 **Installation guide:**
 - [Installing Red Hat Developer Hub](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/)
@@ -67,9 +67,8 @@ Set the following environment variables used for convenience in this tutorial:
 ```sh
 # Your backstage instance namespace. Choose your own.
 export RHDH_NS=rhdh
-export KUADRANT_PLUGIN_VERSION=v0.1.0
-export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION dist.integrity)
-export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION dist.integrity)
+export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic@v0.1.0 dist.integrity)
+export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-frontend@v0.1.0 dist.integrity)
 # base hostname of the cluster.
 # In openshift, this can be easily read with the following command
 #  oc get ingress.config.openshift.io cluster -o jsonpath='{.spec.domain}'
@@ -475,13 +474,13 @@ If you don't need RBAC, you can skip the RBAC module - the core plugin functiona
 **Frontend** (`packages/app`):
 
 ```bash
-yarn --cwd packages/app add @kuadrant/kuadrant-backstage-plugin-frontend
+yarn --cwd packages/app add @kuadrant/kuadrant-backstage-plugin-frontend@v0.1.0
 ```
 
 **Backend** (`packages/backend`):
 
 ```bash
-yarn --cwd packages/backend add @kuadrant/kuadrant-backstage-plugin-backend-dynamic
+yarn --cwd packages/backend add @kuadrant/kuadrant-backstage-plugin-backend-dynamic@v0.1.0
 ```
 
 ### 2. Register Backend Plugin
@@ -697,12 +696,12 @@ includes:
 
 plugins:
   # Kuadrant Backend
-  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION"
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic@v0.1.0"
     disabled: false
     integrity: $KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256
 
   # Kuadrant Frontend
-  - package: "@kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION"
+  - package: "@kuadrant/kuadrant-backstage-plugin-frontend@v0.1.0"
     integrity: $KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256
     disabled: false
     pluginConfig:
