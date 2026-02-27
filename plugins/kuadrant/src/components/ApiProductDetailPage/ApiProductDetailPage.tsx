@@ -25,13 +25,6 @@ import {
   Tab,
   Button,
   makeStyles,
-  Grid,
-  Chip,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
 } from "@material-ui/core";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import EditIcon from "@material-ui/icons/Edit";
@@ -40,9 +33,11 @@ import { Alert, Skeleton } from '@material-ui/lab';
 import { APIProduct } from "../../types/api-management";
 import { EditAPIProductDialog } from "../EditAPIProductDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
+import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps, RateLimitPoliciesProps } from '../ApiProductPolicies';
 import { ApiProductDetails } from "../ApiProductDetails";
 import { OidcProviderCard } from "../OidcProviderCard";
 import { useKuadrantPermission } from "../../utils/permissions";
+import { getPolicyForRoute } from '../../utils/policies';
 import {
   kuadrantApiProductUpdateAllPermission,
   kuadrantApiProductDeleteAllPermission,
@@ -110,6 +105,14 @@ export const ApiProductDetailPage = () => {
 
     return route?.spec?.hostnames || null;
   }, [product, namespace, kuadrantApi]);
+
+  // load ratelimitpolicies
+  const {
+    value: rateLimitPolicies,
+    error: rateLimitPoliciesError
+  } = useAsync(async () => {
+    return await kuadrantApi.getRateLimitPolicies();
+  }, [kuadrantApi, open]);
 
   const handlePublishToggle = async () => {
     if (!product) return;
@@ -204,14 +207,57 @@ export const ApiProductDetailPage = () => {
 
   const isPublished = product.spec?.publishStatus === "Published";
 
+
   // get policy conditions from status
   const planPolicyCondition = product.status?.conditions?.find(
     (c) => c.type === "PlanPolicyDiscovered"
-  );
+  ) || null;
   const authPolicyCondition = product.status?.conditions?.find(
     (c) => c.type === "AuthPolicyDiscovered"
-  );
+  ) || null;
   const discoveredPlans = product.status?.discoveredPlans || [];
+
+  const planPolicyProps: PlanPoliciesProps = {
+    statusCondition: planPolicyCondition,
+    discoveredPlans: discoveredPlans,
+  };
+  // Parse the auth policy name from the AuthPolicyDiscovered condition message
+  // It's the only place to get the policy name without fetching all the policies.
+  // Consider enhancing the developer portal controller to provide name in an structured way
+  const parseNameFromMessage = (value: string) => {
+    const parts = value.split(' ');
+    return parts.length >= 3 ? parts[2] : '';
+  };
+  const authPolicyName = authPolicyCondition?.status === "True" ? parseNameFromMessage(authPolicyCondition.message ?? "") : "";
+
+  const authPolicyProps: AuthPoliciesProps = {
+    statusCondition: authPolicyCondition,
+    namespacedName: {
+      name: authPolicyName,
+      namespace: product.metadata.namespace,
+    },
+  };
+
+
+  if (rateLimitPoliciesError) {
+    return (
+      <ResponseErrorPanel error={rateLimitPoliciesError} />
+    );
+  }
+
+  const selectedRateLimitPolicy = product?.spec?.targetRef
+    ? getPolicyForRoute(rateLimitPolicies?.items, product.metadata.namespace, product?.spec?.targetRef.name)
+    : null;
+  const rateLimitPolicyAcceptedCondition = selectedRateLimitPolicy?.status?.conditions?.find(
+    (c: any) => c.type === "Accepted"
+  );
+  const rateLimitPolicyProps: RateLimitPoliciesProps = {
+    namespacedName: {
+      namespace: selectedRateLimitPolicy?.metadata.namespace,
+      name: selectedRateLimitPolicy?.metadata.name,
+    },
+    statusCondition: rateLimitPolicyAcceptedCondition,
+  }
 
   const authSchemes = product.status?.discoveredAuthScheme?.authentication || {};
   const schemeObjects = Object.values(authSchemes);
@@ -225,22 +271,12 @@ export const ApiProductDetailPage = () => {
 
   // compute tab indices
   const hasDefinitionTab = !!(product.status?.openapi?.raw || product.spec?.documentation?.openAPISpecURL);
-  const hasPoliciesTab = !!(planPolicyCondition || authPolicyCondition || discoveredPlans.length > 0);
 
-  let nextIndex = 1; // Overview is always at index 0
+  let nextIndex = 0;
+  const overviewTabIndex = nextIndex++;
   const definitionTabIndex = hasDefinitionTab ? nextIndex++ : -1;
-  const policiesTabIndex = hasPoliciesTab ? nextIndex++ : -1;
+  const policiesTabIndex = nextIndex++;
   const oidcTabIndex = hasOIDCTab ? nextIndex++ : -1;
-
-  const formatLimits = (limits: any): string => {
-    if (!limits) return "No limits";
-    const parts: string[] = [];
-    if (limits.daily) parts.push(`${limits.daily}/day`);
-    if (limits.weekly) parts.push(`${limits.weekly}/week`);
-    if (limits.monthly) parts.push(`${limits.monthly}/month`);
-    if (limits.yearly) parts.push(`${limits.yearly}/year`);
-    return parts.length > 0 ? parts.join(", ") : "No limits";
-  };
 
   return (
     <Page themeId="tool">
@@ -311,12 +347,12 @@ export const ApiProductDetailPage = () => {
           >
             <Tab label="Overview" />
             {hasDefinitionTab && <Tab label="Definition" />}
-            {hasPoliciesTab && <Tab label="Policies" />}
+            <Tab label="Policies" />
             {hasOIDCTab && <Tab label="OIDC" />}
           </Tabs>
         </Box>
 
-        {selectedTab === 0 && (
+        {selectedTab === overviewTabIndex && (
           <InfoCard title="API Product">
             <Box className={classes.cardHeader}>
               <Box>
@@ -381,89 +417,15 @@ export const ApiProductDetailPage = () => {
           </InfoCard>
         )}
 
-        {selectedTab === policiesTabIndex && hasPoliciesTab && (
-          <Grid container spacing={3}>
-            <Grid item xs={12}>
-              <InfoCard title="Discovered Policies">
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      Plan Policy
-                    </Typography>
-                    {planPolicyCondition ? (
-                      <Box>
-                        <Chip
-                          label={planPolicyCondition.status === "True" ? "Found" : "Not Found"}
-                          size="small"
-                          style={{
-                            backgroundColor: planPolicyCondition.status === "True" ? "#4caf50" : "#ff9800",
-                            color: "#fff",
-                            marginBottom: 8,
-                          }}
-                        />
-                        <Typography variant="body2">
-                          {planPolicyCondition.message || "No details available"}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2">No plan policy information</Typography>
-                    )}
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="body2" color="textSecondary" gutterBottom>
-                      Auth Policy
-                    </Typography>
-                    {authPolicyCondition ? (
-                      <Box>
-                        <Chip
-                          label={authPolicyCondition.status === "True" ? "Found" : "Not Found"}
-                          size="small"
-                          style={{
-                            backgroundColor: authPolicyCondition.status === "True" ? "#4caf50" : "#ff9800",
-                            color: "#fff",
-                            marginBottom: 8,
-                          }}
-                        />
-                        <Typography variant="body2">
-                          {authPolicyCondition.message || "No details available"}
-                        </Typography>
-                      </Box>
-                    ) : (
-                      <Typography variant="body2">No auth policy information</Typography>
-                    )}
-                  </Grid>
-                </Grid>
-              </InfoCard>
-            </Grid>
-
-            {discoveredPlans.length > 0 && (
-              <Grid item xs={12}>
-                <InfoCard title="Effective Plan Tiers">
-                  <Typography variant="body2" color="textSecondary" paragraph>
-                    These tiers are computed from all attached PlanPolicies (including gateway-level policies).
-                  </Typography>
-                  <Table size="small">
-                    <TableHead>
-                      <TableRow>
-                        <TableCell>Tier</TableCell>
-                        <TableCell>Rate Limits</TableCell>
-                      </TableRow>
-                    </TableHead>
-                    <TableBody>
-                      {discoveredPlans.map((plan) => (
-                        <TableRow key={plan.tier}>
-                          <TableCell>
-                            <Chip label={plan.tier} size="small" color="primary" />
-                          </TableCell>
-                          <TableCell>{formatLimits(plan.limits)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </InfoCard>
-              </Grid>
-            )}
-          </Grid>
+        {selectedTab === policiesTabIndex && (
+          <InfoCard title="Discovered Policies">
+            <ApiProductPolicies
+              planPolicy={planPolicyProps}
+              authPolicy={authPolicyProps}
+              rateLimitPolicy={rateLimitPolicyProps}
+              includeTopMargin={false}
+            />
+          </InfoCard>
         )}
 
         {selectedTab === oidcTabIndex && hasOIDCTab && (
