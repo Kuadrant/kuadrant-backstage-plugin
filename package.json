@@ -1,6 +1,6 @@
 {
   "name": "root",
-  "version": "1.9.0",
+  "version": "1.8.4",
   "private": true,
   "engines": {
     "node": "22"
@@ -32,8 +32,7 @@
     "new": "backstage-cli new --scope internal",
     "repo:fix": "backstage-cli repo fix --publish",
     "versions:metadata": "node ./scripts/update-metadata.mjs",
-    "versions:bump": "node ./scripts/update-backstage.mjs",
-    "knip": "knip"
+    "versions:bump": "node ./scripts/update-backstage.mjs"
   },
   "workspaces": {
     "packages": [
@@ -42,38 +41,39 @@
     ]
   },
   "devDependencies": {
-    "@backstage/cli": "0.34.5",
-    "@backstage/frontend-test-utils": "0.4.1",
+    "@backstage/cli": "0.34.1",
+    "@backstage/frontend-test-utils": "0.3.5",
     "@ianvs/prettier-plugin-sort-imports": "4.7.0",
     "@manypkg/cli": "0.25.1",
     "concurrently": "^9.2.1",
-    "glob": "12.0.0",
+    "glob": "11.1.0",
     "husky": "8.0.3",
     "jsdom": "^26.1.0",
-    "knip": "^5.82.1",
     "lint-staged": "15.5.2",
     "node-gyp": "10.3.1",
-    "sherif": "1.7.0",
-    "turbo": "2.6.2"
+    "sherif": "1.6.1",
+    "turbo": "2.5.8"
   },
   "resolutions": {
-    "@types/react": "18.3.27",
+    "@types/react": "18.3.23",
     "@types/react-dom": "18.3.7",
     "@aws-sdk/util-utf8-browser": "npm:@smithy/util-utf8@~2",
     "@kubernetes/client-node@npm:0.20.0/jsonpath-plus": "^10.3.0",
-    "@backstage/plugin-permission-backend": "0.7.6",
-    "@backstage/plugin-catalog-react": "1.21.3",
-    "@backstage/plugin-auth-node": "0.6.10",
-    "refractor@npm:3.6.0/prismjs": "^1.30.0",
-    "tar": "7.5.3",
-    "zod": "^3.24.0"
+    "@backstage/plugin-permission-backend": "0.7.3",
+    "@backstage/plugin-catalog": "1.31.2",
+    "@backstage/plugin-catalog-react": "1.20.1",
+    "@backstage/plugin-auth-node": "0.6.6",
+    "express": "4.22.1",
+    "@backstage/plugin-catalog-graph@0.4.22": "patch:@backstage/plugin-catalog-graph@npm%3A0.4.22#./.yarn/patches/@backstage-plugin-catalog-graph-npm-0.4.22-9b7885f2b0.patch",
+    "@backstage/plugin-search@1.4.29": "patch:@backstage/plugin-search@npm%3A1.4.29#./.yarn/patches/@backstage-plugin-search-npm-1.4.29-73fcb2942c.patch",
+    "zod": "^3.25.0"
   },
   "jest": {
     "testTimeout": 20000
   },
   "packageManager": "yarn@3.8.7",
   "dependencies": {
-    "@backstage/plugin-auth-backend-module-oidc-provider": "^0.4.8",
+    "@backstage/plugin-auth-backend-module-oidc-provider": "^0.4.6",
     "dotenv": "^17.2.3"
   }
 }

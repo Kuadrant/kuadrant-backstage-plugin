@@ -2,8 +2,8 @@
   "title": "RHDH Metadata",
   "titleKey": "app.userSettings.infoCard.title",
   "card": {
-    "RHDH Version": "1.9.0",
+    "RHDH Version": "1.8.4",
     "Backstage Version": "1.42.5",
-    "Last Commit": "repo @ 2025-09-03T18:03:57Z"
+    "Last Commit": "repo @ 2026-02-27T15:50:03Z"
   }
 }

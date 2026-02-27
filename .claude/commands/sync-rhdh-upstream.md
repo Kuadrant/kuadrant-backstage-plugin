@@ -12,25 +12,37 @@ Fetch and selectively sync changes from the upstream RHDH repository.
 
 ---
 
-## Step 1: Fetch Upstream
+## Step 0: Choose Version
 
-Fetch latest from RHDH without clobbering local tags:
+Ask the user which RHDH version to sync to. List available tags:
 
 ```bash
-git fetch https://github.com/redhat-developer/rhdh.git main:refs/remotes/rhdh-sync/main --no-tags
+git ls-remote --tags https://github.com/redhat-developer/rhdh.git | sed -n 's|.*refs/tags/\([0-9][0-9]*\.[0-9][0-9]*\(\.[0-9][0-9]*\)\{0,1\}\)$|\1|p' | sort -V | tail -20
 ```
 
-## Step 2: Show Recent Upstream Changes
+Present the tags and ask the user to pick one (e.g. `1.8.4`). Store this as `RHDH_VERSION` for use in later steps.
+
+If the user already provided a version as an argument to this command, use that directly.
+
+## Step 1: Fetch Upstream
+
+Fetch the chosen tag:
 
 ```bash
-git log --oneline rhdh-sync/main -30
+git fetch https://github.com/redhat-developer/rhdh.git refs/tags/${RHDH_VERSION}:refs/remotes/rhdh-sync/target --no-tags
+```
+
+## Step 2: Show What's at That Tag
+
+```bash
+git log --oneline rhdh-sync/target -10
 ```
 
 ## Step 3: Create Sync Branch
 
 ```bash
 git checkout main
-git checkout -b rhdh-sync-$(date +%Y%m%d)
+git checkout -b rhdh-sync-${RHDH_VERSION}
 ```
 
 ## Step 4: Compare Versions
@@ -38,20 +50,31 @@ git checkout -b rhdh-sync-$(date +%Y%m%d)
 Check Backstage version:
 ```bash
 echo "Local:"; cat backstage.json
-echo "Upstream:"; git show rhdh-sync/main:backstage.json
+echo "Upstream (${RHDH_VERSION}):"; git show rhdh-sync/target:backstage.json
 ```
 
-## Step 5: Sync Key Files
+## Step 5: Sync Lockfile
 
-Update these files by comparing and applying changes:
+Use the upstream lockfile as a base. This preserves upstream transitive resolutions and avoids cascading dependency conflicts.
+
+```bash
+git show rhdh-sync/target:yarn.lock > yarn.lock
+```
+
+After syncing all package.json files (below), run `yarn install` to layer our extra packages on top.
+
+## Step 6: Sync Key Files
+
+Update these files by comparing and applying changes. Use `git show rhdh-sync/target:<file>` to read upstream versions.
 
 ### backstage.json
 ```bash
-git show rhdh-sync/main:backstage.json > backstage.json
+git show rhdh-sync/target:backstage.json > backstage.json
 ```
 
 ### Root package.json
 Compare and selectively update:
+- `version` field to match RHDH version
 - `@backstage/cli` version in devDependencies
 - `@backstage/frontend-test-utils` version in devDependencies
 - Resolution versions (keep our custom ones, update Backstage ones)
@@ -73,18 +96,48 @@ Update all `@backstage/*` dependencies to match upstream versions.
 - `@kuadrant/kuadrant-backstage-plugin-backend`
 - `dotenv`
 
-### Kuadrant plugins
-Update `plugins/kuadrant/package.json` and `plugins/kuadrant-backend/package.json` to use compatible `@backstage/*` versions.
+### Internal RHDH plugins
+Sync `plugins/dynamic-plugins-info-backend`, `plugins/licensed-users-info-backend`, and `plugins/scalprum-backend` package.json files from upstream.
 
-## Step 6: Handle Known Issues
+### Yarn patches
+Copy any `.yarn/patches/` files from upstream:
+```bash
+git show rhdh-sync/target:.yarn/patches/ # check what exists
+```
+
+### Kuadrant plugins
+Update `plugins/kuadrant/package.json` and `plugins/kuadrant-backend/package.json` to use compatible `@backstage/*` versions. Match the versions used by other packages in the monorepo.
+
+## Step 7: Install and Verify
+
+```bash
+yarn install
+```
+
+Regenerate build metadata (RHDH version, Backstage version):
+```bash
+yarn versions:metadata
+```
+
+Clear stale webpack cache before building (janus-cli uses filesystem caching that bakes in absolute module paths):
+```bash
+rm -rf packages/app/.webpack-cache
+```
+
+Then verify:
+```bash
+yarn tsc
+yarn build
+yarn test
+```
+
+## Step 8: Handle Known Issues
 
 ### Zod Version Conflicts
-If you see zod type errors during tsc, add a resolution in root package.json:
-```json
-"resolutions": {
-  "zod": "3.23.8"
-}
-```
+If RBAC or other plugins pull in `zod-to-json-schema` that needs `zod@^3.25` (for the `zod/v3` export), set the zod resolution to `^3.25.0` rather than pinning an older version.
+
+### Stale Webpack Cache
+If `yarn build` fails with `Cannot find module .../html-webpack-plugin/node_modules/lodash/lodash.js`, delete `packages/app/.webpack-cache` and rebuild.
 
 ### OOM During TypeScript
 If tsc runs out of memory:
@@ -92,18 +145,16 @@ If tsc runs out of memory:
 NODE_OPTIONS="--max-old-space-size=8192" yarn tsc
 ```
 
-## Step 7: Install and Verify
-
+### Stale node_modules
+If you see `@backstage/cli/config/tsconfig.json` not found or similar, do a clean install:
 ```bash
-yarn install
-NODE_OPTIONS="--max-old-space-size=8192" yarn tsc
-NODE_OPTIONS="--max-old-space-size=8192" yarn build
+rm -rf node_modules && yarn install
 ```
 
-## Step 8: Cleanup
+## Step 9: Cleanup
 
 ```bash
-git update-ref -d refs/remotes/rhdh-sync/main
+git update-ref -d refs/remotes/rhdh-sync/target
 ```
 
 ---
@@ -114,6 +165,7 @@ git update-ref -d refs/remotes/rhdh-sync/main
 RHDH UPSTREAM SYNC COMPLETE
 ===========================
 
+Synced to: RHDH ${RHDH_VERSION}
 Backstage version: [old] -> [new]
 
 Files updated:
