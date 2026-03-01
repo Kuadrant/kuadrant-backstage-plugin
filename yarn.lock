@@ -4354,16 +4354,16 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage-community/plugin-scaffolder-backend-module-annotator@npm:2.8.0":
-  version: 2.8.0
-  resolution: "@backstage-community/plugin-scaffolder-backend-module-annotator@npm:2.8.0"
+"@backstage-community/plugin-scaffolder-backend-module-annotator@npm:2.13.0":
+  version: 2.13.0
+  resolution: "@backstage-community/plugin-scaffolder-backend-module-annotator@npm:2.13.0"
   dependencies:
-    "@backstage/backend-plugin-api": ^1.3.1
-    "@backstage/plugin-scaffolder-node": ^0.8.2
+    "@backstage/backend-plugin-api": ^1.6.0
+    "@backstage/plugin-scaffolder-node": ^0.12.2
     fs-extra: ^11.2.0
     lodash: ^4.17.21
     yaml: ^2.0.0
-  checksum: 3163e39ca304aeb187b942b2056a74c4430b886b2a702ca8d8d21815da4effe4ddda783d898f71de95220b521704a4f29e58d9608247e1bf7417386cda833e18
+  checksum: c6e6d0a9f1526634a4a655817d6ee9dd333d6464f595491e060109f38d9fac9a23b7700f3edb8903333d4b44e2e2c7608d8d175c67bc6e453afb960d7685efbd
   languageName: node
   linkType: hard
 
@@ -4983,28 +4983,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/backend-plugin-api@npm:^1.3.1, @backstage/backend-plugin-api@npm:^1.6.0, @backstage/backend-plugin-api@npm:^1.6.1":
-  version: 1.6.1
-  resolution: "@backstage/backend-plugin-api@npm:1.6.1"
-  dependencies:
-    "@backstage/cli-common": ^0.1.17
-    "@backstage/config": ^1.3.6
-    "@backstage/errors": ^1.2.7
-    "@backstage/plugin-auth-node": ^0.6.11
-    "@backstage/plugin-permission-common": ^0.9.4
-    "@backstage/plugin-permission-node": ^0.10.8
-    "@backstage/types": ^1.2.2
-    "@types/express": ^4.17.6
-    "@types/json-schema": ^7.0.6
-    "@types/luxon": ^3.0.0
-    json-schema: ^0.4.0
-    knex: ^3.0.0
-    luxon: ^3.0.0
-    zod: ^3.22.4
-  checksum: a4ac46eb30bb3be61ee7bb1165b03c54f1d1346eba1245a6bc6bb6c980d98d39873d6266c93ac507551df5b12f511033f96d5c1273df7d80e1f78568713c0ed7
-  languageName: node
-  linkType: hard
-
 "@backstage/backend-plugin-api@npm:^1.4.2, @backstage/backend-plugin-api@npm:^1.4.3":
   version: 1.4.3
   resolution: "@backstage/backend-plugin-api@npm:1.4.3"
@@ -5046,6 +5024,28 @@ __metadata:
     luxon: ^3.0.0
     zod: ^3.22.4
   checksum: f6f055c4a141b84ea212e3283b422c9725df1b0d9e266fc44cbfa9a6eec1e9999a7d622e46e9273f1cb3c4a9bf8f3168cbd748c31c56d8155ca5f4fb0ef753dd
+  languageName: node
+  linkType: hard
+
+"@backstage/backend-plugin-api@npm:^1.6.0, @backstage/backend-plugin-api@npm:^1.6.1":
+  version: 1.6.1
+  resolution: "@backstage/backend-plugin-api@npm:1.6.1"
+  dependencies:
+    "@backstage/cli-common": ^0.1.17
+    "@backstage/config": ^1.3.6
+    "@backstage/errors": ^1.2.7
+    "@backstage/plugin-auth-node": ^0.6.11
+    "@backstage/plugin-permission-common": ^0.9.4
+    "@backstage/plugin-permission-node": ^0.10.8
+    "@backstage/types": ^1.2.2
+    "@types/express": ^4.17.6
+    "@types/json-schema": ^7.0.6
+    "@types/luxon": ^3.0.0
+    json-schema: ^0.4.0
+    knex: ^3.0.0
+    luxon: ^3.0.0
+    zod: ^3.22.4
+  checksum: a4ac46eb30bb3be61ee7bb1165b03c54f1d1346eba1245a6bc6bb6c980d98d39873d6266c93ac507551df5b12f511033f96d5c1273df7d80e1f78568713c0ed7
   languageName: node
   linkType: hard
 
@@ -5216,7 +5216,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/catalog-model@npm:1.7.6, @backstage/catalog-model@npm:^1.7.4, @backstage/catalog-model@npm:^1.7.6":
+"@backstage/catalog-model@npm:1.7.6, @backstage/catalog-model@npm:^1.7.6":
   version: 1.7.6
   resolution: "@backstage/catalog-model@npm:1.7.6"
   dependencies:
@@ -6814,24 +6814,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/integration@npm:^1.17.0, @backstage/integration@npm:^1.19.2":
-  version: 1.19.2
-  resolution: "@backstage/integration@npm:1.19.2"
-  dependencies:
-    "@azure/identity": ^4.0.0
-    "@azure/storage-blob": ^12.5.0
-    "@backstage/config": ^1.3.6
-    "@backstage/errors": ^1.2.7
-    "@octokit/auth-app": ^4.0.0
-    "@octokit/rest": ^19.0.3
-    cross-fetch: ^4.0.0
-    git-url-parse: ^15.0.0
-    lodash: ^4.17.21
-    luxon: ^3.0.0
-  checksum: 0bc4d3454da9059c72ca65298f904de79f5d2d456e2af4cfaee48256ceb1aaf65417470b0edc0e0856b8127d702e33a6f32778052d9c3920286642b7822ed7ed
-  languageName: node
-  linkType: hard
-
 "@backstage/integration@npm:^1.17.1, @backstage/integration@npm:^1.18.0":
   version: 1.18.0
   resolution: "@backstage/integration@npm:1.18.0"
@@ -6883,6 +6865,24 @@ __metadata:
     lodash: ^4.17.21
     luxon: ^3.0.0
   checksum: 5d037450c4673a0eada8df7f000d4294b970b67c7937fa875165e7bac96a04943f1e8438fe2de06bd6ddfd39777e56c553a6b0cbe30cf1442ed49ae5399f3d67
+  languageName: node
+  linkType: hard
+
+"@backstage/integration@npm:^1.19.2":
+  version: 1.19.2
+  resolution: "@backstage/integration@npm:1.19.2"
+  dependencies:
+    "@azure/identity": ^4.0.0
+    "@azure/storage-blob": ^12.5.0
+    "@backstage/config": ^1.3.6
+    "@backstage/errors": ^1.2.7
+    "@octokit/auth-app": ^4.0.0
+    "@octokit/rest": ^19.0.3
+    cross-fetch: ^4.0.0
+    git-url-parse: ^15.0.0
+    lodash: ^4.17.21
+    luxon: ^3.0.0
+  checksum: 0bc4d3454da9059c72ca65298f904de79f5d2d456e2af4cfaee48256ceb1aaf65417470b0edc0e0856b8127d702e33a6f32778052d9c3920286642b7822ed7ed
   languageName: node
   linkType: hard
 
@@ -8849,25 +8849,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-scaffolder-common@npm:^1.5.11, @backstage/plugin-scaffolder-common@npm:^1.7.5":
-  version: 1.7.5
-  resolution: "@backstage/plugin-scaffolder-common@npm:1.7.5"
-  dependencies:
-    "@backstage/catalog-model": ^1.7.6
-    "@backstage/errors": ^1.2.7
-    "@backstage/integration": ^1.19.2
-    "@backstage/plugin-permission-common": ^0.9.4
-    "@backstage/types": ^1.2.2
-    "@microsoft/fetch-event-source": ^2.0.1
-    "@types/json-schema": ^7.0.9
-    cross-fetch: ^4.0.0
-    json-schema: ^0.4.0
-    uri-template: ^2.0.0
-    zen-observable: ^0.10.0
-  checksum: a951de5218047a79bcdddfd9e568498f129bb7de8dd6177cd8ef1859a66f1889b0016e601ce3b44701da129e285b760c4783b757ad446b4a9a861e58d61d162a
-  languageName: node
-  linkType: hard
-
 "@backstage/plugin-scaffolder-common@npm:^1.7.0":
   version: 1.7.0
   resolution: "@backstage/plugin-scaffolder-common@npm:1.7.0"
@@ -8906,6 +8887,25 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@backstage/plugin-scaffolder-common@npm:^1.7.5":
+  version: 1.7.5
+  resolution: "@backstage/plugin-scaffolder-common@npm:1.7.5"
+  dependencies:
+    "@backstage/catalog-model": ^1.7.6
+    "@backstage/errors": ^1.2.7
+    "@backstage/integration": ^1.19.2
+    "@backstage/plugin-permission-common": ^0.9.4
+    "@backstage/types": ^1.2.2
+    "@microsoft/fetch-event-source": ^2.0.1
+    "@types/json-schema": ^7.0.9
+    cross-fetch: ^4.0.0
+    json-schema: ^0.4.0
+    uri-template: ^2.0.0
+    zen-observable: ^0.10.0
+  checksum: a951de5218047a79bcdddfd9e568498f129bb7de8dd6177cd8ef1859a66f1889b0016e601ce3b44701da129e285b760c4783b757ad446b4a9a861e58d61d162a
+  languageName: node
+  linkType: hard
+
 "@backstage/plugin-scaffolder-node@npm:^0.11.0":
   version: 0.11.0
   resolution: "@backstage/plugin-scaffolder-node@npm:0.11.0"
@@ -8934,7 +8934,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-scaffolder-node@npm:^0.12.1, @backstage/plugin-scaffolder-node@npm:^0.12.3":
+"@backstage/plugin-scaffolder-node@npm:^0.12.1, @backstage/plugin-scaffolder-node@npm:^0.12.2, @backstage/plugin-scaffolder-node@npm:^0.12.3":
   version: 0.12.3
   resolution: "@backstage/plugin-scaffolder-node@npm:0.12.3"
   dependencies:
@@ -8959,33 +8959,6 @@ __metadata:
     zod: ^3.22.4
     zod-to-json-schema: ^3.25.1
   checksum: 0466d81fc71f275c2f9fda0fce985378a1b2cfeb66afd4ebe166c5a0a886b9bd6554b95633d9339ebea0b11a3df063816913ebd4e68fba26e2f130c6c8fcd1e1
-  languageName: node
-  linkType: hard
-
-"@backstage/plugin-scaffolder-node@npm:^0.8.2":
-  version: 0.8.2
-  resolution: "@backstage/plugin-scaffolder-node@npm:0.8.2"
-  dependencies:
-    "@backstage/backend-plugin-api": ^1.3.1
-    "@backstage/catalog-model": ^1.7.4
-    "@backstage/errors": ^1.2.7
-    "@backstage/integration": ^1.17.0
-    "@backstage/plugin-scaffolder-common": ^1.5.11
-    "@backstage/types": ^1.2.1
-    "@isomorphic-git/pgp-plugin": ^0.0.7
-    concat-stream: ^2.0.0
-    fs-extra: ^11.2.0
-    globby: ^11.0.0
-    isomorphic-git: ^1.23.0
-    jsonschema: ^1.5.0
-    lodash: ^4.17.21
-    p-limit: ^3.1.0
-    tar: ^6.1.12
-    winston: ^3.2.1
-    winston-transport: ^4.7.0
-    zod: ^3.22.4
-    zod-to-json-schema: ^3.20.4
-  checksum: ce70855113d2224ef0fa557c716c47fd4b93f581514efdec19240b598c479b77ac11e2eecf425c76330a0104d6c2e09c49f9a71166606b3de1ec3cae0b418999
   languageName: node
   linkType: hard
 
@@ -25062,7 +25035,7 @@ __metadata:
   dependencies:
     "@backstage-community/plugin-rbac-backend": 7.4.0
     "@backstage-community/plugin-rbac-node": 1.14.0
-    "@backstage-community/plugin-scaffolder-backend-module-annotator": 2.8.0
+    "@backstage-community/plugin-scaffolder-backend-module-annotator": 2.13.0
     "@backstage/backend-app-api": 1.3.0
     "@backstage/backend-defaults": 0.13.1
     "@backstage/backend-dynamic-feature-service": 0.7.6
