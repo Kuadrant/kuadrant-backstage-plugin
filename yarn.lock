@@ -4637,7 +4637,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/backend-defaults@npm:^0.13.1":
+"@backstage/backend-defaults@npm:^0.13.1, @backstage/backend-defaults@npm:^0.13.2":
   version: 0.13.2
   resolution: "@backstage/backend-defaults@npm:0.13.2"
   dependencies:
@@ -8790,11 +8790,11 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/plugin-scaffolder-backend@npm:3.0.1":
-  version: 3.0.1
-  resolution: "@backstage/plugin-scaffolder-backend@npm:3.0.1"
+"@backstage/plugin-scaffolder-backend@npm:3.0.2":
+  version: 3.0.2
+  resolution: "@backstage/plugin-scaffolder-backend@npm:3.0.2"
   dependencies:
-    "@backstage/backend-defaults": ^0.13.1
+    "@backstage/backend-defaults": ^0.13.2
     "@backstage/backend-openapi-utils": ^0.6.3
     "@backstage/backend-plugin-api": ^1.5.0
     "@backstage/catalog-model": ^1.7.6
@@ -8845,7 +8845,7 @@ __metadata:
     zen-observable: ^0.10.0
     zod: ^3.22.4
     zod-to-json-schema: ^3.20.4
-  checksum: 57f68958981ca3b6839bca3e5e9f271c0ad8b6aab0768bab48fa4ec0491cb6814a18d07ee6fcfbf22e11c6908d90e59b56d78040438900124cc0b99b67e379bc
+  checksum: 2b91f486df229ce4bc60da4172c589fa2ecaa1b4564ea5e9e6b379cdffc8149aaf8f0aba40bb99856fd83757b0cf59e1b4d3ea88a7c395f4298c0b60988563d4
   languageName: node
   linkType: hard
 
@@ -25102,7 +25102,7 @@ __metadata:
     "@backstage/plugin-events-node": 0.4.17
     "@backstage/plugin-permission-backend": 0.7.6
     "@backstage/plugin-proxy-backend": 0.6.8
-    "@backstage/plugin-scaffolder-backend": 3.0.1
+    "@backstage/plugin-scaffolder-backend": 3.0.2
     "@backstage/plugin-search-backend": 2.0.8
     "@backstage/plugin-search-backend-module-catalog": 0.3.10
     "@backstage/plugin-search-backend-module-pg": 0.5.50
