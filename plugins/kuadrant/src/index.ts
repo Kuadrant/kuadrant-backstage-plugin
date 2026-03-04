@@ -44,5 +44,7 @@ export {
   kuadrantPermissions,
 } from './permissions';
 
+export { default as KuadrantIcon } from './components/KuadrantIcon';
+
 export { kuadrantApiRef, type KuadrantAPI } from './api';
 export { kuadrantApiFactory } from './apis';

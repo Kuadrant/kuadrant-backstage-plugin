@@ -48,6 +48,7 @@ For specific topics, refer to these focused guides:
 | [docs/kuadrant-resources.md](docs/kuadrant-resources.md) | CRDs, namespace organisation, approval modes, catalog sync |
 | [docs/ui-patterns.md](docs/ui-patterns.md) | Table patterns, delete dialogs, frontend permissions, sidebar menu config |
 | [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
+| [docs/minc.md](docs/minc.md) | MINC dev environment, cluster setup, RHDH integration testing |
 
 ## Prerequisites
 

@@ -1,0 +1,20 @@
+# SA and RBAC for running the console outside the cluster
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: openshift-console
+  namespace: kube-system
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: openshift-console-admin
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: openshift-console
+    namespace: kube-system
