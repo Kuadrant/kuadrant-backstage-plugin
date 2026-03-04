@@ -354,7 +354,83 @@ This section covers installing the plugins using [rhdh-local](https://github.com
 
 ### 1. Configure Dynamic Plugins
 
-Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
+Add the plugins to `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
+
+```yaml
+includes:
+  - dynamic-plugins.default.yaml
+
+plugins:
+  # RBAC Management UI (bundled with RHDH, just enable it)
+  - package: ./dynamic-plugins/dist/backstage-community-plugin-rbac
+    disabled: false
+
+  # Kuadrant Backend
+  - package: "@kuadrant/kuadrant-backstage-plugin-backend-dynamic"
+    disabled: false
+    integrity: <sha512-integrity-hash>
+
+  # Kuadrant Frontend
+  - package: "@kuadrant/kuadrant-backstage-plugin-frontend"
+    integrity: <sha512-integrity-hash>
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          internal.plugin-kuadrant:
+            appIcons:
+              - name: kuadrantIcon
+                importName: KuadrantIcon
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: API Key Approval
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+            menuItems:
+              kuadrant:
+                icon: kuadrantIcon
+                title: Kuadrant
+              kuadrant.api-products:
+                parent: kuadrant
+              kuadrant.my-api-keys:
+                parent: kuadrant
+              kuadrant.api-key-approval:
+                parent: kuadrant
+            mountPoints:
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiKeyManagementTab
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+              - mountPoint: entity.page.api/cards
+                importName: EntityKuadrantApiProductInfoContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+```
 
 To get the integrity hash:
 ```bash
@@ -390,9 +466,14 @@ Add to `configs/app-config/app-config.yaml`:
 permission:
   enabled: true
   rbac:
+    admin:
+      superUsers:
+        - name: <your-admin-user-entity-ref>
     policies-csv-file: /opt/app-root/src/configs/rbac-policy.csv
     policyFileReload: true
 ```
+
+Replace `<your-admin-user-entity-ref>` with the entity ref of your admin user (e.g. `user:default/admin`). This grants full RBAC management permissions.
 
 Create `configs/rbac-policy.csv` with the [RBAC policy content](#rbac-policy).
 
