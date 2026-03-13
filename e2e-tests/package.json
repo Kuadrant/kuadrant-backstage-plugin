@@ -38,7 +38,7 @@
   "dependencies": {
     "@azure/arm-network": "34.0.0",
     "@azure/identity": "4.9.1",
-    "@keycloak/keycloak-admin-client": "25.0.6",
+    "@keycloak/keycloak-admin-client": "26.5.5",
     "@kubernetes/client-node": "0.22.3",
     "@microsoft/microsoft-graph-client": "3.0.7",
     "isomorphic-fetch": "3.0.0",
