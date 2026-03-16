@@ -44,7 +44,7 @@
     "export-dynamic:clean": "run export-dynamic --clean"
   },
   "dependencies": {
-    "@backstage-community/plugin-rbac-node": "^1.5.1",
+    "@backstage-community/plugin-rbac-node": "^1.14.0",
     "@backstage/plugin-catalog-node": "^1.18.0",
     "@kubernetes/client-node": "^0.20.0",
     "@types/cors": "^2.8.19",

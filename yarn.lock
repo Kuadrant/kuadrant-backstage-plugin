@@ -4326,15 +4326,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage-community/plugin-rbac-node@npm:^1.5.1":
-  version: 1.17.0
-  resolution: "@backstage-community/plugin-rbac-node@npm:1.17.0"
-  dependencies:
-    "@backstage/backend-plugin-api": ^1.6.2
-  checksum: 71e34a24d415cb97a047f2c8c8a12439ce7e103b6fca14fb24d7564441f07612bc3a6fe41f86bdd5b566f17a785974937970382e38595499c6127194306ee136
-  languageName: node
-  linkType: hard
-
 "@backstage-community/plugin-rbac@npm:1.41.6":
   version: 1.41.6
   resolution: "@backstage-community/plugin-rbac@npm:1.41.6"
@@ -4736,7 +4727,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@backstage/backend-plugin-api@npm:^1.6.2, @backstage/backend-plugin-api@npm:^1.7.0":
+"@backstage/backend-plugin-api@npm:^1.7.0":
   version: 1.7.0
   resolution: "@backstage/backend-plugin-api@npm:1.7.0"
   dependencies:
@@ -11006,7 +10997,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@kuadrant/kuadrant-backstage-plugin-backend@workspace:plugins/kuadrant-backend"
   dependencies:
-    "@backstage-community/plugin-rbac-node": ^1.5.1
+    "@backstage-community/plugin-rbac-node": ^1.14.0
     "@backstage/backend-defaults": ^0.12.0
     "@backstage/backend-plugin-api": ^1.4.2
     "@backstage/backend-test-utils": ^1.8.0
