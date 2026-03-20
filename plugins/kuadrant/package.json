@@ -29,7 +29,8 @@
       "EntityKuadrantApiAccessCard": "./src/plugin.ts",
       "EntityKuadrantApiKeyManagementTab": "./src/plugin.ts",
       "EntityKuadrantApiKeysContent": "./src/plugin.ts",
-      "EntityKuadrantApiProductInfoContent": "./src/plugin.ts"
+      "EntityKuadrantApiProductInfoContent": "./src/plugin.ts",
+      "KuadrantIcon": "./src/components/KuadrantIcon"
     }
   },
   "sideEffects": false,

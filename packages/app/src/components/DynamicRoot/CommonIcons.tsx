@@ -31,8 +31,8 @@ import Support from '@mui/icons-material/Support';
 import Textsms from '@mui/icons-material/TextsmsOutlined';
 import WavingHand from '@mui/icons-material/WavingHandOutlined';
 
+import { KuadrantIcon } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DeveloperHub from '../CustomIcons/DeveloperHub';
-import Kuadrant from '../CustomIcons/Kuadrant';
 
 const CommonIcons: {
   [k: string]: React.ComponentType<{}>;
@@ -70,7 +70,7 @@ const CommonIcons: {
   key: Key,
   api: Api,
   approval: Approval,
-  kuadrant: Kuadrant,
+  kuadrant: KuadrantIcon,
 };
 
 export default CommonIcons;
