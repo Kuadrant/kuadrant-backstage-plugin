@@ -1,0 +1,1 @@
+export { KuadrantIcon } from './KuadrantIcon';
