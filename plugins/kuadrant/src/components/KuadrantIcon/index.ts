@@ -1,1 +1,1 @@
-export { default as KuadrantIcon } from './KuadrantIcon';
+export { KuadrantIcon } from './KuadrantIcon';

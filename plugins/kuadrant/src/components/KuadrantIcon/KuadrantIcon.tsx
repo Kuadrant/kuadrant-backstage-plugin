@@ -1,7 +1,7 @@
 import React from 'react';
 import SvgIcon, { SvgIconProps } from '@mui/material/SvgIcon';
 
-const KuadrantIcon = (props: SvgIconProps) => (
+export const KuadrantIcon = (props: SvgIconProps) => (
   <SvgIcon
     {...props}
     viewBox="0 0 1024 1024"
@@ -14,5 +14,3 @@ const KuadrantIcon = (props: SvgIconProps) => (
     <rect x="1" y="1" width="218" height="1022" fill="currentColor" />
   </SvgIcon>
 );
-
-export default KuadrantIcon;
