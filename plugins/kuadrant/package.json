@@ -24,7 +24,7 @@
   "scalprum": {
     "name": "internal.plugin-kuadrant",
     "exposedModules": {
-      "PluginRoot": "./src/plugin.ts",
+      "PluginRoot": "./src/index.ts",
       "KuadrantPage": "./src/plugin.ts",
       "EntityKuadrantApiAccessCard": "./src/plugin.ts",
       "EntityKuadrantApiKeyManagementTab": "./src/plugin.ts",
