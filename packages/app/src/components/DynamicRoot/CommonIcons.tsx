@@ -1,3 +1,4 @@
+import { KuadrantIcon } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import AddCircle from '@mui/icons-material/AddCircleOutline';
 import Api from '@mui/icons-material/ApiOutlined';
@@ -31,7 +32,6 @@ import Support from '@mui/icons-material/Support';
 import Textsms from '@mui/icons-material/TextsmsOutlined';
 import WavingHand from '@mui/icons-material/WavingHandOutlined';
 
-import { KuadrantIcon } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DeveloperHub from '../CustomIcons/DeveloperHub';
 
 const CommonIcons: {
