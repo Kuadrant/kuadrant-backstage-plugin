@@ -580,14 +580,14 @@ test.describe("Kuadrant Permissions Matrix", () => {
         timeout: TIMEOUTS.DEFAULT,
       });
 
-      // consumer should not see Policy column header in the table
+      // consumer should see Policy column header in the table
       const policyColumnHeader = page
         .locator("th")
         .filter({ hasText: /^Policy$/i });
       await expect(
         policyColumnHeader,
-        "Consumer should NOT see Policy column",
-      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+        "Consumer should see Policy column",
+      ).toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
     test("admin CAN see Policy filter and column", async ({ page }) => {
