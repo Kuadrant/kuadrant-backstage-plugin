@@ -733,6 +733,12 @@ plugins:
             appIcons:
               - name: kuadrantIcon
                 importName: KuadrantIcon
+              - name: apiIcon
+                importName: ApiIcon
+              - name: keyIcon
+                importName: KeyIcon
+              - name: approvalIcon
+                importName: ApprovalIcon
             menuItems:
               kuadrant.api-products:
                 parent: kuadrant
@@ -749,17 +755,17 @@ plugins:
               - path: /kuadrant/api-products
                 importName: ApiProductsPage
                 menuItem:
-                  icon: api
+                  icon: apiIcon
                   text: API Products
               - path: /kuadrant/my-api-keys
                 importName: MyApiKeysPage
                 menuItem:
-                  icon: key
+                  icon: keyIcon
                   text: My API Keys
               - path: /kuadrant/api-key-approval
                 importName: ApiKeyApprovalPage
                 menuItem:
-                  icon: approval
+                  icon: approvalIcon
                   text: API Key Approval
               - path: /kuadrant/api-products/:namespace/:name
                 importName: ApiProductDetailPage
@@ -901,6 +907,9 @@ rules:
 | `EntityKuadrantApiKeysContent`       | API keys content component                      |
 | `EntityKuadrantApiProductInfoContent`| APIProduct details tab                          |
 | `KuadrantIcon`                       | Kuadrant logo icon for navigation               |
+| `ApiIcon`                            | Api icon from standard MUI icons                |
+| `KeyIcon`                            | Key icon from standard MUI icons                |
+| `ApprovalIcon`                       | Approval icon from standard MUI icons           |
 
 ### Backend
 
