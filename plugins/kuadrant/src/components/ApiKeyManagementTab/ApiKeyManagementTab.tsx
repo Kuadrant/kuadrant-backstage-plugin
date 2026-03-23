@@ -31,7 +31,8 @@ import {
   alertApiRef,
 } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
-import { useEntity } from "@backstage/plugin-catalog-react";
+import { UserEntity } from '@backstage/catalog-model';
+import { useEntity, catalogApiRef } from "@backstage/plugin-catalog-react";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import HourglassEmptyIcon from "@material-ui/icons/HourglassEmpty";
@@ -64,6 +65,7 @@ export const ApiKeyManagementTab = ({
   namespace: propNamespace,
 }: ApiKeyManagementTabProps) => {
   const { entity } = useEntity();
+  const catalogAPI = useApi(catalogApiRef);
   const kuadrantApi = useApi(kuadrantApiRef);
   const identityApi = useApi(identityApiRef);
   const alertApi = useApi(alertApiRef);
@@ -113,7 +115,18 @@ export const ApiKeyManagementTab = ({
     const identity = await identityApi.getBackstageIdentity();
     const profile = await identityApi.getProfileInfo();
     setUserId(identity.userEntityRef);
-    setUserEmail(profile.email || "");
+
+    // Try profile email first (works for OAuth providers)
+    let email = profile.email || "";
+    // Fallback to catalog entity for guest/other providers
+    if (!email && identity.userEntityRef) {
+       const userEntity = await catalogAPI.getEntityByRef(identity.userEntityRef) as UserEntity;
+        if (userEntity?.spec?.profile?.email) {
+          email = userEntity.spec.profile.email as string;
+        }
+    }
+
+    setUserEmail(email);
   }, [identityApi]);
 
   const {
@@ -813,12 +826,22 @@ export const ApiKeyManagementTab = ({
                 color="primary"
                 startIcon={<AddIcon />}
                 onClick={() => setRequestDialogOpen(true)}
-                disabled={plans.length === 0}
+                disabled={plans.length === 0 || !userEmail}
                 data-testid="request-api-access-button"
                 data-plans-count={plans.length}
               >
                 Request API Access
               </Button>
+              {!userEmail && (
+                <Typography
+                  variant="caption"
+                  color="textSecondary"
+                  style={{ marginTop: 4 }}
+                  data-testid="no-email-message"
+                 >
+                "Email address is required"
+                </Typography>
+              )}
               {plans.length === 0 && (
                 <Typography
                   variant="caption"

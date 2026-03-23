@@ -11036,6 +11036,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@kuadrant/kuadrant-backstage-plugin-frontend@workspace:plugins/kuadrant"
   dependencies:
+    "@backstage/catalog-model": 1.7.5
     "@backstage/cli": ^0.34.1
     "@backstage/core-app-api": ^1.18.0
     "@backstage/core-components": ^0.17.5
