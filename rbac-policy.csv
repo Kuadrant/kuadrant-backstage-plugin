@@ -49,6 +49,10 @@ p, role:default/api-owner, catalog.entity.read, read, allow, api
 # cannot do: approve requests, create apis, modify rate limits, view planpolicies directly
 p, role:default/api-consumer, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-consumer, kuadrant.apiproduct.list, read, allow
+p, role:default/api-consumer, kuadrant.planpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.authpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.ratelimitpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.httproute.list, read, allow
 # allow requesting access to any api (per-apiproduct access control can be added below)
 p, role:default/api-consumer, kuadrant.apikey.create, create, allow, apiproduct:*/*
 p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
