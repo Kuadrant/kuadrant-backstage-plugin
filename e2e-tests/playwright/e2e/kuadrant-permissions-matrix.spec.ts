@@ -563,7 +563,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
-    test("consumer CANNOT see Policy filter or column", async ({ page }) => {
+    test("consumer CAN see Policy filter or column", async ({ page }) => {
       const common = new Common(page);
       await common.dexQuickLogin("consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
@@ -574,21 +574,20 @@ test.describe("Kuadrant Permissions Matrix", () => {
         timeout: TIMEOUTS.DEFAULT,
       });
 
-      // consumer should not see Policy filter in the filter panel
+      // consumer should see Policy filter in the filter panel
       const policyFilter = page.locator("text=POLICY").first();
-      await expect(
-        policyFilter,
-        "Consumer should NOT see Policy filter",
-      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+      await expect(policyFilter, "Consumer should see Policy filter").toBeVisible({
+        timeout: TIMEOUTS.DEFAULT,
+      });
 
-      // consumer should not see Policy column header in the table
+      // consumer should see Policy column header in the table
       const policyColumnHeader = page
         .locator("th")
         .filter({ hasText: /^Policy$/i });
       await expect(
         policyColumnHeader,
-        "Consumer should NOT see Policy column",
-      ).not.toBeVisible({ timeout: TIMEOUTS.QUICK });
+        "Consumer should see Policy column",
+      ).toBeVisible({ timeout: TIMEOUTS.QUICK });
     });
 
     test("admin CAN see Policy filter and column", async ({ page }) => {

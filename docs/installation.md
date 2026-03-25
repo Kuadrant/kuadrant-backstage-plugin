@@ -31,10 +31,12 @@ The plugins require a Kubernetes cluster with Kuadrant installed. You can either
    - [Kuadrant operator 1.4+](https://docs.kuadrant.io/latest/getting-started/) installed
 
 2. **Use the development setup** (recommended for testing):
+
    ```bash
    cd kuadrant-dev-setup
    make kind-create
    ```
+
    This creates a kind cluster with:
    - Kuadrant operator
    - Gateway API CRDs v1.2.0
@@ -49,14 +51,16 @@ This section covers installing the Kuadrant plugins on a Red Hat Developer Hub d
 
 ### Prerequisites
 
-* Red Hat Developer Hub
+- Red Hat Developer Hub
 
 The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.6** (based on Backstage 1.45.3).
 
 **Installation guide:**
+
 - [Installing Red Hat Developer Hub](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/)
 
 Choose your preferred deployment method:
+
 - Operator-based deployment (recommended for production)
 - Helm-based deployment
 
@@ -89,7 +93,6 @@ kubectl create namespace $RHDH_NS
 Create a config map with the dynamic plugin configuration required to load kuadrant backstage plugins as dynamic plugins.
 
 Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named, for example, `dynamic-plugins-rhdh.yaml`. Replace the environment variables with their actual values. Then, create `dynamic-plugins-rhdh` configmap from that file.
-
 
 ```sh
 kubectl create configmap dynamic-plugins-rhdh --from-file=dynamic-plugins-rhdh.yaml --namespace=$RHDH_NS
@@ -149,11 +152,13 @@ The recommended approach is so-called `in-cluster` mode. In this mode, the backs
 The `in-cluster` mode can be configured by either:
 
 - Omitting the `kubernetes` section entirely (setting it to null):
+
   ```yaml
   kubernetes: null
   ```
 
 - Omitting the `serviceAccountToken` when configuring clusters:
+
   ```yaml
   kubernetes:
     serviceLocatorMethod:
@@ -266,7 +271,7 @@ kubectl auth can-i update apikeys.devportal.kuadrant.io --as=system:serviceaccou
 
 The Backstage CR represents one backstage instance. It is where all preparation comes into one place and takes effect.
 
-* Link the dynamic plugin configmap
+- Link the dynamic plugin configmap
 
 ```yaml
 spec:
@@ -274,7 +279,7 @@ spec:
     dynamicPluginsConfigMapName: dynamic-plugins-rhdh
 ```
 
-* Link the main `rhdh-app-config` configmap
+- Link the main `rhdh-app-config` configmap
 
 ```yaml
 spec:
@@ -285,7 +290,7 @@ spec:
          - name: rhdh-app-config
 ```
 
-* Link the RBAC policies from the `rbac-policies` configmap
+- Link the RBAC policies from the `rbac-policies` configmap
 
 ```yaml
 spec:
@@ -295,9 +300,10 @@ spec:
       configMaps:
          - name: rbac-policies
 ```
+
 > The mounting path is referenced from `app-config.yaml`, RBAC for the kuadrant functionality section. Ensure they match.
 
-* [Optional] Enable serviceaccount token automount
+- [Optional] Enable serviceaccount token automount
 
 Only required for kubernetes access *in-cluster* mode.
 
@@ -357,6 +363,7 @@ This section covers installing the plugins using [rhdh-local](https://github.com
 Copy [Kuadrant backstage dynamic plugins metadata](#dynamic-plugins) into a file named `configs/dynamic-plugins/dynamic-plugins.override.yaml`:
 
 To get the integrity hash:
+
 ```bash
 npm view @kuadrant/kuadrant-backstage-plugin-frontend dist.integrity
 npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic dist.integrity
@@ -452,7 +459,7 @@ EOF
 docker compose up
 ```
 
-Visit http://localhost:7007/kuadrant
+Visit <http://localhost:7007/kuadrant>
 
 ## Installation on Backstage
 
@@ -683,7 +690,7 @@ EOF
 yarn start
 ```
 
-Visit http://localhost:3000/kuadrant
+Visit <http://localhost:3000/kuadrant>
 
 ---
 
@@ -754,6 +761,10 @@ p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.update.own, update, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
+p, role:default/api-consumer, kuadrant.planpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.authpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.ratelimitpolicy.list, read, allow
+p, role:default/api-consumer, kuadrant.httproute.list, read, allow
 
 # api owner: publishes apis they own, approves requests for their apis
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
