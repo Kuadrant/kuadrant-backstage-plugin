@@ -1,6 +1,6 @@
 {
   "name": "@kuadrant/kuadrant-backstage-plugin-frontend",
-  "version": "0.0.2-dev",
+  "version": "0.2.1",
   "license": "Apache-2.0",
   "repository": {
     "type": "git",
