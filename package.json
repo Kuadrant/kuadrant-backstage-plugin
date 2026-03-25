@@ -32,7 +32,11 @@
     "new": "backstage-cli new --scope internal",
     "repo:fix": "backstage-cli repo fix --publish",
     "versions:metadata": "node ./scripts/update-metadata.mjs",
-    "versions:bump": "node ./scripts/update-backstage.mjs"
+    "versions:bump": "node ./scripts/update-backstage.mjs",
+    "minc": "./minc/setup.sh",
+    "minc:cluster": "./minc/setup.sh --cluster",
+    "minc:rhdh": "./minc/setup.sh --rhdh",
+    "minc:teardown": "./minc/teardown.sh"
   },
   "workspaces": {
     "packages": [
