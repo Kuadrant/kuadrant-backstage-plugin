@@ -53,7 +53,7 @@ This section covers installing the Kuadrant plugins on a Red Hat Developer Hub d
 
 - Red Hat Developer Hub
 
-The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.6** (based on Backstage 1.45.3).
+The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.8.4** (based on Backstage 1.42.5).
 
 **Installation guide:**
 
@@ -71,9 +71,12 @@ Set the following environment variables used for convenience in this tutorial:
 ```sh
 # Your backstage instance namespace. Choose your own.
 export RHDH_NS=rhdh
-export KUADRANT_PLUGIN_VERSION=v0.1.0
-export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION dist.integrity)
-export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256=$(npm view @kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION dist.integrity)
+export KUADRANT_PLUGIN_VERSION=v0.2.1
+export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC="@kuadrant/kuadrant-backstage-plugin-backend-dynamic@$KUADRANT_PLUGIN_VERSION"
+export KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC_SHA256=$(npm view ${KUADRANT_BACKSTAGE_PLUGIN_BACKEND_DYNAMIC} dist.integrity)
+export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND="@kuadrant/kuadrant-backstage-plugin-frontend@$KUADRANT_PLUGIN_VERSION"
+export KUADRANT_BACKSTAGE_PLUGIN_FRONTEND_SHA256=$(npm view ${KUADRANT_BACKSTAGE_PLUGIN_FRONTEND} dist.integrity)
+
 # base hostname of the cluster.
 # In openshift, this can be easily read with the following command
 #  oc get ingress.config.openshift.io cluster -o jsonpath='{.spec.domain}'
@@ -85,7 +88,13 @@ export CLUSTER_HOSTNAME=apps.example.com
 Create namespace for the backstage instance
 
 ```sh
-kubectl create namespace $RHDH_NS
+kubectl apply -f - <<EOF
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: $RHDH_NS
+EOF
 ```
 
 #### Dynamic Plugin ConfigMap
@@ -219,6 +228,9 @@ kubernetes: null
 catalog:
   rules:
     - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
+  locations:
+    - type: file
+      target: /opt/app-root/src/catalog-entities/all.yaml
 
 permission:
   enabled: true
@@ -239,7 +251,7 @@ kubectl create configmap rhdh-app-config --from-file=app-config.yaml --namespace
 
 This step grants permissions to the backstage application to manage kuadrant CRD's existing in the cluster. It consist on two steps: creating the clusterRole and then the ClusterRoleBinding.
 
-First, create the [ClusterRole](#clusterrole) which defines permissions on the kuadrant CRD's.
+First, create the [ClusterRole](#kuadrant-clusterrole) which defines permissions on the kuadrant CRD's.
 
 By default, backstage application will run with the `default` service account of the namespace.
 Thus, secondly, we need to bind that cluster role to this service account with cluster wide scope. Therefore, create *CluterRoleBinding* as follows:
@@ -716,15 +728,45 @@ plugins:
       dynamicPlugins:
         frontend:
           internal.plugin-kuadrant:
+            apiFactories:
+              - importName: kuadrantApiFactory
             appIcons:
               - name: kuadrantIcon
                 importName: KuadrantIcon
+              - name: apiIcon
+                importName: ApiIcon
+              - name: keyIcon
+                importName: KeyIcon
+              - name: approvalIcon
+                importName: ApprovalIcon
+            menuItems:
+              kuadrant.api-products:
+                parent: kuadrant
+              kuadrant.my-api-keys:
+                parent: kuadrant
+              kuadrant.api-key-approval:
+                parent: kuadrant
             dynamicRoutes:
               - path: /kuadrant
                 importName: KuadrantPage
                 menuItem:
                   icon: kuadrantIcon
                   text: Kuadrant
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: apiIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: keyIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: approvalIcon
+                  text: API Key Approval
               - path: /kuadrant/api-products/:namespace/:name
                 importName: ApiProductDetailPage
               - path: /kuadrant/api-keys/:namespace/:name
@@ -806,7 +848,7 @@ g, group:default/api-admins, role:default/api-admin
 g, user:default/guest, role:default/api-admin
 ```
 
-### ClusterRole
+### Kuadrant ClusterRole
 
 Permissions to manage resources from kuadrant CRDs.
 
@@ -869,6 +911,9 @@ rules:
 | `EntityKuadrantApiKeysContent`       | API keys content component                      |
 | `EntityKuadrantApiProductInfoContent`| APIProduct details tab                          |
 | `KuadrantIcon`                       | Kuadrant logo icon for navigation               |
+| `ApiIcon`                            | Api icon from standard MUI icons                |
+| `KeyIcon`                            | Key icon from standard MUI icons                |
+| `ApprovalIcon`                       | Approval icon from standard MUI icons           |
 
 ### Backend
 

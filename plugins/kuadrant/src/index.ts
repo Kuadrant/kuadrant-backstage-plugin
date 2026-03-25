@@ -16,6 +16,8 @@ export {
 export { ApiAccessCard } from './components/ApiAccessCard';
 export { ApiKeyManagementTab } from './components/ApiKeyManagementTab';
 export { ApiProductInfoCard } from './components/ApiProductInfoCard';
+export { KuadrantIcon } from './components/KuadrantIcon';
+export { ApiIcon, KeyIcon, ApprovalIcon } from './components/icons';
 
 export {
   kuadrantPlanPolicyCreatePermission,
