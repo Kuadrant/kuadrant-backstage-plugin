@@ -501,13 +501,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               helperText={openAPISpecError || "Enter the full path to your API spec file"}
               error={!!openAPISpecError}
               margin="normal"
-              required
               disabled={creating}
-              InputLabelProps={{
-                classes: {
-                  asterisk: classes.asterisk,
-                },
-              }}
             />
           </Grid>
           <Grid item xs={12}>
