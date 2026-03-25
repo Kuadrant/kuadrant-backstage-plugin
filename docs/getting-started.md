@@ -243,6 +243,7 @@ These steps are performed by an API consumer using the Backstage UI.
 
 The API page shows:
 - **Overview** tab with description and metadata
+- **Definition** tab with the API specification
 - **API Keys** tab for requesting access
 - **API Product Info** tab with plan tiers and rate limits
 
@@ -263,7 +264,7 @@ Back to the API owner workflow.
 ### Step 8: Approve the Request
 
 1. Navigate to the **Kuadrant** page
-2. View the **Pending Requests** section
+2. Go to the **API Key Approval** section and look for requests with **Pending** status
 3. Find the request and review the details:
    - Requester
    - Requested tier
