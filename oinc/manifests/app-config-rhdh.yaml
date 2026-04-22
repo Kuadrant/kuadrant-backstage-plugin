@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: app-config-rhdh
+  namespace: rhdh
+data:
+  app-config-kuadrant.yaml: |
+    app:
+      title: Red Hat Developer Hub
+      baseUrl: http://localhost:7007
+
+    backend:
+      baseUrl: http://localhost:7007
+      cors:
+        origin: http://localhost:7007
+
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+          userEntityRef: user:default/guest
+
+    catalog:
+      rules:
+        - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
+      locations:
+        - type: file
+          target: /opt/app-root/src/catalog-entities/all.yaml
+
+    permission:
+      enabled: true
+      rbac:
+        admin:
+          superUsers:
+            - name: user:default/guest
+        policies-csv-file: /opt/app-root/src/rbac/rbac-policy.csv
+        policyFileReload: true
+
+    extensions:
+      installation:
+        enabled: true
+        saveToSingleFile:
+          file: /opt/app-root/src/dynamic-plugins-root/dynamic-plugins.yaml

@@ -2,15 +2,15 @@
 
 [oinc](https://github.com/jasonmadigan/oinc) (OpenShift in a Container) provides a lightweight OpenShift-compatible cluster for testing the Kuadrant plugins with RHDH dynamic plugins.
 
-This is an alternative to `kuadrant-dev-setup/` (kind cluster + `yarn dev`), not something you run alongside it. Use `kuadrant-dev-setup/` when you're developing plugins and want hot reload. Use oinc when you want to test with stock RHDH and dynamic plugins.
+This is an alternative to `kuadrant-dev-setup/` (kind cluster + `yarn dev`), not something you run alongside it. Use `kuadrant-dev-setup/` when you're developing plugins and want hot reload. Use oinc when you want to test with stock RHDH and local dynamic plugins deployed via PVC.
 
 ## Prerequisites
 
 - [oinc](https://github.com/jasonmadigan/oinc)
 - kubectl
 - helm
-- npm
 - Docker or Podman
+- Local plugins built: `yarn build && cd plugins/kuadrant && yarn export-dynamic && cd ../kuadrant-backend && yarn export-dynamic`
 
 Recommended 8GB+ RAM. The full stack (Istio, Kuadrant, RHDH, PostgreSQL) is heavy.
 
@@ -76,33 +76,57 @@ Our setup scripts add:
 | Component | Source | Notes |
 |-|-|-|
 | RHDH (Helm chart) | `rhdh/backstage` | Stock RHDH image with dynamic plugins |
-| Kuadrant plugins | npm packages | Frontend + backend, integrity hashes fetched at setup time |
+| Kuadrant plugins | Local PVC | Frontend + backend copied from `plugins/*/dist-dynamic` to PVC |
+| PVC | `rhdh-dynamic-plugins-local` | 1Gi PVC for local dynamic plugins |
 | RBAC management UI | Bundled in RHDH image | `backstage-community-plugin-rbac`, just enabled |
 | RHDH service account | `oinc/manifests/rhdh-sa.yaml` | ClusterRole for Kuadrant CRDs |
-| Guest auth + RBAC | ConfigMaps | Guest user gets `api-admin` role for local dev |
-| Extensions UI | app-config + seed file | Enables the plugin management UI in RHDH |
+| App config | `oinc/manifests/app-config-rhdh.yaml` | Guest auth, k8s cluster config, RBAC, extensions UI |
+| RBAC policy | ConfigMap from `rbac-policy.csv` | Guest user gets `api-admin` role for local dev |
 
 ## File structure
 
 ```
 oinc/
-  setup.sh              # entry point, dispatches to modes
-  setup-cluster.sh      # oinc create + post-setup (MetalLB pool, Gateway, demos)
-  setup-rhdh.sh         # RHDH installation
-  teardown.sh           # deletes the oinc cluster
-  lib.sh                # shared helpers
+  setup.sh                  # entry point, dispatches to modes
+  setup-cluster.sh          # oinc create + post-setup (MetalLB pool, Gateway, demos)
+  setup-rhdh.sh             # RHDH installation with local plugins via PVC
+  update-local-plugins.sh   # updates local plugins in PVC after code changes
+  teardown.sh               # deletes the oinc cluster
+  lib.sh                    # shared helpers
   manifests/
-    rhdh-sa.yaml        # RHDH service account + RBAC
+    rhdh-sa.yaml            # RHDH service account + RBAC
+    app-config-rhdh.yaml    # RHDH app-config ConfigMap (guest auth, k8s cluster, RBAC, extensions)
 ```
 
 ## Differences from `yarn dev`
 
 | | `yarn dev` (kind) | `yarn oinc` (oinc) |
 |-|-|-|
-| Plugins | Static (built into app) | Dynamic (npm packages) |
-| Hot reload | Yes | No (uses published packages) |
+| Plugins | Static (built into app) | Dynamic (local files via PVC) |
+| Hot reload | Yes | No (requires rebuild + update-local-plugins.sh) |
 | RHDH image | N/A (standalone Backstage) | Stock RHDH |
-| Use case | Plugin development | Integration testing, installation guide validation |
+| Use case | Plugin development (fast iteration) | Integration testing with real RHDH |
+
+## Updating Local Plugins
+
+After making code changes to the Kuadrant plugins:
+
+```bash
+# 1. Rebuild plugins
+yarn build
+cd plugins/kuadrant && yarn export-dynamic
+cd ../kuadrant-backend && yarn export-dynamic
+cd ../..
+
+# 2. Update PVC
+./oinc/update-local-plugins.sh
+
+# 3. Restart RHDH
+kubectl rollout restart deployment/rhdh-developer-hub -n rhdh
+kubectl rollout status deployment/rhdh-developer-hub -n rhdh
+```
+
+The `update-local-plugins.sh` script copies the rebuilt plugins from `plugins/*/dist-dynamic` to the PVC using a temporary pod.
 
 ## Running e2e tests against oinc
 

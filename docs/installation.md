@@ -396,41 +396,49 @@ plugins:
       dynamicPlugins:
         frontend:
           internal.plugin-kuadrant:
+            apiFactories:
+              - importName: kuadrantApiFactory
             appIcons:
               - name: kuadrantIcon
                 importName: KuadrantIcon
-            dynamicRoutes:
-              - path: /kuadrant
-                importName: KuadrantPage
-              - path: /kuadrant/api-products
-                importName: ApiProductsPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Products
-              - path: /kuadrant/my-api-keys
-                importName: MyApiKeysPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: My API Keys
-              - path: /kuadrant/api-key-approval
-                importName: ApiKeyApprovalPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Key Approval
-              - path: /kuadrant/api-products/:namespace/:name
-                importName: ApiProductDetailPage
-              - path: /kuadrant/api-keys/:namespace/:name
-                importName: ApiKeyDetailPage
+              - name: apiIcon
+                importName: ApiIcon
+              - name: keyIcon
+                importName: KeyIcon
+              - name: approvalIcon
+                importName: ApprovalIcon
             menuItems:
-              kuadrant:
-                icon: kuadrantIcon
-                title: Kuadrant
               kuadrant.api-products:
                 parent: kuadrant
               kuadrant.my-api-keys:
                 parent: kuadrant
               kuadrant.api-key-approval:
                 parent: kuadrant
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: Kuadrant
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: apiIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: keyIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: approvalIcon
+                  text: API Key Approval
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
             mountPoints:
               - mountPoint: entity.page.api/cards
                 importName: EntityKuadrantApiKeyManagementTab
