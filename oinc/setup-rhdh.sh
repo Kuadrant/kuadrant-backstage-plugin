@@ -15,16 +15,164 @@ BACKEND_PKG="@kuadrant/kuadrant-backstage-plugin-backend-dynamic"
 # --- prerequisites ---
 
 check_command kubectl "Install from https://kubernetes.io/docs/tasks/tools/"
-check_command helm "Install from https://helm.sh/docs/intro/install/"
 
 kubectl get crd kuadrants.kuadrant.io &>/dev/null || {
   log "error: kuadrant CRDs not found. Run setup-cluster.sh first."
   exit 1
 }
 
+# --- RHDH via Operator ---
+
+log "installing RHDH operator via OLM..."
+
+# Check for OLM
+kubectl get crd subscriptions.operators.coreos.com &>/dev/null || {
+  log "error: OLM not found. Ensure your cluster has OLM installed."
+  exit 1
+}
+
+# Check for registry credentials
+ENV_FILE="${SCRIPT_DIR}/.env"
+if [ ! -f "${ENV_FILE}" ]; then
+  log "error: Red Hat registry credentials not found"
+  log "  create ${ENV_FILE} with your credentials:"
+  log "  cp ${SCRIPT_DIR}/.env.example ${ENV_FILE}"
+  log ""
+  log "  Get credentials from: https://access.redhat.com/terms-based-registry/"
+  exit 1
+fi
+
+# Source credentials
+# shellcheck disable=SC1090
+source "${ENV_FILE}"
+
+if [ -z "${REDHAT_REGISTRY_USERNAME}" ] || [ -z "${REDHAT_REGISTRY_PASSWORD}" ]; then
+  log "error: REDHAT_REGISTRY_USERNAME or REDHAT_REGISTRY_PASSWORD not set in ${ENV_FILE}"
+  exit 1
+fi
+
+# Detect cluster version
+CLUSTER_VERSION=$(kubectl get configmap -n kube-public microshift-version -o jsonpath='{.data.version}' 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
+if [ -z "${CLUSTER_VERSION}" ]; then
+  log "warning: could not detect cluster version, defaulting to 4.21"
+  CLUSTER_VERSION="4.21"
+fi
+log "detected cluster version: ${CLUSTER_VERSION}"
+
+# Create catalog source for Red Hat operators (this creates the service account)
+log "creating Red Hat operator catalog source..."
+kubectl apply -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: CatalogSource
+metadata:
+  name: redhat-operators
+  namespace: openshift-marketplace
+spec:
+  sourceType: grpc
+  image: registry.redhat.io/redhat/redhat-operator-index:v${CLUSTER_VERSION}
+  displayName: Red Hat Operators
+  publisher: Red Hat
+  updateStrategy:
+    registryPoll:
+      interval: 10m
+EOF
+
+# Wait for OLM to create the service account for this catalog
+log "waiting for catalog service account to be created..."
+for i in {1..30}; do
+  if kubectl get serviceaccount redhat-operators -n openshift-marketplace &>/dev/null; then
+    break
+  fi
+  sleep 2
+done
+
+# Create pull secret for Red Hat registry in openshift-marketplace
+log "creating registry pull secret in openshift-marketplace..."
+kubectl create secret docker-registry redhat-pull-secret \
+  --namespace=openshift-marketplace \
+  --docker-server=registry.redhat.io \
+  --docker-username="${REDHAT_REGISTRY_USERNAME}" \
+  --docker-password="${REDHAT_REGISTRY_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+kubectl patch serviceaccount default -n openshift-marketplace -p \
+  '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+# Link pull secret to the OLM-created service account for this catalog
+log "linking pull secret to catalog service account..."
+kubectl patch serviceaccount redhat-operators -n openshift-marketplace -p \
+  '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+# Create pull secret for Red Hat registry in openshift-operators (for operator images)
+log "creating registry pull secret in openshift-operators..."
+kubectl create secret docker-registry redhat-pull-secret \
+  --namespace=openshift-operators \
+  --docker-server=registry.redhat.io \
+  --docker-username="${REDHAT_REGISTRY_USERNAME}" \
+  --docker-password="${REDHAT_REGISTRY_PASSWORD}" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# Delete existing catalog pod to force recreation with pull secret
+log "restarting catalog pod with authentication..."
+kubectl delete pod -n openshift-marketplace -l olm.catalogSource=redhat-operators --ignore-not-found=true
+
+log "waiting for catalog to be ready..."
+kubectl wait --for=jsonpath='{.status.connectionState.lastObservedState}'=READY \
+  catalogsource/redhat-operators -n openshift-marketplace --timeout=300s
+
+# Create Subscription for RHDH operator v1.8.6
+log "creating RHDH operator subscription..."
+kubectl apply -n openshift-operators -f - <<EOF
+apiVersion: operators.coreos.com/v1alpha1
+kind: Subscription
+metadata:
+  name: rhdh
+  namespace: openshift-operators
+spec:
+  channel: fast-1.8
+  name: rhdh
+  source: redhat-operators
+  sourceNamespace: openshift-marketplace
+  installPlanApproval: Automatic
+  startingCSV: rhdh-operator.v1.8.6
+EOF
+
+log "waiting for RHDH operator subscription to be ready..."
+kubectl wait --for=condition=CatalogSourcesUnhealthy=False subscription/rhdh -n openshift-operators --timeout=300s || true
+kubectl wait --for=jsonpath='{.status.state}'=AtLatestKnown subscription/rhdh -n openshift-operators --timeout=300s
+
+log "waiting for RHDH operator service account to be created..."
+for i in {1..60}; do
+  if kubectl get serviceaccount rhdh-controller-manager -n openshift-operators &>/dev/null; then
+    log "RHDH operator service account found"
+    break
+  fi
+  sleep 5
+done
+
+log "linking pull secret to RHDH operator service account..."
+kubectl patch serviceaccount rhdh-controller-manager -n openshift-operators -p \
+  '{"imagePullSecrets": [{"name": "redhat-pull-secret"}]}'
+
+log "waiting for RHDH operator deployment to be created..."
+for i in {1..60}; do
+  if kubectl get deployment rhdh-operator -n openshift-operators &>/dev/null; then
+    log "RHDH operator deployment found"
+    break
+  fi
+  sleep 5
+done
+
+# Delete operator pod to force recreation with pull secret
+log "restarting RHDH operator pod with authentication..."
+kubectl delete pod -n openshift-operators -l app=rhdh-operator --ignore-not-found=true
+
+log "waiting for RHDH operator deployment to be ready..."
+kubectl wait --for=condition=Available deployment/rhdh-operator -n openshift-operators --timeout=300s
+
 # --- check for local dynamic plugins ---
 
-FRONTEND_DIST="${REPO_DIR}/plugins/kuadrant/dist-dynamic"
+FRONTEND_DIST="${REPO_DIR}/plugins/kuadrant/dist-scalprum"
 BACKEND_DIST="${REPO_DIR}/plugins/kuadrant-backend/dist-dynamic"
 
 if [ ! -d "${FRONTEND_DIST}" ] || [ ! -d "${BACKEND_DIST}" ]; then
@@ -42,16 +190,6 @@ fi
 log "found local dynamic plugins:"
 log "  frontend: ${FRONTEND_DIST}"
 log "  backend:  ${BACKEND_DIST}"
-
-# --- RHDH SA + RBAC ---
-
-log "applying RHDH service account and RBAC..."
-kubectl apply -f "${SCRIPT_DIR}/manifests/rhdh-sa.yaml"
-
-# --- generate SA token ---
-
-SA_TOKEN=$(kubectl create token rhdh-kuadrant -n rhdh --duration=8760h)
-CLUSTER_URL="https://kubernetes.default.svc"
 
 # --- create PVC and copy local plugins ---
 
@@ -108,6 +246,11 @@ kubectl cp "${BACKEND_DIST}/." rhdh/rhdh-plugin-copier:/dynamic-plugins-root/kua
 log "cleaning up copier pod..."
 kubectl delete pod rhdh-plugin-copier -n rhdh --wait=true
 
+# --- RHDH SA + RBAC ---
+
+log "applying RHDH service account and RBAC..."
+kubectl apply -f "${SCRIPT_DIR}/manifests/rhdh-sa.yaml"
+
 # --- RHDH configuration ---
 
 log "creating RHDH configuration..."
@@ -136,32 +279,47 @@ stringData:
   K8S_CLUSTER_TOKEN: "${SA_TOKEN}"
 EOF
 
-# --- RHDH via Helm ---
-
-log "installing RHDH via Helm..."
-helm repo add rhdh https://redhat-developer.github.io/rhdh-chart/ --force-update
-
-RHDH_VALUES=$(mktemp)
-cat >"${RHDH_VALUES}" <<VALS
-upstream:
-  backstage:
+log "creating Backstage CR..."
+kubectl apply -n rhdh -f - <<EOF
+apiVersion: rhdh.redhat.com/v1alpha1
+kind: Backstage
+metadata:
+  name: rhdh
+  namespace: rhdh
+spec:
+  application:
     appConfig:
-      app:
-        baseUrl: http://localhost:7007
-      backend:
-        baseUrl: http://localhost:7007
-        cors:
-          origin: http://localhost:7007
+      configMaps:
+        - name: app-config-rhdh
+    extraEnvs:
+      secrets:
+        - name: rhdh-k8s-credentials
+    extraFiles:
+      configMaps:
+        - name: rbac-policy-rhdh
+          key: rbac-policy.csv
+          mountPath: rbac
+    replicas: 1
+    dynamicPluginsConfigMapName: rhdh-dynamic-plugins
+    route:
+      enabled: false
+    extraVolumes:
+      - name: dynamic-plugins-root-local
+        persistentVolumeClaim:
+          claimName: rhdh-dynamic-plugins-local
+      - name: npmcacache
+        emptyDir: {}
+    extraVolumeMounts:
+      - name: dynamic-plugins-root-local
+        mountPath: /opt/app-root/src/dynamic-plugins-root
     initContainers:
       - name: install-dynamic-plugins
-        image: '{{ include "backstage.image" . }}'
+        image: quay.io/rhdh/rhdh-hub-rhel9:1.8
         command:
           - /bin/bash
           - -c
-          - |
-            ./install-dynamic-plugins.sh /dynamic-plugins-root
-            # seed the extensions installation file so the UI can manage plugins
-            cp /opt/app-root/src/dynamic-plugins.yaml /dynamic-plugins-root/dynamic-plugins.yaml
+        args:
+          - ./install-dynamic-plugins.sh /dynamic-plugins-root && cp /opt/app-root/src/dynamic-plugins.yaml /dynamic-plugins-root/dynamic-plugins.yaml
         env:
           - name: NPM_CONFIG_USERCONFIG
             value: /opt/app-root/src/.npmrc.dynamic-plugins
@@ -179,13 +337,8 @@ upstream:
             name: dynamic-plugins-npmrc
             readOnly: true
             subPath: .npmrc
-          - mountPath: /opt/app-root/src/.config/containers
-            name: dynamic-plugins-registry-auth
-            readOnly: true
           - mountPath: /opt/app-root/src/.npm/_cacache
             name: npmcacache
-          - name: temp
-            mountPath: /tmp
         resources:
           requests:
             cpu: 250m
@@ -194,63 +347,22 @@ upstream:
             cpu: 1000m
             memory: 2.5Gi
             ephemeral-storage: 5Gi
-    extraAppConfig:
-      - configMapRef: app-config-rhdh
-        filename: app-config-kuadrant.yaml
-    extraEnvVarsSecrets:
-      - rhdh-k8s-credentials
-    extraVolumeMounts:
-      - name: dynamic-plugins-root
-        mountPath: /opt/app-root/src/dynamic-plugins-root
-      - name: extensions-catalog
-        mountPath: /extensions
-      - name: temp
-        mountPath: /tmp
-      - name: rbac-policy
-        mountPath: /opt/app-root/src/rbac
-    extraVolumes:
-      - name: dynamic-plugins-root
-        persistentVolumeClaim:
-          claimName: rhdh-dynamic-plugins-local
-      - name: dynamic-plugins
-        configMap:
-          defaultMode: 420
-          name: rhdh-dynamic-plugins
-          optional: true
-      - name: dynamic-plugins-npmrc
-        secret:
-          defaultMode: 420
-          optional: true
-          secretName: rhdh-dynamic-plugins-npmrc
-      - name: dynamic-plugins-registry-auth
-        secret:
-          defaultMode: 416
-          optional: true
-          secretName: rhdh-dynamic-plugins-registry-auth
-      - name: npmcacache
-        emptyDir: {}
-      - name: extensions-catalog
-        emptyDir: {}
-      - name: temp
-        emptyDir: {}
-      - name: rbac-policy
-        configMap:
-          name: rbac-policy-rhdh
-  postgresql:
-    primary:
-      persistence:
-        enabled: false
-      resources:
-        limits:
-          ephemeral-storage: 2Gi
-VALS
+    podSecurityContext:
+      fsGroup: 1001
+    containerSecurityContext:
+      runAsNonRoot: true
+      allowPrivilegeEscalation: false
+      seccompProfile:
+        type: RuntimeDefault
+      capabilities:
+        drop:
+          - ALL
+  database:
+    enableLocalDb: true
+EOF
 
-helm install rhdh rhdh/backstage \
-  --namespace rhdh \
-  --values "${RHDH_VALUES}" \
-  --timeout 900s \
-  --wait
-rm -f "${RHDH_VALUES}"
+log "waiting for RHDH deployment to be ready..."
+kubectl wait --for=condition=Available deployment/backstage-rhdh -n rhdh --timeout=600s
 
 # --- verify ---
 
@@ -260,7 +372,7 @@ log "RHDH is running with LOCAL plugins"
 
 # --- done ---
 
-RHDH_SVC=$(kubectl -n rhdh get svc -l app.kubernetes.io/component=backstage -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "rhdh-developer-hub")
+RHDH_SVC=$(kubectl -n rhdh get svc -l rhdh.redhat.com/app=backstage -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "backstage-rhdh")
 RHDH_PORT=$(kubectl -n rhdh get svc "${RHDH_SVC}" -o jsonpath='{.spec.ports[0].port}' 2>/dev/null || echo "7007")
 
 echo ""
@@ -283,5 +395,5 @@ echo "      cd ../kuadrant-backend && yarn export-dynamic"
 echo "   2. Update PVC:"
 echo "      ./oinc/update-local-plugins.sh"
 echo "   3. Restart RHDH:"
-echo "      kubectl rollout restart deployment/rhdh-developer-hub -n rhdh"
+echo "      kubectl rollout restart deployment/backstage-rhdh -n rhdh"
 echo ""

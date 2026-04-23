@@ -8,11 +8,29 @@ This is an alternative to `kuadrant-dev-setup/` (kind cluster + `yarn dev`), not
 
 - [oinc](https://github.com/jasonmadigan/oinc)
 - kubectl
-- helm
 - Docker or Podman
+- Red Hat registry credentials (see below)
 - Local plugins built: `yarn build && cd plugins/kuadrant && yarn export-dynamic && cd ../kuadrant-backend && yarn export-dynamic`
 
 Recommended 8GB+ RAM. The full stack (Istio, Kuadrant, RHDH, PostgreSQL) is heavy.
+
+### Red Hat Registry Credentials
+
+RHDH operator installation requires access to the Red Hat registry. Create `oinc/.env` with your credentials:
+
+```bash
+cd oinc
+cp .env.example .env
+# Edit .env with your credentials
+```
+
+Get credentials from: https://access.redhat.com/terms-based-registry/
+
+The `.env` file is gitignored and should contain:
+```
+REDHAT_REGISTRY_USERNAME=your-username
+REDHAT_REGISTRY_PASSWORD=your-password
+```
 
 ## Usage
 
@@ -53,7 +71,7 @@ Configures: RHDH service account, RBAC policies, dynamic plugins (frontend + bac
 
 After setup:
 ```bash
-kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh
+kubectl port-forward svc/backstage-rhdh 7007:7007 -n rhdh
 # http://localhost:7007/kuadrant
 ```
 
@@ -75,8 +93,11 @@ Our setup scripts add:
 
 | Component | Source | Notes |
 |-|-|-|
-| RHDH (Helm chart) | `rhdh/backstage` | Stock RHDH image with dynamic plugins |
-| Kuadrant plugins | Local PVC | Frontend + backend copied from `plugins/*/dist-dynamic` to PVC |
+| Red Hat registry pull secret | From `oinc/.env` | Created in `openshift-marketplace` and `openshift-operators` for authenticated registry access |
+| Red Hat operators catalog | CatalogSource | Version-matched to cluster (e.g., v4.21), uses pull secret |
+| RHDH operator | OLM subscription v1.8.6 | Installs via `redhat-operators` catalog, `fast-1.8` channel |
+| RHDH instance | Backstage CR | Stock RHDH image with dynamic plugins |
+| Kuadrant plugins | Local PVC | Frontend (`dist-scalprum`) + backend (`dist-dynamic`) copied to PVC |
 | PVC | `rhdh-dynamic-plugins-local` | 1Gi PVC for local dynamic plugins |
 | RBAC management UI | Bundled in RHDH image | `backstage-community-plugin-rbac`, just enabled |
 | RHDH service account | `oinc/manifests/rhdh-sa.yaml` | ClusterRole for Kuadrant CRDs |
@@ -93,6 +114,8 @@ oinc/
   update-local-plugins.sh   # updates local plugins in PVC after code changes
   teardown.sh               # deletes the oinc cluster
   lib.sh                    # shared helpers
+  .env.example              # template for Red Hat registry credentials
+  .env                      # (gitignored) your Red Hat registry credentials
   manifests/
     rhdh-sa.yaml            # RHDH service account + RBAC
     app-config-rhdh.yaml    # RHDH app-config ConfigMap (guest auth, k8s cluster, RBAC, extensions)
@@ -122,18 +145,18 @@ cd ../..
 ./oinc/update-local-plugins.sh
 
 # 3. Restart RHDH
-kubectl rollout restart deployment/rhdh-developer-hub -n rhdh
-kubectl rollout status deployment/rhdh-developer-hub -n rhdh
+kubectl rollout restart deployment/backstage-rhdh -n rhdh
+kubectl rollout status deployment/backstage-rhdh -n rhdh
 ```
 
-The `update-local-plugins.sh` script copies the rebuilt plugins from `plugins/*/dist-dynamic` to the PVC using a temporary pod.
+The `update-local-plugins.sh` script copies the rebuilt plugins from `plugins/kuadrant/dist-scalprum` and `plugins/kuadrant-backend/dist-dynamic` to the PVC using a temporary pod.
 
 ## Running e2e tests against oinc
 
 With RHDH running and port-forwarded:
 
 ```bash
-kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh
+kubectl port-forward svc/backstage-rhdh 7007:7007 -n rhdh
 ```
 
 Run the e2e tests with `BASE_URL` pointed at port 7007 (the default is 3000 for `yarn dev`):
@@ -148,12 +171,12 @@ BASE_URL=http://localhost:7007 yarn test
 Check pod status:
 ```bash
 kubectl -n rhdh get pods
-kubectl -n rhdh logs deployment/rhdh-developer-hub
+kubectl -n rhdh logs deployment/backstage-rhdh
 ```
 
 Init container logs (plugin installation):
 ```bash
-kubectl -n rhdh logs deployment/rhdh-developer-hub -c install-dynamic-plugins
+kubectl -n rhdh logs deployment/backstage-rhdh -c install-dynamic-plugins
 ```
 
 If RHDH is stuck in init, it's usually downloading plugins. The init container fetches all default RHDH plugins plus the Kuadrant ones from npm.

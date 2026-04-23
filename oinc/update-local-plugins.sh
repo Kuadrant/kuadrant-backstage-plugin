@@ -10,7 +10,7 @@ source "${SCRIPT_DIR}/lib.sh"
 
 # --- check for local dynamic plugins ---
 
-FRONTEND_DIST="${REPO_DIR}/plugins/kuadrant/dist-dynamic"
+FRONTEND_DIST="${REPO_DIR}/plugins/kuadrant/dist-scalprum"
 BACKEND_DIST="${REPO_DIR}/plugins/kuadrant-backend/dist-dynamic"
 
 if [ ! -d "${FRONTEND_DIST}" ] || [ ! -d "${BACKEND_DIST}" ]; then
@@ -74,5 +74,5 @@ echo " Plugins updated successfully"
 echo "============================================"
 echo ""
 echo " Restart RHDH to load the new plugins:"
-echo "   kubectl rollout restart deployment/rhdh-developer-hub -n rhdh"
+echo "   kubectl rollout restart deployment/backstage-rhdh -n rhdh"
 echo ""
