@@ -1470,24 +1470,16 @@ export async function createRouter({
         }
       }
 
-      // check if secret can be read
-      if (apiKey.status?.canReadSecret !== true) {
-        res.status(403).json({
-          error: 'secret has already been read and cannot be retrieved again',
-        });
-        return;
-      }
-
-      // check if secretRef is set
-      if (!apiKey.status?.secretRef?.name || !apiKey.status?.secretRef?.key) {
+      // check if secretRef is set in spec
+      if (!apiKey.spec?.secretRef?.name) {
         res.status(404).json({
-          error: 'secret reference not found in apikey status',
+          error: 'secretRef not found in APIKey spec',
         });
         return;
       }
 
       // get the secret
-      const secretName = apiKey.status.secretRef.name;
+      const secretName = apiKey.spec.secretRef.name;
 
       let secret;
       try {
@@ -1513,19 +1505,6 @@ export async function createRouter({
 
       // decode base64
       const decodedApiKey = Buffer.from(apiKeyValue, 'base64').toString('utf-8');
-
-      // update canReadSecret to false
-      await k8sClient.patchCustomResourceStatus(
-        'devportal.kuadrant.io',
-        'v1alpha1',
-        namespace,
-        'apikeys',
-        name,
-        {
-          ...apiKey.status,
-          canReadSecret: false,
-        },
-      );
 
       res.json({
         apiKey: decodedApiKey,

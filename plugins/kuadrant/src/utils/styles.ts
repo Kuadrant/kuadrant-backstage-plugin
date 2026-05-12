@@ -10,6 +10,8 @@ export const getMyApiKeysStatusChipStyle = (phase: string): CSSProperties => {
       return { ...base, backgroundColor: "#1976d2", color: "#fff" }; // Blue
     case "Rejected":
       return { ...base, backgroundColor: "#d32f2f", color: "#fff" }; // Red
+    case "Failed":
+      return { ...base, backgroundColor: "#ed6c02", color: "#fff" }; // Orange
     case "Pending":
       return { ...base, backgroundColor: "#9c27b0", color: "#fff" }; // Purple
     default:

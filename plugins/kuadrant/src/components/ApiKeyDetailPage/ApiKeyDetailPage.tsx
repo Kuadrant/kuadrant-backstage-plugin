@@ -5,6 +5,7 @@ import {
   alertApiRef,
 } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
+import { getAPIKeyPhase } from '../../utils/apikeys';
 import { useAsync } from "react-use";
 import {
   Header,
@@ -25,17 +26,12 @@ import {
   Tabs,
   Tab,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   makeStyles,
 } from "@material-ui/core";
 import { Skeleton } from "@material-ui/lab";
 import VisibilityIcon from "@material-ui/icons/Visibility";
 import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
-import WarningIcon from "@material-ui/icons/Warning";
 import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import OpenInNewIcon from "@material-ui/icons/OpenInNew";
 import EmailIcon from "@material-ui/icons/Email";
@@ -110,8 +106,6 @@ export const ApiKeyDetailPage = () => {
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKeyValue, setApiKeyValue] = useState<string | null>(null);
   const [apiKeyLoading, setApiKeyLoading] = useState(false);
-  const [alreadyRead, setAlreadyRead] = useState(false);
-  const [showWarning, setShowWarning] = useState(false);
 
   const {
     value: data,
@@ -122,11 +116,6 @@ export const ApiKeyDetailPage = () => {
       kuadrantApi.getApiKey(namespace!, name!),
       kuadrantApi.getApiProducts(),
     ]);
-
-    // check if key has already been read
-    if (apiKeyData.status?.canReadSecret === false) {
-      setAlreadyRead(true);
-    }
 
     // find matching api product to get contact info
     const apiProduct = (productsData.items || []).find(
@@ -146,26 +135,15 @@ export const ApiKeyDetailPage = () => {
     try {
       const extractedSecret = await kuadrantApi.getApiKeySecret(namespace!, name!);
       setApiKeyValue(extractedSecret.apiKey);
-      setAlreadyRead(true);
       setShowApiKey(true);
     } catch (err) {
       console.error("Failed to fetch API key:", err);
       const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
-      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
-        setAlreadyRead(true);
-        alertApi.post({
-          message:
-            "This API key has already been viewed and cannot be retrieved again.",
-          severity: "warning",
-          display: "transient",
-        });
-      } else {
-        alertApi.post({
-          message: `Failed to fetch APIKey. ${errorMessage}`,
-          severity: 'error',
-          display: 'transient',
-        });
-      }
+      alertApi.post({
+        message: `Failed to fetch APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
+      });
     } finally {
       setApiKeyLoading(false);
     }
@@ -175,14 +153,9 @@ export const ApiKeyDetailPage = () => {
     if (showApiKey) {
       setShowApiKey(false);
       setApiKeyValue(null);
-    } else if (!alreadyRead) {
-      setShowWarning(true);
+    } else {
+      fetchApiKeySecret();
     }
-  };
-
-  const handleConfirmReveal = () => {
-    setShowWarning(false);
-    fetchApiKeySecret();
   };
 
   const handleCopy = async (text: string) => {
@@ -217,7 +190,7 @@ export const ApiKeyDetailPage = () => {
     );
   }
 
-  const phase = apiKey.status?.phase || "Pending";
+  const phase = getAPIKeyPhase(apiKey.status?.conditions || []);
   const statusLabel = phase === "Approved" ? "Active" : phase;
   const hostname = apiKey.status?.apiHostname || "api.example.com";
   const displayApiKey = apiKeyValue || "<your-api-key>";
@@ -401,66 +374,49 @@ func main() {
             {phase === "Approved" && (
               <Box mt={2}>
                 <InfoCard title="API Key">
-                  {alreadyRead && !apiKeyValue ? (
-                    <Tooltip title="This API key has already been viewed and cannot be retrieved again">
-                      <Box display="flex" alignItems="center">
-                        <Typography variant="body2" color="textSecondary">
-                          Already viewed - cannot be retrieved again
-                        </Typography>
-                        <VisibilityOffIcon
-                          fontSize="small"
-                          color="disabled"
-                          style={{ marginLeft: 8 }}
-                        />
-                      </Box>
-                    </Tooltip>
-                  ) : (
-                    <Box className={classes.apiKeyContainer}>
-                      <Typography
-                        variant="body2"
-                        style={{ fontFamily: "monospace", flex: 1 }}
-                      >
-                        {apiKeyLoading
-                          ? "Loading..."
-                          : showApiKey && apiKeyValue
-                            ? apiKeyValue
-                            : "•".repeat(32)}
-                      </Typography>
-                      {showApiKey && apiKeyValue && (
-                        <Tooltip title="Copy to clipboard">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleCopy(apiKeyValue)}
-                          >
-                            <FileCopyIcon fontSize="small" />
-                          </IconButton>
-                        </Tooltip>
-                      )}
-                      <Tooltip
-                        title={
-                          showApiKey
-                            ? "Hide API key"
-                            : "Reveal API key (one-time only)"
-                        }
-                      >
-                        <span>
-                          <IconButton
-                            size="small"
-                            onClick={handleRevealClick}
-                            disabled={
-                              apiKeyLoading || (alreadyRead && !apiKeyValue)
-                            }
-                          >
-                            {showApiKey ? (
-                              <VisibilityOffIcon fontSize="small" />
-                            ) : (
-                              <VisibilityIcon fontSize="small" />
-                            )}
-                          </IconButton>
-                        </span>
+                  <Box className={classes.apiKeyContainer}>
+                    <Typography
+                      variant="body2"
+                      style={{ fontFamily: "monospace", flex: 1 }}
+                    >
+                      {apiKeyLoading
+                        ? "Loading..."
+                        : showApiKey && apiKeyValue
+                          ? apiKeyValue
+                          : "•".repeat(32)}
+                    </Typography>
+                    {showApiKey && apiKeyValue && (
+                      <Tooltip title="Copy to clipboard">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleCopy(apiKeyValue)}
+                        >
+                          <FileCopyIcon fontSize="small" />
+                        </IconButton>
                       </Tooltip>
-                    </Box>
-                  )}
+                    )}
+                    <Tooltip
+                      title={
+                        showApiKey
+                          ? "Hide API key"
+                          : "Reveal API key"
+                      }
+                    >
+                      <span>
+                        <IconButton
+                          size="small"
+                          onClick={handleRevealClick}
+                          disabled={apiKeyLoading}
+                        >
+                          {showApiKey ? (
+                            <VisibilityOffIcon fontSize="small" />
+                          ) : (
+                            <VisibilityIcon fontSize="small" />
+                          )}
+                        </IconButton>
+                      </span>
+                    </Tooltip>
+                  </Box>
                 </InfoCard>
               </Box>
             )}
@@ -531,38 +487,6 @@ func main() {
           )}
         </Grid>
       </Content>
-
-      <Dialog
-        open={showWarning}
-        onClose={() => setShowWarning(false)}
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center">
-            <WarningIcon color="primary" style={{ marginRight: 8 }} />
-            View API Key
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" paragraph>
-            This API key can only be viewed <strong>once</strong>. After you
-            reveal it, you will not be able to retrieve it again.
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Make sure to copy and store it securely before closing this view.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setShowWarning(false)}>Cancel</Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={handleConfirmReveal}
-          >
-            Reveal API Key
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Page>
   );
 };

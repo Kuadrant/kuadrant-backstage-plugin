@@ -11,6 +11,7 @@ import {
   alertApiRef,
 } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
+import { getAPIKeyPhase } from '../../utils/apikeys';
 import useAsync from "react-use/lib/useAsync";
 import {
   Box,
@@ -81,7 +82,7 @@ interface ExpandedRowProps {
 
 const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
   const classes = useStyles();
-  const isRejected = request.status?.phase === "Rejected";
+  const isRejected = getAPIKeyPhase(request.status?.conditions) === "Denied";
   const apiProductName = request.spec.apiProductRef?.name || "unknown";
 
   return (
@@ -133,9 +134,6 @@ export const MyApiKeysTable = () => {
     new Map(),
   );
   const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
-  const [alreadyReadKeys, setAlreadyReadKeys] = useState<Set<string>>(
-    new Set(),
-  );
   const [showOnceWarningOpen, setShowOnceWarningOpen] = useState(false);
   const [pendingKeyReveal, setPendingKeyReveal] = useState<{
     namespace: string;
@@ -182,14 +180,18 @@ export const MyApiKeysTable = () => {
     );
   }, [data?.requests, optimisticallyDeleted]);
 
+  // normalize phase to UI status (Denied → Rejected for display)
+  const toUiStatus = (phase: ReturnType<typeof getAPIKeyPhase>) =>
+    phase === 'Denied' ? 'Rejected' : phase;
+
   // filter options from data
   const filterSections: FilterSection[] = useMemo(() => {
-    const statusCounts = { Approved: 0, Pending: 0, Rejected: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Rejected: 0, Failed: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
     allRequests.forEach((r: APIKey) => {
-      const status = r.status?.phase || "Pending";
+      const status = toUiStatus(getAPIKeyPhase(r.status?.conditions));
       statusCounts[status as keyof typeof statusCounts]++;
 
       const apiProduct = r.spec.apiProductRef?.name || "unknown";
@@ -214,6 +216,7 @@ export const MyApiKeysTable = () => {
             label: "Rejected",
             count: statusCounts.Rejected,
           },
+          { value: "Failed", label: "Failed", count: statusCounts.Failed },
         ],
       },
       {
@@ -245,7 +248,7 @@ export const MyApiKeysTable = () => {
     return allRequests.filter((r: APIKey) => {
       // status filter
       if (filters.status.length > 0) {
-        const status = r.status?.phase || "Pending";
+        const status = toUiStatus(getAPIKeyPhase(r.status?.conditions));
         if (!filters.status.includes(status)) return false;
       }
 
@@ -288,25 +291,14 @@ export const MyApiKeysTable = () => {
     try {
       const result = await kuadrantApi.getApiKeySecret(requestNamespace, requestName);
       setApiKeyValues((prev) => new Map(prev).set(key, result.apiKey));
-      setAlreadyReadKeys((prev) => new Set(prev).add(key));
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "unknown error occurred";
-      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
-        setAlreadyReadKeys((prev) => new Set(prev).add(key));
-        alertApi.post({
-          message:
-            "This API key has already been viewed and cannot be retrieved again.",
-          severity: "warning",
-          display: "transient",
-        });
-      } else {
-        alertApi.post({
-          message: `Failed to fetch api key: ${errorMessage}`,
-          severity: "error",
-          display: "transient",
-        });
-      }
+      alertApi.post({
+        message: `Failed to fetch api key: ${errorMessage}`,
+        severity: "error",
+        display: "transient",
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -427,10 +419,11 @@ export const MyApiKeysTable = () => {
     },
     {
       title: "Status",
-      field: "status.phase",
+      field: "status.conditions",
       render: (row: APIKey) => {
-        const phase = row.status?.phase || "Pending";
-        const label = phase === "Approved" ? "Active" : phase;
+        const phase = getAPIKeyPhase(row.status?.conditions);
+        const displayPhase = toUiStatus(phase);
+        const label = displayPhase === "Approved" ? "Active" : displayPhase;
         return (
           <Chip label={label} size="small" style={getMyApiKeysStatusChipStyle(phase)} />
         );
@@ -448,7 +441,7 @@ export const MyApiKeysTable = () => {
       field: "status.secretRef",
       filtering: false,
       render: (row: APIKey) => {
-        if (row.status?.phase !== "Approved") {
+        if (getAPIKeyPhase(row.status?.conditions) !== "Approved") {
           return (
             <Typography variant="body2" color="textSecondary">
               -
@@ -457,43 +450,15 @@ export const MyApiKeysTable = () => {
         }
 
         const key = `${row.metadata.namespace}/${row.metadata.name}`;
-        const hasSecretRef = row.status?.secretRef?.name;
         const isVisible = visibleKeys.has(row.metadata.name);
         const isLoading = apiKeyLoading.has(key);
         const apiKeyValue = apiKeyValues.get(key);
-        const canReadSecret = row.status?.canReadSecret !== false;
-        const isAlreadyRead = alreadyReadKeys.has(key) || !canReadSecret;
-
-        if (!hasSecretRef) {
-          return (
-            <Typography variant="body2" color="textSecondary">
-              Awaiting secret...
-            </Typography>
-          );
-        }
-
-        if (isAlreadyRead && !apiKeyValue) {
-          return (
-            <Tooltip title="This API key has already been viewed and cannot be retrieved again">
-              <Box display="flex" alignItems="center">
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  style={{ fontFamily: "monospace", marginRight: 8 }}
-                >
-                  Already viewed
-                </Typography>
-                <VisibilityOffIcon fontSize="small" color="disabled" />
-              </Box>
-            </Tooltip>
-          );
-        }
 
         const handleRevealClick = () => {
           if (isVisible) {
             clearApiKeyValue(row.metadata.namespace, row.metadata.name);
             toggleKeyVisibility(row.metadata.name);
-          } else if (!isAlreadyRead) {
+          } else {
             setPendingKeyReveal({
               namespace: row.metadata.namespace,
               name: row.metadata.name,
@@ -531,14 +496,14 @@ export const MyApiKeysTable = () => {
             )}
             <Tooltip
               title={
-                isVisible ? "Hide API key" : "Reveal API key (one-time only)"
+                isVisible ? "Hide API key" : "Reveal API key"
               }
             >
               <span>
                 <IconButton
                   size="small"
                   onClick={handleRevealClick}
-                  disabled={isLoading || (isAlreadyRead && !apiKeyValue)}
+                  disabled={isLoading}
                 >
                   {isVisible ? (
                     <VisibilityOffIcon fontSize="small" />
@@ -638,7 +603,7 @@ export const MyApiKeysTable = () => {
   }
 
   const isPending = (row: APIKey) =>
-    !row.status || row.status.phase === "Pending";
+    getAPIKeyPhase(row.status?.conditions) === "Pending";
 
   return (
     <>
@@ -772,11 +737,11 @@ export const MyApiKeysTable = () => {
         </DialogTitle>
         <DialogContent>
           <Typography variant="body1" paragraph>
-            This API key can only be viewed <strong>once</strong>. After you
-            reveal it, you will not be able to retrieve it again.
+            You are about to reveal the API key. Make sure to copy and store it
+            securely.
           </Typography>
           <Typography variant="body2" color="textSecondary">
-            Make sure to copy and store it securely before closing this view.
+            The key will remain accessible for future viewing if needed.
           </Typography>
         </DialogContent>
         <DialogActions>
