@@ -341,25 +341,21 @@ func main() {
                     : "-"}
                 </Typography>
 
-                {apiKey.status?.reviewedBy && (
-                  <>
-                    <Typography variant="caption" className={classes.label}>
-                      Reviewed By
-                    </Typography>
-                    <Typography variant="body1" className={classes.value}>
-                      {apiKey.status.reviewedBy.replace(/^user:default\//, "")}
-                      {apiKey.status.reviewedAt && (
-                        <Typography variant="caption" color="textSecondary">
-                          {" "}
-                          on{" "}
-                          {new Date(
-                            apiKey.status.reviewedAt,
-                          ).toLocaleDateString()}
-                        </Typography>
-                      )}
-                    </Typography>
-                  </>
-                )}
+                {(() => {
+                  const approvalDate = apiKey.status?.conditions?.find(
+                    c => c.type === 'Approved' && c.status === 'True'
+                  )?.lastTransitionTime;
+                  return approvalDate ? (
+                    <>
+                      <Typography variant="caption" className={classes.label}>
+                        Approved On
+                      </Typography>
+                      <Typography variant="body1" className={classes.value}>
+                        {new Date(approvalDate).toLocaleDateString()}
+                      </Typography>
+                    </>
+                  ) : null;
+                })()}
               </Box>
             </InfoCard>
           </Grid>
