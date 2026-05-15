@@ -301,6 +301,69 @@ describe('createRouter', () => {
     });
   });
 
+  describe('POST /secrets', () => {
+    it('should create secret in api-consumers namespace', async () => {
+      // Mock permission check - user has create permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      const mockSecret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: 'test-secret',
+          namespace: 'api-consumers',
+        },
+        type: 'Opaque',
+        data: {
+          api_key: Buffer.from('test-key-123').toString('base64'),
+        },
+      };
+
+      mockK8sClient.createSecret.mockResolvedValue(mockSecret);
+
+      const response = await request(app)
+        .post('/secrets')
+        .send({
+          name: 'test-secret',
+          apiKeyValue: 'test-key-123',
+        })
+        .expect(201);
+
+      expect(response.body.metadata.name).toBe('test-secret');
+      expect(response.body.metadata.namespace).toBe('api-consumers');
+      expect(mockK8sClient.createSecret).toHaveBeenCalledWith(
+        'api-consumers',
+        expect.objectContaining({
+          metadata: { name: 'test-secret', namespace: 'api-consumers' },
+          data: { api_key: Buffer.from('test-key-123').toString('base64') },
+        }),
+      );
+    });
+
+    it('should validate input schema', async () => {
+      const response = await request(app)
+        .post('/secrets')
+        .send({ name: 'test-secret' }) // missing apiKeyValue
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('should check permissions', async () => {
+      // Mock permission check - user does not have create permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+
+      await request(app)
+        .post('/secrets')
+        .send({ name: 'test-secret', apiKeyValue: 'test-key' })
+        .expect(403);
+    });
+  });
+
   describe('POST /requests/bulk-approve', () => {
     const namespace = 'toystore';
     const mockAPIProduct = {

@@ -665,6 +665,66 @@ export async function createRouter({
     }
   });
 
+  // Secret management endpoints
+  const secretSchema = z.object({
+    name: z.string(),
+    apiKeyValue: z.string(),
+  });
+
+  router.post('/secrets', async (req, res) => {
+    try {
+      const parsed = secretSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new InputError(parsed.error.toString());
+      }
+
+      const credentials = await httpAuth.credentials(req);
+
+      // Check permission to create secrets in api-consumers namespace
+      const resourceRef = 'secret:api-consumers/*';
+      const decision = await permissions.authorize(
+        [{
+          permission: kuadrantApiKeyCreatePermission,
+          resourceRef,
+        }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('not authorized to create secrets');
+      }
+
+      const { name, apiKeyValue } = parsed.data;
+
+      const secret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name,
+          namespace: 'api-consumers',
+        },
+        type: 'Opaque',
+        data: {
+          api_key: Buffer.from(apiKeyValue).toString('base64'),
+        },
+      };
+
+      const created = await k8sClient.createSecret('api-consumers', secret);
+      res.status(201).json(created);
+
+    } catch (error) {
+      console.error('error creating secret:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else if (error instanceof InputError) {
+        res.status(400).json({ error: error.message });
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'failed to create secret';
+        res.status(500).json({ error: errorMessage });
+      }
+    }
+  });
+
   // apikey crud endpoints
   const requestSchema = z.object({
     apiProductName: z.string(), // name of the APIProduct
