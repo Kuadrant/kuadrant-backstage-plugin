@@ -125,7 +125,8 @@ export interface APIKeyRequest {
   namespace: string,
   planTier: PlanTier,
   useCase: string,
-  userEmail: string
+  userEmail: string,
+  secretName?: string,
 }
 
 export interface APIProductSpec {

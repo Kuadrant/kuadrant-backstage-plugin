@@ -112,6 +112,30 @@ export const SimpleRequestAccessDialog = ({
 
     setCreating(true);
     try {
+      // 1. generate secret name and API key value
+      const identity = await identityApi.getBackstageIdentity();
+      const username = identity.userEntityRef.split('/')[1] || 'unknown';
+      const randomSuffix = Math.random().toString(36).substring(2, 10);
+      const secretName = `${username}-${apiProductName}-secret-${randomSuffix}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-');
+      const apiKeyValue = crypto.randomUUID().replace(/-/g, '');
+
+      // 2. create secret first (design doc: secret must exist before APIKey)
+      const secretResponse = await fetchApi.fetch(
+        `${backendUrl}/api/kuadrant/secrets`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: secretName, apiKeyValue }),
+        },
+      );
+      if (!secretResponse.ok) {
+        const err = await secretResponse.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to create secret (${secretResponse.status})`);
+      }
+
+      // 3. create APIKey referencing the pre-existing secret
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests`,
         {
@@ -125,6 +149,7 @@ export const SimpleRequestAccessDialog = ({
             planTier: selectedTier,
             useCase: useCase.trim() || '',
             userEmail: userEmail || 'unknown',
+            secretName,
           }),
         },
       );
@@ -147,6 +172,7 @@ export const SimpleRequestAccessDialog = ({
             planTier: selectedTier,
             useCase: useCase.trim() || '',
             userEmail: userEmail || 'unknown',
+            secretName: '(generated)',
           }
         });
 
@@ -172,6 +198,12 @@ export const SimpleRequestAccessDialog = ({
         } else if (response.status >= 500) {
           errorMsg = `Server error: ${rawError}`;
         }
+
+        // cleanup orphaned secret since APIKey creation failed
+        await fetchApi.fetch(
+          `${backendUrl}/api/kuadrant/secrets/${secretName}`,
+          { method: 'DELETE' },
+        ).catch(e => console.warn('Failed to cleanup orphaned secret:', e));
 
         throw new Error(errorMsg);
       }

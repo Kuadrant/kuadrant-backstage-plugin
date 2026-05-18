@@ -1,4 +1,27 @@
 ---
+# Consumer namespaces - each consumer has their own namespace
+# Naming convention: userEntityRef "user:default/consumer1" -> namespace "consumer1"
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: consumer1
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: consumer2
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: guest
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
 # owner1's payment api
 apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct

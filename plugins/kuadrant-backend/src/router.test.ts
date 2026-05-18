@@ -28,6 +28,8 @@ describe('createRouter', () => {
       deleteCustomResource: jest.fn(),
       createSecret: jest.fn(),
       deleteSecret: jest.fn(),
+      getNamespace: jest.fn().mockResolvedValue({ metadata: { name: 'testuser' } }),
+      createNamespace: jest.fn(),
     } as any;
 
     // Mock the constructor to return our mock instance
@@ -302,18 +304,21 @@ describe('createRouter', () => {
   });
 
   describe('POST /secrets', () => {
-    it('should create secret in api-consumers namespace', async () => {
+    it('should create secret in consumer namespace derived from user identity', async () => {
       // Mock permission check - user has create permission
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.ALLOW },
       ]);
+
+      // consumer namespace is derived from userEntityRef 'user:default/testuser' -> 'testuser'
+      const consumerNamespace = 'testuser';
 
       const mockSecret = {
         apiVersion: 'v1',
         kind: 'Secret',
         metadata: {
           name: 'test-secret',
-          namespace: 'api-consumers',
+          namespace: consumerNamespace,
         },
         type: 'Opaque',
         data: {
@@ -332,11 +337,11 @@ describe('createRouter', () => {
         .expect(201);
 
       expect(response.body.metadata.name).toBe('test-secret');
-      expect(response.body.metadata.namespace).toBe('api-consumers');
+      expect(response.body.metadata.namespace).toBe(consumerNamespace);
       expect(mockK8sClient.createSecret).toHaveBeenCalledWith(
-        'api-consumers',
+        consumerNamespace,
         expect.objectContaining({
-          metadata: { name: 'test-secret', namespace: 'api-consumers' },
+          metadata: { name: 'test-secret', namespace: consumerNamespace },
           data: { api_key: Buffer.from('test-key-123').toString('base64') },
         }),
       );
