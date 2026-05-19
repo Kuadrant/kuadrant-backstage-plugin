@@ -11,24 +11,20 @@ import {
   Button,
   IconButton,
   Tooltip,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
 } from '@material-ui/core';
 import { Skeleton } from '@material-ui/lab';
 import AddIcon from '@material-ui/icons/Add';
 import VisibilityIcon from '@material-ui/icons/Visibility';
 import VisibilityOffIcon from '@material-ui/icons/VisibilityOff';
 import FileCopyIcon from '@material-ui/icons/FileCopy';
-import WarningIcon from '@material-ui/icons/Warning';
 import { useApi, identityApiRef, alertApiRef } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { RequestAccessDialog } from '../RequestAccessDialog';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiKeyCreatePermission } from '../../permissions';
-import { APIKey, APIProduct, Plan } from "../../types/api-management.ts";
+import { APIKey, APIProduct, Plan } from "../../types/api-management";
+import { getAPIKeyPhase } from '../../utils/apikeys';
 
 export interface ApiAccessCardProps {
   // deprecated: use entity annotations instead
@@ -48,12 +44,6 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
   const [apiKeyValues, setApiKeyValues] = useState<Map<string, string>>(new Map());
   const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
-  const [alreadyReadKeys, setAlreadyReadKeys] = useState<Set<string>>(new Set());
-  const [showOnceWarningOpen, setShowOnceWarningOpen] = useState(false);
-  const [pendingKeyReveal, setPendingKeyReveal] = useState<{
-    namespace: string;
-    name: string;
-  } | null>(null);
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName = entity.metadata.annotations?.['kuadrant.io/apiproduct'] || entity.metadata.name;
@@ -70,7 +60,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     const data = await kuadrantApi.getRequestsByNamespace(namespace)
     const allRequests = data.items || [];
     return allRequests.filter((r: APIKey) =>
-      r.spec.apiProductRef?.name === apiProductName && r.status?.phase === 'Approved'
+      r.spec.apiProductRef?.name === apiProductName && getAPIKeyPhase(r.status?.conditions || []) === 'Approved'
     );
   }, [namespace, apiProductName, kuadrantApi, refresh]);
 
@@ -107,24 +97,15 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     try {
       const data = await kuadrantApi.getApiKeySecret(requestNamespace, requestName);
       setApiKeyValues((prev) => new Map(prev).set(key, data.apiKey));
-      setAlreadyReadKeys((prev) => new Set(prev).add(key));
+      toggleVisibility(requestName);
     } catch (err) {
       console.error('failed to fetch api key:', err);
       const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
-      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
-        setAlreadyReadKeys((prev) => new Set(prev).add(key));
-        alertApi.post({
-          message: 'This API key has already been viewed and cannot be retrieved again.',
-          severity: 'warning',
-          display: 'transient',
-        });
-      } else {
-        alertApi.post({
-          message: `Failed to fetch APIKey. ${errorMessage}`,
-          severity: 'error',
-          display: 'transient',
-        });
-      }
+      alertApi.post({
+        message: `Failed to fetch APIKey. ${errorMessage}`,
+        severity: 'error',
+        display: 'transient',
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -182,20 +163,14 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     const isVisible = visibleKeys.has(request.metadata.name);
     const isLoading = apiKeyLoading.has(key);
     const apiKeyValue = apiKeyValues.get(key);
-    const hasSecretRef = request.status?.secretRef?.name;
-    const canReadSecret = request.status?.canReadSecret !== false;
-    const isAlreadyRead = alreadyReadKeys.has(key) || !canReadSecret;
+    const hasSecretRef = Boolean(request.spec?.secretRef?.name);
 
     const handleRevealClick = () => {
       if (isVisible) {
         clearApiKeyValue(request.metadata.namespace, request.metadata.name);
         toggleVisibility(request.metadata.name);
-      } else if (!isAlreadyRead) {
-        setPendingKeyReveal({
-          namespace: request.metadata.namespace,
-          name: request.metadata.name,
-        });
-        setShowOnceWarningOpen(true);
+      } else {
+        fetchApiKeyFromSecret(request.metadata.namespace, request.metadata.name);
       }
     };
 
@@ -241,9 +216,7 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
                 ? 'Loading...'
                 : isVisible && apiKeyValue
                   ? apiKeyValue
-                  : isAlreadyRead && !apiKeyValue
-                    ? 'Already viewed'
-                    : '••••••••••••••••'}
+                  : '••••••••••••••••'}
             </Typography>
             {isVisible && apiKeyValue && (
               <Tooltip title="Copy to clipboard">
@@ -252,20 +225,12 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
                 </IconButton>
               </Tooltip>
             )}
-            <Tooltip
-              title={
-                isAlreadyRead && !apiKeyValue
-                  ? 'Key already viewed'
-                  : isVisible
-                    ? 'Hide API key'
-                    : 'Reveal API key (one-time only)'
-              }
-            >
+            <Tooltip title={isVisible ? 'Hide API key' : 'Reveal API key'}>
               <span>
                 <IconButton
                   size="small"
                   onClick={handleRevealClick}
-                  disabled={isLoading || (isAlreadyRead && !apiKeyValue)}
+                  disabled={isLoading}
                 >
                   {isVisible ? <VisibilityOffIcon fontSize="small" /> : <VisibilityIcon fontSize="small" />}
                 </IconButton>
@@ -327,57 +292,6 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
         plans={plans}
       />
 
-      <Dialog
-        open={showOnceWarningOpen}
-        onClose={() => {
-          setShowOnceWarningOpen(false);
-          setPendingKeyReveal(null);
-        }}
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center">
-            <WarningIcon color="primary" style={{ marginRight: 8 }} />
-            View API Key
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" paragraph>
-            This API key can only be viewed <strong>once</strong>. After you
-            reveal it, you will not be able to retrieve it again.
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Make sure to copy and store it securely before closing this view.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setShowOnceWarningOpen(false);
-              setPendingKeyReveal(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              if (pendingKeyReveal) {
-                fetchApiKeyFromSecret(
-                  pendingKeyReveal.namespace,
-                  pendingKeyReveal.name,
-                );
-                toggleVisibility(pendingKeyReveal.name);
-              }
-              setShowOnceWarningOpen(false);
-              setPendingKeyReveal(null);
-            }}
-          >
-            Reveal API Key
-          </Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 };
