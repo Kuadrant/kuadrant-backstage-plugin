@@ -28,7 +28,7 @@ describe('createRouter', () => {
       deleteCustomResource: jest.fn(),
       createSecret: jest.fn(),
       deleteSecret: jest.fn(),
-      getNamespace: jest.fn().mockResolvedValue({ metadata: { name: 'testuser' } }),
+      getNamespace: jest.fn().mockResolvedValue({ metadata: { name: 'kuadrant-testuser-c7a65229' } }),
       createNamespace: jest.fn(),
     } as any;
 
@@ -310,8 +310,8 @@ describe('createRouter', () => {
         { result: AuthorizeResult.ALLOW },
       ]);
 
-      // consumer namespace is derived from userEntityRef 'user:default/testuser' -> 'testuser'
-      const consumerNamespace = 'testuser';
+      // consumer namespace: kuadrant-{sanitized}-{8char sha256 of userEntityRef}
+      const consumerNamespace = 'kuadrant-testuser-c7a65229';
 
       const mockSecret = {
         apiVersion: 'v1',

@@ -1,24 +1,24 @@
 ---
 # Consumer namespaces - each consumer has their own namespace
-# Naming convention: userEntityRef "user:default/consumer1" -> namespace "consumer1"
+# Naming: kuadrant-{sanitized-username}-{8char sha256 of userEntityRef}
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: consumer1
+  name: kuadrant-consumer1-3ef37f33
   labels:
     devportal.kuadrant.io/consumer-namespace: "true"
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: consumer2
+  name: kuadrant-consumer2-1a6e8295
   labels:
     devportal.kuadrant.io/consumer-namespace: "true"
 ---
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: guest
+  name: kuadrant-guest-05957230
   labels:
     devportal.kuadrant.io/consumer-namespace: "true"
 ---

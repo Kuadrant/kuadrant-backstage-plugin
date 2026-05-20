@@ -257,8 +257,6 @@ export interface KuadrantAPI {
 
   /**
    * Delete a secret from consumer's own namespace
-   * Backend validates the namespace parameter matches the authenticated user's namespace.
-   * @param namespace - Kubernetes namespace (backend enforces it's the user's own namespace)
    * @param name - Secret name
    * @returns Promise that resolves when secret is deleted
    */

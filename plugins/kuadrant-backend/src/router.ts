@@ -6,7 +6,7 @@ import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
 import cors from 'cors';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { KuadrantK8sClient } from './k8s-client';
 import { getAPIProductEntityProvider } from './module';
 import {
@@ -50,11 +50,14 @@ function getConsumerNamespace(userEntityRef: string): string {
   if (!username || username.trim() === '') {
     throw new Error('Invalid user identity - username is empty');
   }
-  const namespace = username.toLowerCase().replace(/[^a-z0-9-]/g, '-');
-  if (namespace === '' || namespace.startsWith('-') || namespace.endsWith('-')) {
+  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  if (sanitized === '' || sanitized.startsWith('-') || sanitized.endsWith('-')) {
     throw new Error(`Username "${username}" cannot be converted to valid namespace name`);
   }
-  return namespace;
+  // Hash prevents collisions when different usernames sanitize to the same string
+  // (e.g. "foo_bar" and "foo.bar" both become "foo-bar")
+  const hash = createHash('sha256').update(userEntityRef).digest('hex').substring(0, 8);
+  return `kuadrant-${sanitized}-${hash}`;
 }
 
 async function ensureConsumerNamespace(k8sClient: KuadrantK8sClient, namespace: string): Promise<void> {

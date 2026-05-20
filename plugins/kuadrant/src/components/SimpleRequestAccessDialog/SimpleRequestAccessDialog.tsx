@@ -22,6 +22,7 @@ import {
   identityApiRef,
 } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
+import { kuadrantApiRef } from '../../api';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -54,6 +55,7 @@ export const SimpleRequestAccessDialog = ({
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
   const identityApi = useApi(identityApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const backendUrl = config.getString('backend.baseUrl');
 
   const [selectedApi, setSelectedApi] = useState('');
@@ -122,18 +124,7 @@ export const SimpleRequestAccessDialog = ({
       const apiKeyValue = crypto.randomUUID().replace(/-/g, '');
 
       // 2. create secret first (design doc: secret must exist before APIKey)
-      const secretResponse = await fetchApi.fetch(
-        `${backendUrl}/api/kuadrant/secrets`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ name: secretName, apiKeyValue }),
-        },
-      );
-      if (!secretResponse.ok) {
-        const err = await secretResponse.json().catch(() => ({}));
-        throw new Error(err.error || `Failed to create secret (${secretResponse.status})`);
-      }
+      await kuadrantApi.createSecret(secretName, apiKeyValue);
 
       // 3. create APIKey referencing the pre-existing secret
       const response = await fetchApi.fetch(
@@ -200,10 +191,8 @@ export const SimpleRequestAccessDialog = ({
         }
 
         // cleanup orphaned secret since APIKey creation failed
-        await fetchApi.fetch(
-          `${backendUrl}/api/kuadrant/secrets/${secretName}`,
-          { method: 'DELETE' },
-        ).catch(e => console.warn('Failed to cleanup orphaned secret:', e));
+        await kuadrantApi.deleteSecret(secretName)
+          .catch(e => console.warn('Failed to cleanup orphaned secret:', e));
 
         throw new Error(errorMsg);
       }
