@@ -1,4 +1,27 @@
 ---
+# Consumer namespaces - each consumer has their own namespace
+# Naming: kuadrant-{sanitized-username}-{8char sha256 of userEntityRef}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-consumer1-3ef37f33
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-consumer2-1a6e8295
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: kuadrant-guest-05957230
+  labels:
+    devportal.kuadrant.io/consumer-namespace: "true"
+---
 # owner1's payment api
 apiVersion: devportal.kuadrant.io/v1alpha1
 kind: APIProduct

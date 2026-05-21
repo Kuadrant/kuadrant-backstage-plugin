@@ -6,7 +6,7 @@ import { z } from 'zod';
 import express from 'express';
 import Router from 'express-promise-router';
 import cors from 'cors';
-import { randomBytes } from 'crypto';
+import { randomBytes, createHash } from 'crypto';
 import { KuadrantK8sClient } from './k8s-client';
 import { getAPIProductEntityProvider } from './module';
 import {
@@ -43,6 +43,51 @@ const secretKey = 'api_key';
 function extractNameFromEntityRef(entityRef: string): string {
   const parts = entityRef.split('/');
   return parts[parts.length - 1];
+}
+
+function getConsumerNamespace(userEntityRef: string): string {
+  const username = extractNameFromEntityRef(userEntityRef);
+  if (!username || username.trim() === '') {
+    throw new Error('Invalid user identity - username is empty');
+  }
+  const sanitized = username.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  if (sanitized === '' || sanitized.startsWith('-') || sanitized.endsWith('-')) {
+    throw new Error(`Username "${username}" cannot be converted to valid namespace name`);
+  }
+  // Hash prevents collisions when different usernames sanitize to the same string
+  // (e.g. "foo_bar" and "foo.bar" both become "foo-bar")
+  const hash = createHash('sha256').update(userEntityRef).digest('hex').substring(0, 8);
+  return `kuadrant-${sanitized}-${hash}`;
+}
+
+async function ensureConsumerNamespace(k8sClient: KuadrantK8sClient, namespace: string): Promise<void> {
+  try {
+    await k8sClient.getNamespace(namespace);
+  } catch (error: any) {
+    const statusCode = error.statusCode || error.response?.statusCode || error.body?.code;
+    if (statusCode === 404) {
+      try {
+        await k8sClient.createNamespace({
+          apiVersion: 'v1',
+          kind: 'Namespace',
+          metadata: {
+            name: namespace,
+            labels: {
+              'devportal.kuadrant.io/consumer-namespace': 'true',
+            },
+          },
+        });
+      } catch (createError: any) {
+        const createStatusCode = createError.statusCode || createError.response?.statusCode || createError.body?.code;
+        if (createStatusCode !== 409) {
+          throw createError;
+        }
+        // 409 AlreadyExists: another request created it concurrently, treat as success
+      }
+    } else {
+      throw error;
+    }
+  }
 }
 
 async function getUserIdentity(req: express.Request, httpAuth: HttpAuthService, userInfo: UserInfoService): Promise<{
@@ -665,13 +710,113 @@ export async function createRouter({
     }
   });
 
+  // Secret management endpoints
+  const secretSchema = z.object({
+    name: z.string().min(1),
+    apiKeyValue: z.string().min(1),
+  });
+
+  router.post('/secrets', async (req, res) => {
+    try {
+      const parsed = secretSchema.safeParse(req.body);
+      if (!parsed.success) {
+        throw new InputError(parsed.error.toString());
+      }
+
+      const credentials = await httpAuth.credentials(req);
+
+      // Get authenticated user identity to determine consumer namespace
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const consumerNamespace = getConsumerNamespace(userEntityRef);
+
+      // Check permission to create secrets in consumer's namespace
+      const resourceRef = `secret:${consumerNamespace}/*`;
+      const decision = await permissions.authorize(
+        [{
+          permission: kuadrantApiKeyCreatePermission,
+          resourceRef,
+        }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('not authorized to create secrets');
+      }
+
+      // Ensure consumer's namespace exists
+      await ensureConsumerNamespace(k8sClient, consumerNamespace);
+
+      const { name, apiKeyValue } = parsed.data;
+
+      const secret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name,
+          namespace: consumerNamespace,
+        },
+        type: 'Opaque',
+        data: {
+          api_key: Buffer.from(apiKeyValue).toString('base64'),
+        },
+      };
+
+      const created = await k8sClient.createSecret(consumerNamespace, secret);
+      res.status(201).json(created);
+
+    } catch (error) {
+      console.error('error creating secret:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else if (error instanceof InputError) {
+        res.status(400).json({ error: error.message });
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'failed to create secret';
+        res.status(500).json({ error: errorMessage });
+      }
+    }
+  });
+
+  router.delete('/secrets/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+      const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      const { name } = req.params;
+
+      // consumer can only delete secrets from their own namespace
+      const consumerNamespace = getConsumerNamespace(userEntityRef);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyCreatePermission, resourceRef: `secret:${consumerNamespace}/*` }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('not authorized to delete secrets');
+      }
+
+      await k8sClient.deleteSecret(consumerNamespace, name);
+      res.status(204).send();
+
+    } catch (error) {
+      console.error('error deleting secret:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        const errorMessage = error instanceof Error ? error.message : 'failed to delete secret';
+        res.status(500).json({ error: errorMessage });
+      }
+    }
+  });
+
   // apikey crud endpoints
   const requestSchema = z.object({
     apiProductName: z.string(), // name of the APIProduct
-    namespace: z.string(), // namespace where both APIProduct and APIKey live
+    namespace: z.string(), // owner's namespace (where the APIProduct lives)
     planTier: z.string(),
     useCase: z.string().optional(),
     userEmail: z.string().optional(),
+    secretName: z.string(), // frontend creates secret via POST /secrets first
   });
 
   router.post('/requests', async (req, res) => {
@@ -682,7 +827,7 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { apiProductName, namespace, planTier, useCase, userEmail } = parsed.data;
+      const { apiProductName, namespace, planTier, useCase, userEmail, secretName: frontendSecretName } = parsed.data;
 
       // extract userId from authenticated credentials, not from request body
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
@@ -700,25 +845,41 @@ export async function createRouter({
       if (decision[0].result !== AuthorizeResult.ALLOW) {
         throw new NotAllowedError(`not authorised to request access to ${apiProductName}`);
       }
+
+      // determine consumer's own namespace and ensure it exists
+      const consumerNamespace = getConsumerNamespace(userEntityRef);
+      await ensureConsumerNamespace(k8sClient, consumerNamespace);
+
       const randomSuffix = randomBytes(4).toString('hex');
-      const userName = extractNameFromEntityRef(userEntityRef);
-      const requestName = `${userName}-${apiProductName}-${randomSuffix}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+      // namespace provides user isolation, so no need for username prefix in APIKey name
+      const requestName = `${apiProductName}-${randomSuffix}`.toLowerCase().replace(/[^a-z0-9-]/g, '-');
 
       const requestedBy: any = { userId: userEntityRef };
       if (userEmail) {
         requestedBy.email = userEmail;
       }
 
+      // frontend already created the secret via POST /secrets before calling this
+      // spec.secretRef points to that pre-existing secret in the consumer namespace
+      if (!frontendSecretName) {
+        throw new InputError('secretName is required - create the secret via POST /secrets first');
+      }
+      const secretName = frontendSecretName;
+
       const request = {
         apiVersion: 'devportal.kuadrant.io/v1alpha1',
         kind: 'APIKey',
         metadata: {
           name: requestName,
-          namespace,
+          namespace: consumerNamespace,
         },
         spec: {
           apiProductRef: {
             name: apiProductName,
+            namespace, // cross-namespace reference to owner's APIProduct
+          },
+          secretRef: {
+            name: secretName,
           },
           planTier,
           useCase: useCase || '',
@@ -729,13 +890,10 @@ export async function createRouter({
       const created = await k8sClient.createCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
-        namespace,
+        consumerNamespace,
         'apikeys',
         request,
       );
-
-      // controller handles automatic approval and secret creation
-      // we just create the APIKey resource and let the controller reconcile
 
       res.status(201).json(created);
     } catch (error) {
@@ -1470,24 +1628,16 @@ export async function createRouter({
         }
       }
 
-      // check if secret can be read
-      if (apiKey.status?.canReadSecret !== true) {
-        res.status(403).json({
-          error: 'secret has already been read and cannot be retrieved again',
-        });
-        return;
-      }
-
-      // check if secretRef is set
-      if (!apiKey.status?.secretRef?.name || !apiKey.status?.secretRef?.key) {
+      // check if secretRef is set in spec
+      if (!apiKey.spec?.secretRef?.name) {
         res.status(404).json({
-          error: 'secret reference not found in apikey status',
+          error: 'secretRef not found in APIKey spec',
         });
         return;
       }
 
       // get the secret
-      const secretName = apiKey.status.secretRef.name;
+      const secretName = apiKey.spec.secretRef.name;
 
       let secret;
       try {
@@ -1513,19 +1663,6 @@ export async function createRouter({
 
       // decode base64
       const decodedApiKey = Buffer.from(apiKeyValue, 'base64').toString('utf-8');
-
-      // update canReadSecret to false
-      await k8sClient.patchCustomResourceStatus(
-        'devportal.kuadrant.io',
-        'v1alpha1',
-        namespace,
-        'apikeys',
-        name,
-        {
-          ...apiKey.status,
-          canReadSecret: false,
-        },
-      );
 
       res.json({
         apiKey: decodedApiKey,

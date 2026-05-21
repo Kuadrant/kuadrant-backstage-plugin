@@ -61,29 +61,53 @@ export const RequestAccessDialog = ({
 
     setCreating(true);
     setCreateError(null);
+
     try {
-      await kuadrantApi.createRequest({
-        apiProductName,
-        namespace,
-        planTier: selectedPlan,
-        useCase: useCase.trim() || '',
-        userEmail,
-      });
+      // 1. generate secret name and API key value
+      const randomSuffix = Math.random().toString(36).substring(2, 10);
+      const secretName = `${apiProductName}-${randomSuffix}-secret`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-');
+      const apiKeyValue = crypto.randomUUID().replace(/-/g, '');
 
-      alertApi.post({
-        message: 'API key requested successfully',
-        severity: 'success',
-        display: 'transient',
-      });
+      // 2. create secret in consumer's namespace first (design doc: secret before APIKey)
+      await kuadrantApi.createSecret(secretName, apiKeyValue);
 
-      setSelectedPlan('');
-      setUseCase('');
-      onSuccess();
-    } catch (err) {
-      const errorMessage =
-        err instanceof Error ? err.message : 'unknown error occurred';
+      try {
+        // 3. create APIKey referencing the pre-existing secret
+        await kuadrantApi.createRequest({
+          apiProductName,
+          namespace,
+          planTier: selectedPlan,
+          useCase: useCase.trim() || '',
+          userEmail,
+          secretName,
+        });
+
+        alertApi.post({
+          message: `Request submitted successfully. Pending API owner approval.`,
+          severity: 'info',
+          display: 'transient',
+        });
+
+        setSelectedPlan('');
+        setUseCase('');
+        onSuccess();
+
+      } catch (apiKeyError) {
+        // cleanup orphaned secret if APIKey creation fails
+        try {
+          await kuadrantApi.deleteSecret(secretName);
+        } catch (deleteError) {
+          console.warn('Failed to cleanup orphaned secret:', deleteError);
+        }
+        throw apiKeyError;
+      }
+
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'unknown error occurred';
       alertApi.post({
-        message: `Failed to request API key: ${errorMessage}`,
+        message: `Failed to create request: ${errorMessage}`,
         severity: 'error',
         display: 'transient',
       });

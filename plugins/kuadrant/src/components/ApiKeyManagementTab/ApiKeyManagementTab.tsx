@@ -135,11 +135,11 @@ export const ApiKeyManagementTab = ({
     error: requestsError,
   } = useAsync(async () => {
     const data = await kuadrantApi.getRequestsByNamespace(namespace);
-    // filter by apiproduct name, not httproute name
+    // filter by apiproduct name and namespace (APIKey lives in consumer's NS, refs APIProduct in owner's NS)
     return (data.items || []).filter(
       (r: APIKey) =>
         r.spec.apiProductRef.name === apiProductName &&
-        r.metadata.namespace === namespace, // APIProducts and APIKeys (and its Secret) will be in the same NS
+        r.spec.apiProductRef.namespace === namespace, // APIKey refs APIProduct in owner's namespace
     );
   }, [apiProductName, namespace, refresh, kuadrantApi]);
 

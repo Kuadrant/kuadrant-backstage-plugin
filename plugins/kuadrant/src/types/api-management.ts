@@ -34,12 +34,16 @@ export interface StatusCondition {
 export interface APIKeySpec {
   apiProductRef: {
     name: string;
+    namespace: string;
   };
   planTier: PlanTier;
   useCase: string;
   requestedBy: {
     userId: string;
     email: string;
+  };
+  secretRef: {
+    name: string;
   };
 }
 
@@ -85,16 +89,19 @@ export interface APIKeyAuthScheme {
 }
 
 export interface APIKeyStatus {
+  /** @deprecated Use getAPIKeyPhase(conditions) instead. Will be removed after all components migrated. */
   phase?: RequestPhase;
+  /** @deprecated Will be removed in future version. */
   reviewedBy?: string;
+  /** @deprecated Will be removed in future version. */
   reviewedAt?: string;
+  /** @deprecated Use spec.secretRef instead. */
+  secretRef?: { name: string; key: string };
+  /** @deprecated Secret viewing no longer restricted. Will be removed in future version. */
+  canReadSecret?: boolean;
+
   apiHostname?: string;
   limits?: PlanLimits;
-  secretRef?: {
-    name: string;
-    key: string;
-  };
-  canReadSecret?: boolean;
   authScheme?: APIKeyAuthScheme;
   conditions?: StatusCondition[];
 }
@@ -118,7 +125,8 @@ export interface APIKeyRequest {
   namespace: string,
   planTier: PlanTier,
   useCase: string,
-  userEmail: string
+  userEmail: string,
+  secretName?: string,
 }
 
 export interface APIProductSpec {

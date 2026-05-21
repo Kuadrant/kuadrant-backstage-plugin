@@ -245,6 +245,22 @@ export interface KuadrantAPI {
    * @returns Promise with list of all ratelimitpolicies
    */
   getRateLimitPolicies(): Promise<KuadrantList<RateLimitPolicy>>;
+
+  /**
+   * Create a secret in consumer's own namespace
+   * Backend determines namespace from authenticated user identity.
+   * @param name - Secret name
+   * @param apiKeyValue - API key value to store
+   * @returns Promise that resolves when secret is created
+   */
+  createSecret(name: string, apiKeyValue: string): Promise<void>;
+
+  /**
+   * Delete a secret from consumer's own namespace
+   * @param name - Secret name
+   * @returns Promise that resolves when secret is deleted
+   */
+  deleteSecret(name: string): Promise<void>;
 }
 
 /**
@@ -531,6 +547,29 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/ratelimitpolicies`,
       "Failed to fetch RateLimitPolicies."
+    );
+  }
+
+  // ===== Secrets Implementation =====
+
+  async createSecret(name: string, apiKeyValue: string): Promise<void> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithoutRetry(
+      `${baseUrl}kuadrant/secrets`,
+      {
+        method: 'POST',
+        body: JSON.stringify({ name, apiKeyValue }),
+      },
+      'Failed to create secret'
+    );
+  }
+
+  async deleteSecret(name: string): Promise<void> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithoutRetry(
+      `${baseUrl}kuadrant/secrets/${name}`,
+      { method: 'DELETE' },
+      'Failed to delete secret'
     );
   }
 }

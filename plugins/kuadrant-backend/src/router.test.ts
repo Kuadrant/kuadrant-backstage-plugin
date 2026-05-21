@@ -28,6 +28,8 @@ describe('createRouter', () => {
       deleteCustomResource: jest.fn(),
       createSecret: jest.fn(),
       deleteSecret: jest.fn(),
+      getNamespace: jest.fn().mockResolvedValue({ metadata: { name: 'kuadrant-testuser-c7a65229' } }),
+      createNamespace: jest.fn(),
     } as any;
 
     // Mock the constructor to return our mock instance
@@ -91,6 +93,9 @@ describe('createRouter', () => {
           userId: mockUserEntityRef,
           email: 'testuser@example.com',
         },
+        secretRef: {
+          name: secretName,
+        },
       },
       status: {
         phase: 'Approved',
@@ -98,11 +103,6 @@ describe('createRouter', () => {
         reviewedAt: '2024-12-02T10:05:00Z',
         apiKey: apiKeyValue,
         apiHostname: 'toystore.apps.example.com',
-        secretRef: {
-          name: secretName,
-          key: secretKey,
-        },
-        canReadSecret: true,
       },
     };
 
@@ -119,7 +119,7 @@ describe('createRouter', () => {
       },
     };
 
-    it('returns secret on first read when canReadSecret is true', async () => {
+    it('returns secret when user has permission', async () => {
       // Mock permission check - user has read own permission
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.DENY }, // readAll denied
@@ -131,10 +131,6 @@ describe('createRouter', () => {
       // Mock k8s client responses
       mockK8sClient.getCustomResource.mockResolvedValue(mockAPIKey);
       mockK8sClient.getSecret.mockResolvedValue(mockSecret);
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValue({
-        ...mockAPIKey,
-        status: { ...mockAPIKey.status, canReadSecret: false },
-      });
 
       const response = await request(app)
         .get(`/apikeys/${namespace}/${name}/secret`)
@@ -158,53 +154,6 @@ describe('createRouter', () => {
         namespace,
         secretName,
       );
-
-      // Verify canReadSecret was updated to false
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledWith(
-        'devportal.kuadrant.io',
-        'v1alpha1',
-        namespace,
-        'apikeys',
-        name,
-        expect.objectContaining({
-          canReadSecret: false,
-        }),
-      );
-    });
-
-    it('returns 403 when secret already read (canReadSecret is false)', async () => {
-      // Mock permission check
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY },
-      ]);
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW },
-      ]);
-
-      // Mock APIKey with canReadSecret: false
-      const alreadyReadAPIKey = {
-        ...mockAPIKey,
-        status: {
-          ...mockAPIKey.status,
-          canReadSecret: false,
-        },
-      };
-
-      mockK8sClient.getCustomResource.mockResolvedValue(alreadyReadAPIKey);
-
-      const response = await request(app)
-        .get(`/apikeys/${namespace}/${name}/secret`)
-        .expect(403);
-
-      expect(response.body).toEqual({
-        error: 'secret has already been read and cannot be retrieved again',
-      });
-
-      // Verify secret was never fetched
-      expect(mockK8sClient.getSecret).not.toHaveBeenCalled();
-
-      // Verify canReadSecret was never updated
-      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
     });
 
     it('returns 403 when user does not own the API key', async () => {
@@ -262,10 +211,6 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource.mockResolvedValue(otherUserAPIKey);
       mockK8sClient.getSecret.mockResolvedValue(mockSecret);
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValue({
-        ...otherUserAPIKey,
-        status: { ...otherUserAPIKey.status, canReadSecret: false },
-      });
 
       const response = await request(app)
         .get(`/apikeys/${namespace}/${name}/secret`)
@@ -291,8 +236,8 @@ describe('createRouter', () => {
       // Mock APIKey without secretRef
       const noSecretRefAPIKey = {
         ...mockAPIKey,
-        status: {
-          ...mockAPIKey.status,
+        spec: {
+          ...mockAPIKey.spec,
           secretRef: undefined,
         },
       };
@@ -304,7 +249,7 @@ describe('createRouter', () => {
         .expect(404);
 
       expect(response.body).toEqual({
-        error: 'secret reference not found in apikey status',
+        error: 'secretRef not found in APIKey spec',
       });
 
       expect(mockK8sClient.getSecret).not.toHaveBeenCalled();
@@ -333,9 +278,6 @@ describe('createRouter', () => {
       expect(response.body).toEqual({
         error: 'secret not found',
       });
-
-      // Verify canReadSecret was not updated
-      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
     });
 
     it('returns 403 when user has no read permissions', async () => {
@@ -358,6 +300,72 @@ describe('createRouter', () => {
       // Verify no k8s calls were made
       expect(mockK8sClient.getCustomResource).not.toHaveBeenCalled();
       expect(mockK8sClient.getSecret).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('POST /secrets', () => {
+    it('should create secret in consumer namespace derived from user identity', async () => {
+      // Mock permission check - user has create permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      // consumer namespace: kuadrant-{sanitized}-{8char sha256 of userEntityRef}
+      const consumerNamespace = 'kuadrant-testuser-c7a65229';
+
+      const mockSecret = {
+        apiVersion: 'v1',
+        kind: 'Secret',
+        metadata: {
+          name: 'test-secret',
+          namespace: consumerNamespace,
+        },
+        type: 'Opaque',
+        data: {
+          api_key: Buffer.from('test-key-123').toString('base64'),
+        },
+      };
+
+      mockK8sClient.createSecret.mockResolvedValue(mockSecret);
+
+      const response = await request(app)
+        .post('/secrets')
+        .send({
+          name: 'test-secret',
+          apiKeyValue: 'test-key-123',
+        })
+        .expect(201);
+
+      expect(response.body.metadata.name).toBe('test-secret');
+      expect(response.body.metadata.namespace).toBe(consumerNamespace);
+      expect(mockK8sClient.createSecret).toHaveBeenCalledWith(
+        consumerNamespace,
+        expect.objectContaining({
+          metadata: { name: 'test-secret', namespace: consumerNamespace },
+          data: { api_key: Buffer.from('test-key-123').toString('base64') },
+        }),
+      );
+    });
+
+    it('should validate input schema', async () => {
+      const response = await request(app)
+        .post('/secrets')
+        .send({ name: 'test-secret' }) // missing apiKeyValue
+        .expect(400);
+
+      expect(response.body.error).toBeDefined();
+    });
+
+    it('should check permissions', async () => {
+      // Mock permission check - user does not have create permission
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+
+      await request(app)
+        .post('/secrets')
+        .send({ name: 'test-secret', apiKeyValue: 'test-key' })
+        .expect(403);
     });
   });
 

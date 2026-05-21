@@ -22,6 +22,7 @@ import {
   identityApiRef,
 } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
+import { kuadrantApiRef } from '../../api';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -54,6 +55,7 @@ export const SimpleRequestAccessDialog = ({
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
   const identityApi = useApi(identityApiRef);
+  const kuadrantApi = useApi(kuadrantApiRef);
   const backendUrl = config.getString('backend.baseUrl');
 
   const [selectedApi, setSelectedApi] = useState('');
@@ -112,6 +114,19 @@ export const SimpleRequestAccessDialog = ({
 
     setCreating(true);
     try {
+      // 1. generate secret name and API key value
+      const identity = await identityApi.getBackstageIdentity();
+      const username = identity.userEntityRef.split('/')[1] || 'unknown';
+      const randomSuffix = Math.random().toString(36).substring(2, 10);
+      const secretName = `${username}-${apiProductName}-secret-${randomSuffix}`
+        .toLowerCase()
+        .replace(/[^a-z0-9-]/g, '-');
+      const apiKeyValue = crypto.randomUUID().replace(/-/g, '');
+
+      // 2. create secret first (design doc: secret must exist before APIKey)
+      await kuadrantApi.createSecret(secretName, apiKeyValue);
+
+      // 3. create APIKey referencing the pre-existing secret
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests`,
         {
@@ -125,6 +140,7 @@ export const SimpleRequestAccessDialog = ({
             planTier: selectedTier,
             useCase: useCase.trim() || '',
             userEmail: userEmail || 'unknown',
+            secretName,
           }),
         },
       );
@@ -147,6 +163,7 @@ export const SimpleRequestAccessDialog = ({
             planTier: selectedTier,
             useCase: useCase.trim() || '',
             userEmail: userEmail || 'unknown',
+            secretName: '(generated)',
           }
         });
 
@@ -172,6 +189,10 @@ export const SimpleRequestAccessDialog = ({
         } else if (response.status >= 500) {
           errorMsg = `Server error: ${rawError}`;
         }
+
+        // cleanup orphaned secret since APIKey creation failed
+        await kuadrantApi.deleteSecret(secretName)
+          .catch(e => console.warn('Failed to cleanup orphaned secret:', e));
 
         throw new Error(errorMsg);
       }
