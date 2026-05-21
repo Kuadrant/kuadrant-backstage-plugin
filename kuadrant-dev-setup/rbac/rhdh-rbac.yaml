@@ -25,11 +25,9 @@ rules:
     resources:
       - apiproducts
       - apikeys
+      - apikeyrequests
+      - apikeyapprovals
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
-  - apiGroups: ["devportal.kuadrant.io"]
-    resources:
-      - apikeys/status
-    verbs: ["get", "patch", "update"]
   - apiGroups: ["gateway.networking.k8s.io"]
     resources:
       - gateways

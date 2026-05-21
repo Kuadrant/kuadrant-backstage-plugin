@@ -36,6 +36,7 @@ import CancelIcon from "@material-ui/icons/Cancel";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import {APIKey, BulkOperationResult} from "../../types/api-management";
 import { getApprovalQueueStatusChipStyle } from "../../utils/styles";
+import { getAPIKeyPhase } from "../../utils/apikeys";
 
 const useStyles = makeStyles((theme) => ({
   container: {
@@ -540,7 +541,7 @@ export const ApprovalQueueTable = () => {
     const tierCounts = new Map<string, number>();
 
     value.allRequests.forEach((r: APIKey) => {
-      const status = r.status?.phase || "Pending";
+      const status = getAPIKeyPhase(r.status?.conditions);
       statusCounts[status as keyof typeof statusCounts]++;
 
       const apiProduct = r.spec.apiProductRef?.name || "unknown";
@@ -600,7 +601,7 @@ export const ApprovalQueueTable = () => {
 
     return value.allRequests.filter((r: APIKey) => {
       if (filters.status.length > 0) {
-        const status = r.status?.phase || "Pending";
+        const status = getAPIKeyPhase(r.status?.conditions);
         if (!filters.status.includes(status)) return false;
       }
       if (filters.apiProduct.length > 0) {
@@ -785,9 +786,9 @@ export const ApprovalQueueTable = () => {
     },
     {
       title: "Status",
-      field: "status.phase",
+      field: "status.conditions",
       render: (row) => {
-        const phase = row.status?.phase || "Pending";
+        const phase = getAPIKeyPhase(row.status?.conditions);
         return (
           <Chip label={phase} size="small" style={getApprovalQueueStatusChipStyle(phase)} />
         );
@@ -841,7 +842,7 @@ export const ApprovalQueueTable = () => {
       title: "Actions",
       filtering: false,
       render: (row) => {
-        const phase = row.status?.phase || "Pending";
+        const phase = getAPIKeyPhase(row.status?.conditions);
         if (phase !== "Pending") return null;
 
         const apiProductKey = `${row.metadata.namespace}/${row.spec.apiProductRef?.name || "unknown"}`;
@@ -972,12 +973,11 @@ export const ApprovalQueueTable = () => {
                 selection: canSelectRows,
                 showSelectAllCheckbox: filteredRequests.some(
                   (r: APIKey) =>
-                    !r.status?.phase || r.status.phase === "Pending",
+                    getAPIKeyPhase(r.status?.conditions) === "Pending",
                 ),
                 selectionProps: (row: APIKey) => ({
                   disabled:
-                    row.status?.phase !== "Pending" &&
-                    row.status?.phase !== undefined,
+                    getAPIKeyPhase(row.status?.conditions) !== "Pending",
                 }),
                 paging: filteredRequests.length > 10,
                 pageSize: 20,
@@ -1004,7 +1004,7 @@ export const ApprovalQueueTable = () => {
               onSelectionChange={(rows) => {
                 // only allow selecting pending requests
                 const pendingOnly = (rows as APIKey[]).filter(
-                  (r) => !r.status?.phase || r.status.phase === "Pending",
+                  (r) => getAPIKeyPhase(r.status?.conditions) === "Pending",
                 );
                 setSelectedRequests(pendingOnly);
               }}

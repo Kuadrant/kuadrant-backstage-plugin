@@ -485,7 +485,7 @@ export const MyApiKeysTable = () => {
                 ? "Loading..."
                 : isVisible && apiKeyValue
                   ? apiKeyValue
-                  : "•".repeat(20) + "..."}
+                  : "•".repeat(20)}
             </Box>
             {isVisible && apiKeyValue && (
               <Tooltip title="Copy to clipboard">

@@ -938,9 +938,9 @@ export async function createRouter({
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
       }
 
       let filteredItems = data.items || [];
@@ -966,7 +966,21 @@ export async function createRouter({
 
       if (status) {
         filteredItems = filteredItems.filter((req: any) => {
-          const phase = req.status?.phase || 'Pending';
+          // Inline condition parsing (avoiding cross-package import)
+          let phase: string = 'Pending';
+          if (req.status?.conditions && req.status.conditions.length > 0) {
+            const approved = req.status.conditions.find(
+              (c: any) => c.type === 'Approved' && c.status === 'True'
+            );
+            if (approved) {
+              phase = 'Approved';
+            } else {
+              const denied = req.status.conditions.find(
+                (c: any) => c.type === 'Denied' && c.status === 'True'
+              );
+              if (denied) phase = 'Denied';
+            }
+          }
           return phase === status;
         });
       }
