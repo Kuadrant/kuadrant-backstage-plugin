@@ -1056,7 +1056,7 @@ export async function createRouter({
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeys',
+        'apikeyrequests',
         name,
       );
 
@@ -1064,7 +1064,7 @@ export async function createRouter({
       const apiProductName = spec.apiProductRef?.name;
 
       if (!apiProductName) {
-        throw new InputError('apiProductRef.name is required in APIKey spec');
+        throw new InputError('apiProductRef.name is required in APIKeyRequest spec');
       }
 
       // verify user has permission to approve this API key
@@ -1077,20 +1077,28 @@ export async function createRouter({
         permissions,
       );
 
-      // backend sets phase, controller reconciles and creates Secret
-      const status = {
-        phase: 'Approved',
-        reviewedBy,
-        reviewedAt: new Date().toISOString(),
+      const approvalName = `${name}-approval-${randomBytes(4).toString('hex')}`;
+      const approval = {
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
+        kind: 'APIKeyApproval',
+        metadata: {
+          name: approvalName,
+          namespace,
+        },
+        spec: {
+          apiKeyRequestRef: { name },
+          approved: true,
+          reviewedBy,
+          reviewedAt: new Date().toISOString(),
+        },
       };
 
-      await k8sClient.patchCustomResourceStatus(
+      await k8sClient.createCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeys',
-        name,
-        status,
+        'apikeyapprovals',
+        approval,
       );
 
       res.json({ success: true });
@@ -1117,12 +1125,11 @@ export async function createRouter({
       const { namespace, name } = req.params;
       const reviewedBy = userEntityRef;
 
-      // fetch request to get apiproduct info
       const request = await k8sClient.getCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeys',
+        'apikeyrequests',
         name,
       );
 
@@ -1130,7 +1137,7 @@ export async function createRouter({
       const apiProductName = spec.apiProductRef?.name;
 
       if (!apiProductName) {
-        throw new InputError('apiProductRef.name is required in APIKey spec');
+        throw new InputError('apiProductRef.name is required in APIKeyRequest spec');
       }
 
       // verify user has permission to reject this API key
@@ -1143,19 +1150,28 @@ export async function createRouter({
         permissions,
       );
 
-      const status = {
-        phase: 'Rejected',
-        reviewedBy,
-        reviewedAt: new Date().toISOString(),
+      const approvalName = `${name}-denial-${randomBytes(4).toString('hex')}`;
+      const approval = {
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
+        kind: 'APIKeyApproval',
+        metadata: {
+          name: approvalName,
+          namespace,
+        },
+        spec: {
+          apiKeyRequestRef: { name },
+          approved: false,
+          reviewedBy,
+          reviewedAt: new Date().toISOString(),
+        },
       };
 
-      await k8sClient.patchCustomResourceStatus(
+      await k8sClient.createCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
-        'apikeys',
-        name,
-        status,
+        'apikeyapprovals',
+        approval,
       );
 
       res.status(204).send();
@@ -1219,7 +1235,7 @@ export async function createRouter({
               'devportal.kuadrant.io',
               'v1alpha1',
               reqRef.namespace,
-              'apikeys',
+              'apikeyrequests',
               reqRef.name,
             );
             const apiProductName = request.spec?.apiProductRef?.name;
@@ -1228,7 +1244,7 @@ export async function createRouter({
                 namespace: reqRef.namespace,
                 name: reqRef.name,
                 success: false,
-                error: 'API key has no associated API product.'
+                error: 'API key request has no associated API product.'
               });
               continue;
             }
@@ -1253,20 +1269,28 @@ export async function createRouter({
             }
           }
 
-          // backend sets phase, controller reconciles and creates Secret
-          const status = {
-            phase: 'Approved',
-            reviewedBy,
-            reviewedAt: new Date().toISOString(),
+          const approvalName = `${reqRef.name}-approval-${randomBytes(4).toString('hex')}`;
+          const approval = {
+            apiVersion: 'devportal.kuadrant.io/v1alpha1',
+            kind: 'APIKeyApproval',
+            metadata: {
+              name: approvalName,
+              namespace: reqRef.namespace,
+            },
+            spec: {
+              apiKeyRequestRef: { name: reqRef.name },
+              approved: true,
+              reviewedBy,
+              reviewedAt: new Date().toISOString(),
+            },
           };
 
-          await k8sClient.patchCustomResourceStatus(
+          await k8sClient.createCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeys',
-            reqRef.name,
-            status,
+            'apikeyapprovals',
+            approval,
           );
 
           results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true });
@@ -1328,19 +1352,16 @@ export async function createRouter({
 
       for (const reqRef of requests) {
         try {
-          // fetch request to get apiproduct info
           const request = await k8sClient.getCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeys',
+            'apikeyrequests',
             reqRef.name,
           );
 
           const spec = request.spec as any;
 
-          // verify user owns/admins the apiproduct this request is for
-          // apikey and apiproduct are in the same namespace
           const apiProduct = await k8sClient.getCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
@@ -1362,19 +1383,28 @@ export async function createRouter({
             continue;
           }
 
-          const status = {
-            phase: 'Rejected',
-            reviewedBy,
-            reviewedAt: new Date().toISOString(),
+          const approvalName = `${reqRef.name}-denial-${randomBytes(4).toString('hex')}`;
+          const approval = {
+            apiVersion: 'devportal.kuadrant.io/v1alpha1',
+            kind: 'APIKeyApproval',
+            metadata: {
+              name: approvalName,
+              namespace: reqRef.namespace,
+            },
+            spec: {
+              apiKeyRequestRef: { name: reqRef.name },
+              approved: false,
+              reviewedBy,
+              reviewedAt: new Date().toISOString(),
+            },
           };
 
-          await k8sClient.patchCustomResourceStatus(
+          await k8sClient.createCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
             reqRef.namespace,
-            'apikeys',
-            reqRef.name,
-            status,
+            'apikeyapprovals',
+            approval,
           );
 
           results.push({ namespace: reqRef.namespace, name: reqRef.name, success: true });

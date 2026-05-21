@@ -397,16 +397,22 @@ describe('createRouter', () => {
       spec: {},
     };
 
-    const createMockAPIKey = (name: string, apiProductName: string) => ({
+    const createMockAPIKeyRequest = (name: string, apiProductName: string) => ({
       apiVersion: 'devportal.kuadrant.io/v1alpha1',
-      kind: 'APIKey',
-      metadata: { name, namespace },
+      kind: 'APIKeyRequest',
+      metadata: {
+        name,
+        namespace,
+        creationTimestamp: '2024-12-02T10:00:00Z',
+      },
       spec: {
         apiProductRef: { name: apiProductName },
+        apiKeyRef: { name: `${name}-apikey`, namespace: 'consumer-ns' },
         planTier: 'gold',
-        requestedBy: { userId: 'user:default/consumer' },
+        useCase: 'Testing API integration',
+        requestedBy: { userId: 'user:default/consumer', email: 'consumer@example.com' },
       },
-      status: { phase: 'Pending' },
+      status: { conditions: [] },
     });
 
     it('handles partial success when some API products do not exist', async () => {
@@ -424,22 +430,20 @@ describe('createRouter', () => {
         { namespace, name: 'request-3' },
       ];
 
-      // Mock getCustomResource calls - interleaved APIKeys and APIProducts
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'missing-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'missing-api')) // fetch APIKeyRequest
         .mockRejectedValueOnce(new Error('APIProduct not found')) // fetch APIProduct - fail
         // request-3
-        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - success
 
-      // Mock successful patch operations
-      mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({} as any) // request-1 succeeds
-        .mockResolvedValueOnce({} as any); // request-3 succeeds
+      mockK8sClient.createCustomResource
+        .mockResolvedValueOnce({} as any) // request-1 approval created
+        .mockResolvedValueOnce({} as any); // request-3 approval created
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -463,9 +467,32 @@ describe('createRouter', () => {
         name: 'request-3',
         success: true,
       });
+
+      // Verify APIKeyRequests were fetched from correct resource type
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io', 'v1alpha1', namespace, 'apikeyrequests', 'request-1',
+      );
+
+      // Verify APIKeyApprovals were created with correct spec
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
+      const firstApprovalCall = mockK8sClient.createCustomResource.mock.calls[0];
+      expect(firstApprovalCall[0]).toBe('devportal.kuadrant.io');
+      expect(firstApprovalCall[1]).toBe('v1alpha1');
+      expect(firstApprovalCall[2]).toBe(namespace);
+      expect(firstApprovalCall[3]).toBe('apikeyapprovals');
+      expect(firstApprovalCall[4]).toMatchObject({
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
+        kind: 'APIKeyApproval',
+        metadata: { namespace },
+        spec: {
+          apiKeyRequestRef: { name: 'request-1' },
+          approved: true,
+          reviewedBy: mockUserEntityRef,
+        },
+      });
     });
 
-    it('handles partial success when some API keys have no apiProductRef', async () => {
+    it('handles partial success when some API key requests have no apiProductRef', async () => {
       // Mock permission check - user has updateOwn permission
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.DENY }, // updateAll denied
@@ -479,19 +506,19 @@ describe('createRouter', () => {
         { namespace, name: 'request-2' },
       ];
 
-      const invalidAPIKey = {
-        ...createMockAPIKey('request-2', ''),
+      const invalidAPIKeyRequest = {
+        ...createMockAPIKeyRequest('request-2', ''),
         spec: { planTier: 'gold', requestedBy: { userId: 'user:default/consumer' } },
       };
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
         // request-2
-        .mockResolvedValueOnce(invalidAPIKey); // fetch APIKey - no apiProductRef, stops here
+        .mockResolvedValueOnce(invalidAPIKeyRequest); // fetch APIKeyRequest - no apiProductRef
 
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
+      mockK8sClient.createCustomResource.mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -508,11 +535,10 @@ describe('createRouter', () => {
         namespace,
         name: 'request-2',
         success: false,
-        error: 'API key has no associated API product.',
+        error: 'API key request has no associated API product.',
       });
 
-      // Verify only request-1 was patched
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(1);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(1);
     });
 
     it('handles partial success when user owns some but not all API products', async () => {
@@ -532,16 +558,16 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - owned by current user
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockOtherAPIProduct) // fetch APIProduct - owned by other user
         // request-3
-        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
 
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
         .mockResolvedValueOnce({} as any);
 
@@ -568,11 +594,10 @@ describe('createRouter', () => {
         success: true,
       });
 
-      // Verify only owned products were patched
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
     });
 
-    it('handles partial success when patch operations fail', async () => {
+    it('handles partial success when approval creation fails', async () => {
       // Mock permission check - admin user
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.ALLOW }, // updateAll allowed
@@ -584,7 +609,7 @@ describe('createRouter', () => {
         { namespace, name: 'request-3' },
       ];
 
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any) // request-1 succeeds
         .mockRejectedValueOnce(new Error('Conflict: resource version mismatch')) // request-2 fails
         .mockResolvedValueOnce({} as any); // request-3 succeeds
@@ -624,10 +649,9 @@ describe('createRouter', () => {
         { namespace, name: 'request-2' },
       ];
 
-      mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({} as any); // request-1 succeeds
-      mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({} as any); // request-2 succeeds
+      mockK8sClient.createCustomResource
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-approve')
@@ -648,7 +672,7 @@ describe('createRouter', () => {
 
       // Verify ownership was never checked (admin bypass)
       expect(mockK8sClient.getCustomResource).not.toHaveBeenCalled();
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
     });
 
     it('returns 403 when user has no update permissions', async () => {
@@ -665,7 +689,7 @@ describe('createRouter', () => {
         .expect(403);
 
       expect(response.body).toEqual({ error: 'unauthorised' });
-      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
+      expect(mockK8sClient.createCustomResource).not.toHaveBeenCalled();
     });
 
     it('returns 500 when request body is invalid', async () => {
@@ -673,8 +697,6 @@ describe('createRouter', () => {
         .post('/requests/bulk-approve')
         .send({ invalid: 'data' })
         .expect(500);
-
-      // Schema validation throws InputError which is caught and returns 500
     });
   });
 
@@ -706,19 +728,25 @@ describe('createRouter', () => {
       spec: {},
     };
 
-    const createMockAPIKey = (name: string, apiProductName: string) => ({
+    const createMockAPIKeyRequest = (name: string, apiProductName: string) => ({
       apiVersion: 'devportal.kuadrant.io/v1alpha1',
-      kind: 'APIKey',
-      metadata: { name, namespace },
+      kind: 'APIKeyRequest',
+      metadata: {
+        name,
+        namespace,
+        creationTimestamp: '2024-12-02T10:00:00Z',
+      },
       spec: {
         apiProductRef: { name: apiProductName },
+        apiKeyRef: { name: `${name}-apikey`, namespace: 'consumer-ns' },
         planTier: 'gold',
-        requestedBy: { userId: 'user:default/consumer' },
+        useCase: 'Testing API integration',
+        requestedBy: { userId: 'user:default/consumer', email: 'consumer@example.com' },
       },
-      status: { phase: 'Pending' },
+      status: { conditions: [] },
     });
 
-    it('handles partial success when some API keys do not exist', async () => {
+    it('handles partial success when some API key requests do not exist', async () => {
       // Mock permission check - user has updateOwn permission
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.DENY }, // updateAll denied
@@ -735,15 +763,15 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
         // request-2
-        .mockRejectedValueOnce(new Error('APIKey not found')) // fetch APIKey - fail, stops here
+        .mockRejectedValueOnce(new Error('APIKeyRequest not found')) // fetch APIKeyRequest - fail
         // request-3
-        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
 
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
         .mockResolvedValueOnce({} as any);
 
@@ -762,7 +790,7 @@ describe('createRouter', () => {
         namespace,
         name: 'request-2',
         success: false,
-        error: 'APIKey not found',
+        error: 'APIKeyRequest not found',
       });
       expect(response.body.results[2]).toEqual({
         namespace,
@@ -770,8 +798,28 @@ describe('createRouter', () => {
         success: true,
       });
 
-      // Verify only 2 patches happened
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+      // Verify APIKeyRequests were fetched from correct resource type
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io', 'v1alpha1', namespace, 'apikeyrequests', 'request-1',
+      );
+
+      // Verify APIKeyApprovals were created with approved=false
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
+      const firstApprovalCall = mockK8sClient.createCustomResource.mock.calls[0];
+      expect(firstApprovalCall[0]).toBe('devportal.kuadrant.io');
+      expect(firstApprovalCall[1]).toBe('v1alpha1');
+      expect(firstApprovalCall[2]).toBe(namespace);
+      expect(firstApprovalCall[3]).toBe('apikeyapprovals');
+      expect(firstApprovalCall[4]).toMatchObject({
+        apiVersion: 'devportal.kuadrant.io/v1alpha1',
+        kind: 'APIKeyApproval',
+        metadata: { namespace },
+        spec: {
+          apiKeyRequestRef: { name: 'request-1' },
+          approved: false,
+          reviewedBy: mockUserEntityRef,
+        },
+      });
     });
 
     it('handles partial success when some API products do not exist', async () => {
@@ -790,13 +838,13 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'missing-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'missing-api')) // fetch APIKeyRequest
         .mockRejectedValueOnce(new Error('APIProduct not found')); // fetch APIProduct - fail
 
-      mockK8sClient.patchCustomResourceStatus.mockResolvedValueOnce({} as any);
+      mockK8sClient.createCustomResource.mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -816,7 +864,7 @@ describe('createRouter', () => {
         error: 'APIProduct not found',
       });
 
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(1);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(1);
     });
 
     it('handles partial success when user owns some but not all API products', async () => {
@@ -836,16 +884,16 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - owned by current user
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockOtherAPIProduct) // fetch APIProduct - owned by other user
         // request-3
-        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
 
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
         .mockResolvedValueOnce({} as any);
 
@@ -872,10 +920,10 @@ describe('createRouter', () => {
         success: true,
       });
 
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
     });
 
-    it('handles partial success when patch operations fail', async () => {
+    it('handles partial success when approval creation fails', async () => {
       // Mock permission check - admin user
       mockAuthorizeFn.mockResolvedValueOnce([
         { result: AuthorizeResult.ALLOW }, // updateAll allowed
@@ -889,16 +937,16 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
         // request-3
-        .mockResolvedValueOnce(createMockAPIKey('request-3', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
 
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any) // request-1 succeeds
         .mockRejectedValueOnce(new Error('Network timeout')) // request-2 fails
         .mockResolvedValueOnce({} as any); // request-3 succeeds
@@ -940,16 +988,15 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource
         // request-1
-        .mockResolvedValueOnce(createMockAPIKey('request-1', 'toystore-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
         // request-2
-        .mockResolvedValueOnce(createMockAPIKey('request-2', 'other-api')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api')) // fetch APIKeyRequest
         .mockResolvedValueOnce(mockOtherAPIProduct); // fetch APIProduct
 
-      mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({} as any); // request-1 succeeds
-      mockK8sClient.patchCustomResourceStatus
-        .mockResolvedValueOnce({} as any); // request-2 succeeds
+      mockK8sClient.createCustomResource
+        .mockResolvedValueOnce({} as any)
+        .mockResolvedValueOnce({} as any);
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -968,7 +1015,7 @@ describe('createRouter', () => {
         success: true,
       });
 
-      expect(mockK8sClient.patchCustomResourceStatus).toHaveBeenCalledTimes(2);
+      expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
     });
 
     it('returns 403 when user has no update permissions', async () => {
@@ -985,7 +1032,7 @@ describe('createRouter', () => {
         .expect(403);
 
       expect(response.body).toEqual({ error: 'unauthorised' });
-      expect(mockK8sClient.patchCustomResourceStatus).not.toHaveBeenCalled();
+      expect(mockK8sClient.createCustomResource).not.toHaveBeenCalled();
     });
 
     it('returns proper response format with mixed results', async () => {
@@ -996,33 +1043,32 @@ describe('createRouter', () => {
 
       const requests = [
         { namespace, name: 'success-1' },
-        { namespace, name: 'fail-apikey-missing' },
+        { namespace, name: 'fail-request-missing' },
         { namespace, name: 'fail-apiproduct-missing' },
         { namespace, name: 'success-2' },
-        { namespace, name: 'fail-patch-error' },
+        { namespace, name: 'fail-approval-error' },
       ];
 
       mockK8sClient.getCustomResource
         // success-1
-        .mockResolvedValueOnce(createMockAPIKey('success-1', 'toystore-api')) // fetch APIKey
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
-        // fail-apikey-missing
-        .mockRejectedValueOnce(new Error('APIKey not found')) // fetch APIKey - fail, stops here
+        .mockResolvedValueOnce(createMockAPIKeyRequest('success-1', 'toystore-api')) // fetch APIKeyRequest
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // fail-request-missing
+        .mockRejectedValueOnce(new Error('APIKeyRequest not found')) // fetch APIKeyRequest - fail
         // fail-apiproduct-missing
-        .mockResolvedValueOnce(createMockAPIKey('fail-apiproduct-missing', 'missing-product')) // fetch APIKey
+        .mockResolvedValueOnce(createMockAPIKeyRequest('fail-apiproduct-missing', 'missing-product')) // fetch APIKeyRequest
         .mockRejectedValueOnce(new Error('APIProduct not found')) // fetch APIProduct - fail
         // success-2
-        .mockResolvedValueOnce(createMockAPIKey('success-2', 'toystore-api')) // fetch APIKey
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
-        // fail-patch-error
-        .mockResolvedValueOnce(createMockAPIKey('fail-patch-error', 'toystore-api')) // fetch APIKey
-        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - success
+        .mockResolvedValueOnce(createMockAPIKeyRequest('success-2', 'toystore-api')) // fetch APIKeyRequest
+        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
+        // fail-approval-error
+        .mockResolvedValueOnce(createMockAPIKeyRequest('fail-approval-error', 'toystore-api')) // fetch APIKeyRequest
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
 
-      // Patch results
-      mockK8sClient.patchCustomResourceStatus
+      mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any) // success-1
         .mockResolvedValueOnce({} as any) // success-2
-        .mockRejectedValueOnce(new Error('Patch failed')); // fail-patch-error
+        .mockRejectedValueOnce(new Error('Create failed')); // fail-approval-error
 
       const response = await request(app)
         .post('/requests/bulk-reject')
@@ -1031,7 +1077,6 @@ describe('createRouter', () => {
 
       expect(response.body.results).toHaveLength(5);
 
-      // Verify exact response structure
       expect(response.body.results[0]).toEqual({
         namespace,
         name: 'success-1',
@@ -1039,7 +1084,7 @@ describe('createRouter', () => {
       });
       expect(response.body.results[1]).toMatchObject({
         namespace,
-        name: 'fail-apikey-missing',
+        name: 'fail-request-missing',
         success: false,
         error: expect.any(String),
       });
@@ -1056,7 +1101,7 @@ describe('createRouter', () => {
       });
       expect(response.body.results[4]).toMatchObject({
         namespace,
-        name: 'fail-patch-error',
+        name: 'fail-approval-error',
         success: false,
         error: expect.any(String),
       });
