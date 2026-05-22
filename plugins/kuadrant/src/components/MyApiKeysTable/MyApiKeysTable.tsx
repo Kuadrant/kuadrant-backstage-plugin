@@ -19,8 +19,6 @@ import {
   Typography,
   IconButton,
   Tooltip,
-  Menu,
-  MenuItem,
   CircularProgress,
   Dialog,
   DialogTitle,
@@ -36,7 +34,6 @@ import VisibilityOffIcon from "@material-ui/icons/VisibilityOff";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
 import WarningIcon from "@material-ui/icons/Warning";
 import DeleteIcon from "@material-ui/icons/Delete";
-import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { FilterPanel, FilterSection, FilterState } from "../FilterPanel";
 import { APIKey, APIProduct } from "../../types/api-management";
@@ -114,16 +111,6 @@ export const MyApiKeysTable = () => {
 
   const [requestDialogOpen, setRequestDialogOpen] = useState(false);
   const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set());
-  const [menuAnchor, setMenuAnchor] = useState<{
-    top: number;
-    left: number;
-  } | null>(null);
-  const [menuRequest, setMenuRequest] = useState<APIKey | null>(null);
-  const [editDialogState, setEditDialogState] = useState<{
-    open: boolean;
-    request: APIKey | null;
-    plans: any[];
-  }>({ open: false, request: null, plans: [] });
   const [refresh, setRefresh] = useState(0);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [deleteDialogState, setDeleteDialogState] = useState<{
@@ -315,42 +302,6 @@ export const MyApiKeysTable = () => {
       next.delete(key);
       return next;
     });
-  };
-
-  const handleMenuClose = () => {
-    setMenuAnchor(null);
-    setMenuRequest(null);
-  };
-
-  const handleEdit = async () => {
-    if (!menuRequest) return;
-
-    const request = menuRequest;
-    handleMenuClose();
-
-    try {
-      const apiProductName = request.spec.apiProductRef?.name;
-      const apiProductNamespace = request.metadata.namespace;
-      const apiProduct = await kuadrantApi.getApiProduct(apiProductNamespace, apiProductName);
-      const plans = apiProduct.status?.discoveredPlans || [];
-      setEditDialogState({ open: true, request, plans });
-    } catch (err) {
-      console.error("Error fetching plans:", err);
-      setEditDialogState({ open: true, request: menuRequest, plans: [] });
-      const errorMessage = err instanceof Error ? err.message : "unknown error occurred";
-      alertApi.post({
-        message: `Failed to fetch Plans. ${errorMessage}`,
-        severity: 'error',
-        display: 'transient',
-      });
-    }
-  };
-
-  const handleDeleteClick = () => {
-    if (!menuRequest) return;
-    const request = menuRequest;
-    handleMenuClose();
-    setDeleteDialogState({ open: true, request });
   };
 
   const handleDeleteConfirm = async () => {
@@ -602,9 +553,6 @@ export const MyApiKeysTable = () => {
     return <ResponseErrorPanel error={error} />;
   }
 
-  const isPending = (row: APIKey) =>
-    getAPIKeyPhase(row.status?.conditions) === "Pending";
-
   return (
     <>
       <Box display="flex" justifyContent="flex-end" mb={2} px={2}>
@@ -657,60 +605,6 @@ export const MyApiKeysTable = () => {
           )}
         </Box>
       </Box>
-
-      <Menu
-        id="myapikeys-menu"
-        open={Boolean(menuAnchor)}
-        onClose={handleMenuClose}
-        anchorReference="anchorPosition"
-        anchorPosition={menuAnchor || { top: 0, left: 0 }}
-      >
-        {menuRequest &&
-          (() => {
-            const items = [];
-            items.push(
-              <MenuItem
-                key="view"
-                onClick={() => {
-                  navigate(
-                    `/kuadrant/api-keys/${menuRequest.metadata.namespace}/${menuRequest.metadata.name}`,
-                  );
-                  handleMenuClose();
-                }}
-              >
-                View Details
-              </MenuItem>,
-            );
-            if (isPending(menuRequest)) {
-              items.push(
-                <MenuItem key="edit" onClick={handleEdit}>
-                  Edit
-                </MenuItem>,
-              );
-            }
-            items.push(
-              <MenuItem key="delete" onClick={handleDeleteClick}>
-                Delete
-              </MenuItem>,
-            );
-            return items;
-          })()}
-      </Menu>
-
-      {editDialogState.request && (
-        <EditAPIKeyDialog
-          open={editDialogState.open}
-          request={editDialogState.request}
-          availablePlans={editDialogState.plans}
-          onClose={() =>
-            setEditDialogState({ open: false, request: null, plans: [] })
-          }
-          onSuccess={() => {
-            setEditDialogState({ open: false, request: null, plans: [] });
-            setRefresh((r) => r + 1);
-          }}
-        />
-      )}
 
       <ConfirmDeleteDialog
         open={deleteDialogState.open}
