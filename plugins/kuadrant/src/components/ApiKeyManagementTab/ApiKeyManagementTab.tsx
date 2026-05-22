@@ -13,10 +13,6 @@ import {
   Chip,
   Grid,
   Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
   Tabs,
   Tab,
   Menu,
@@ -40,7 +36,6 @@ import CancelIcon from "@material-ui/icons/Cancel";
 import AddIcon from "@material-ui/icons/Add";
 import MoreVertIcon from "@material-ui/icons/MoreVert";
 import FileCopyIcon from "@material-ui/icons/FileCopy";
-import WarningIcon from "@material-ui/icons/Warning";
 import { APIKey, APIProduct, Plan } from "../../types/api-management";
 import {
   kuadrantApiKeyCreatePermission,
@@ -52,6 +47,7 @@ import {
   useKuadrantPermission,
   canDeleteResource,
 } from "../../utils/permissions";
+import { getAPIKeyPhase } from "../../utils/apikeys";
 import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
@@ -93,14 +89,6 @@ export const ApiKeyManagementTab = ({
     new Map(),
   );
   const [apiKeyLoading, setApiKeyLoading] = useState<Set<string>>(new Set());
-  const [alreadyReadKeys, setAlreadyReadKeys] = useState<Set<string>>(
-    new Set(),
-  );
-  const [showOnceWarningOpen, setShowOnceWarningOpen] = useState(false);
-  const [pendingKeyReveal, setPendingKeyReveal] = useState<{
-    namespace: string;
-    name: string;
-  } | null>(null);
 
   // get apiproduct name from entity annotation (set by entity provider)
   const apiProductName =
@@ -232,27 +220,15 @@ export const ApiKeyManagementTab = ({
     try {
       const data = await kuadrantApi.getApiKeySecret(requestNamespace, requestName);
       setApiKeyValues((prev) => new Map(prev).set(key, data.apiKey));
-      // after successful read, mark as already read (show-once behaviour)
-      setAlreadyReadKeys((prev) => new Set(prev).add(key));
+      toggleVisibility(requestName);
     } catch (err) {
       const errorMessage =
         err instanceof Error ? err.message : "unknown error occurred";
-      if (errorMessage.includes("403") || errorMessage.includes("already been viewed")) {
-        // secret has already been read
-        setAlreadyReadKeys((prev) => new Set(prev).add(key));
-        alertApi.post({
-          message:
-            "This API key has already been viewed and cannot be retrieved again.",
-          severity: "warning",
-          display: "transient",
-        });
-      } else {
-        alertApi.post({
-          message: `Failed to fetch api key: ${errorMessage}`,
-          severity: "error",
-          display: "transient",
-        });
-      }
+      alertApi.post({
+        message: `Failed to fetch api key: ${errorMessage}`,
+        severity: "error",
+        display: "transient",
+      });
     } finally {
       setApiKeyLoading((prev) => {
         const next = new Set(prev);
@@ -520,13 +496,13 @@ export const ApiKeyManagementTab = ({
   const plans = (apiProduct?.status?.discoveredPlans || []) as Plan[];
 
   const pendingRequests = myRequests.filter(
-    (r) => !r.status?.phase || r.status.phase === "Pending",
+    (r) => getAPIKeyPhase(r.status?.conditions) === "Pending",
   );
   const approvedRequests = myRequests.filter(
-    (r) => r.status?.phase === "Approved",
+    (r) => getAPIKeyPhase(r.status?.conditions) === "Approved",
   );
   const rejectedRequests = myRequests.filter(
-    (r) => r.status?.phase === "Rejected",
+    (r) => getAPIKeyPhase(r.status?.conditions) === "Denied",
   );
 
   const approvedColumns: TableColumn<APIKey>[] = [
@@ -539,14 +515,17 @@ export const ApiKeyManagementTab = ({
     },
     {
       title: "Approved",
-      field: "status.reviewedAt",
-      render: (row: APIKey) => (
-        <Typography variant="body2">
-          {row.status?.reviewedAt
-            ? new Date(row.status.reviewedAt).toLocaleDateString()
-            : "-"}
-        </Typography>
-      ),
+      field: "status.conditions",
+      render: (row: APIKey) => {
+        const approvalDate = row.status?.conditions?.find(
+          c => c.type === 'Approved' && c.status === 'True'
+        )?.lastTransitionTime;
+        return (
+          <Typography variant="body2">
+            {approvalDate ? new Date(approvalDate).toLocaleDateString() : "-"}
+          </Typography>
+        );
+      },
     },
     {
       title: "API Key",
@@ -558,9 +537,7 @@ export const ApiKeyManagementTab = ({
         const isVisible = visibleKeys.has(row.metadata.name);
         const isLoading = apiKeyLoading.has(key);
         const apiKeyValue = apiKeyValues.get(key);
-        const hasSecretRef = row.status?.secretRef?.name;
-        const canReadSecret = row.status?.canReadSecret !== false;
-        const isAlreadyRead = alreadyReadKeys.has(key) || !canReadSecret;
+        const hasSecretRef = Boolean(row.spec?.secretRef?.name);
 
         if (!hasSecretRef) {
           return (
@@ -570,36 +547,12 @@ export const ApiKeyManagementTab = ({
           );
         }
 
-        // key has already been viewed and cannot be retrieved again
-        if (isAlreadyRead && !apiKeyValue) {
-          return (
-            <Tooltip title="This API key has already been viewed and cannot be retrieved again">
-              <Box display="flex" alignItems="center">
-                <Typography
-                  variant="body2"
-                  color="textSecondary"
-                  style={{ fontFamily: "monospace", marginRight: 8 }}
-                >
-                  Already viewed
-                </Typography>
-                <VisibilityOffIcon fontSize="small" color="disabled" />
-              </Box>
-            </Tooltip>
-          );
-        }
-
         const handleRevealClick = () => {
           if (isVisible) {
-            // hiding - clear the value from memory
             clearApiKeyValue(row.metadata.namespace, row.metadata.name);
             toggleVisibility(row.metadata.name);
-          } else if (!isAlreadyRead) {
-            // show warning dialog before first reveal
-            setPendingKeyReveal({
-              namespace: row.metadata.namespace,
-              name: row.metadata.name,
-            });
-            setShowOnceWarningOpen(true);
+          } else {
+            fetchApiKeyFromSecret(row.metadata.namespace, row.metadata.name);
           }
         };
 
@@ -637,15 +590,13 @@ export const ApiKeyManagementTab = ({
               </Tooltip>
             )}
             <Tooltip
-              title={
-                isVisible ? "Hide API key" : "Reveal API key (one-time only)"
-              }
+              title={isVisible ? "Hide API key" : "Reveal API key"}
             >
               <span>
                 <IconButton
                   size="small"
                   onClick={handleRevealClick}
-                  disabled={isLoading || (isAlreadyRead && !apiKeyValue)}
+                  disabled={isLoading}
                 >
                   {isVisible ? <VisibilityOffIcon /> : <VisibilityIcon />}
                 </IconButton>
@@ -696,13 +647,14 @@ export const ApiKeyManagementTab = ({
   const requestColumns: TableColumn<APIKey>[] = [
     {
       title: "Status",
-      field: "status.phase",
+      field: "status.conditions",
       render: (row: APIKey) => {
-        const phase = row.status?.phase || "Pending";
+        const phase = getAPIKeyPhase(row.status?.conditions || []);
         const isPending = phase === "Pending";
+        const displayLabel = phase === "Denied" ? "Rejected" : phase;
         return (
           <Chip
-            label={phase}
+            label={displayLabel}
             size="small"
             icon={isPending ? <HourglassEmptyIcon /> : <CancelIcon />}
             color={isPending ? "default" : "secondary"}
@@ -754,13 +706,14 @@ export const ApiKeyManagementTab = ({
     },
     {
       title: "Reviewed",
-      field: "status.reviewedAt",
+      field: "status.conditions",
       render: (row: APIKey) => {
-        if (!row.status?.reviewedAt)
-          return <Typography variant="body2">-</Typography>;
+        const approvedDate = row.status?.conditions?.find(
+          c => (c.type === 'Approved' || c.type === 'Denied') && c.status === 'True'
+        )?.lastTransitionTime;
         return (
           <Typography variant="body2">
-            {new Date(row.status.reviewedAt).toLocaleDateString()}
+            {approvedDate ? new Date(approvedDate).toLocaleDateString() : "-"}
           </Typography>
         );
       },
@@ -775,7 +728,7 @@ export const ApiKeyManagementTab = ({
         if (isDeleting) {
           return <CircularProgress size={20} />;
         }
-        const isPending = !row.status?.phase || row.status.phase === "Pending";
+        const isPending = getAPIKeyPhase(row.status?.conditions || []) === "Pending";
         const ownerId = row.spec.requestedBy.userId;
         const canDelete = canDeleteResource(
           ownerId,
@@ -965,9 +918,7 @@ export const ApiKeyManagementTab = ({
       >
         {menuRequest &&
           (() => {
-            const isPending =
-              !menuRequest.status?.phase ||
-              menuRequest.status.phase === "Pending";
+            const isPending = getAPIKeyPhase(menuRequest.status?.conditions || []) === "Pending";
             const ownerId = menuRequest.spec.requestedBy.userId;
             const canEdit = canUpdateRequest && ownerId === userId && isPending;
 
@@ -1004,63 +955,11 @@ export const ApiKeyManagementTab = ({
       <ConfirmDeleteDialog
         open={deleteDialogState.open}
         title="Delete Request"
-        description={`Are you sure you want to delete this ${deleteDialogState.request?.status?.phase === "Approved" ? "API key" : "request"}?`}
+        description={`Are you sure you want to delete this ${getAPIKeyPhase(deleteDialogState.request?.status?.conditions || []) === "Approved" ? "API key" : "request"}?`}
         deleting={deleting !== null}
         onConfirm={handleDeleteConfirm}
         onCancel={handleDeleteCancel}
       />
-
-      <Dialog
-        open={showOnceWarningOpen}
-        onClose={() => {
-          setShowOnceWarningOpen(false);
-          setPendingKeyReveal(null);
-        }}
-        maxWidth="sm"
-      >
-        <DialogTitle>
-          <Box display="flex" alignItems="center">
-            <WarningIcon color="primary" style={{ marginRight: 8 }} />
-            View API Key
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Typography variant="body1" paragraph>
-            This API key can only be viewed <strong>once</strong>. After you
-            reveal it, you will not be able to retrieve it again.
-          </Typography>
-          <Typography variant="body2" color="textSecondary">
-            Make sure to copy and store it securely before closing this view.
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button
-            onClick={() => {
-              setShowOnceWarningOpen(false);
-              setPendingKeyReveal(null);
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => {
-              if (pendingKeyReveal) {
-                fetchApiKeyFromSecret(
-                  pendingKeyReveal.namespace,
-                  pendingKeyReveal.name,
-                );
-                toggleVisibility(pendingKeyReveal.name);
-              }
-              setShowOnceWarningOpen(false);
-              setPendingKeyReveal(null);
-            }}
-          >
-            Reveal API Key
-          </Button>
-        </DialogActions>
-      </Dialog>
     </Box>
   );
 };
