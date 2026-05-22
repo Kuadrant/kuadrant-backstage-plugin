@@ -100,16 +100,6 @@ export const ApiKeyDetailPage = kuadrantPlugin.provide(
   }),
 );
 
-export const EntityKuadrantApiApprovalTab = kuadrantPlugin.provide(
-  createComponentExtension({
-    name: 'EntityKuadrantApiApprovalTab',
-    component: {
-      lazy: () =>
-        import('./components/EntityApiApprovalTab').then(m => m.EntityApiApprovalTab),
-    },
-  }),
-);
-
 export const EntityKuadrantApiProductOpenApiAlert = kuadrantPlugin.provide(
   createComponentExtension({
     name: 'EntityKuadrantApiProductOpenApiAlert',
