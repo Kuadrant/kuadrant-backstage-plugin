@@ -456,10 +456,11 @@ const ResourceList = () => {
     setDeleteStats(null);
 
     try {
-      const data = await kuadrantApi.getRequestsByNamespace(namespace);
+      // Fetch all API keys across all namespaces to find those referencing this APIProduct
+      const data = await kuadrantApi.getAllRequests();
       const related = (data.items || []).filter(
         (r: any) =>
-          r.spec.apiName === name && r.spec.apiNamespace === namespace,
+          r.spec.apiProductRef?.name === name && r.spec.apiProductRef?.namespace === namespace,
       );
       const approved = related.filter(
         (r: any) => r.status?.phase === "Approved",
@@ -469,7 +470,7 @@ const ResourceList = () => {
       const errorMessage =
         err instanceof Error ? err.message : "unknown error occurred";
       alertApi.post({
-        message: `Failed to delete access request: ${errorMessage}`,
+        message: `Failed to count related API keys: ${errorMessage}`,
         severity: "error",
         display: "transient",
       });

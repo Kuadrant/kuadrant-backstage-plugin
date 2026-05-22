@@ -57,10 +57,14 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
 
   // fetch user's approved keys
   const { value: requests, loading: keysLoading, error: keysError } = useAsync(async () => {
-    const data = await kuadrantApi.getRequestsByNamespace(namespace)
+    // Fetch all user's API keys (they live in consumer namespaces, not APIProduct namespace)
+    const data = await kuadrantApi.getRequests();
     const allRequests = data.items || [];
+    // Filter by APIProduct reference and approved status
     return allRequests.filter((r: APIKey) =>
-      r.spec.apiProductRef?.name === apiProductName && getAPIKeyPhase(r.status?.conditions || []) === 'Approved'
+      r.spec.apiProductRef?.name === apiProductName &&
+      r.spec.apiProductRef?.namespace === namespace &&
+      getAPIKeyPhase(r.status?.conditions || []) === 'Approved'
     );
   }, [namespace, apiProductName, kuadrantApi, refresh]);
 
