@@ -40,7 +40,6 @@ plugins/kuadrant/
 │   │   ├── MyApiKeysPage/           # Consumer's API keys page
 │   │   ├── MyApiKeysTable/          # Consumer's API keys table
 │   │   ├── RequestAccessDialog/     # API access request dialog
-│   │   ├── EntityApiApprovalTab/    # Entity page approval tab
 │   │   ├── ConfirmDeleteDialog/     # Delete confirmation dialog
 │   │   ├── PermissionGate/          # RBAC permission gate component
 │   │   └── FilterPanel/             # Filter panel component

@@ -10,7 +10,6 @@ export {
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,
   EntityKuadrantApiProductInfoContent,
-  EntityKuadrantApiApprovalTab,
   EntityKuadrantApiProductOpenApiAlert,
 } from './plugin';
 export { ApiAccessCard } from './components/ApiAccessCard';
