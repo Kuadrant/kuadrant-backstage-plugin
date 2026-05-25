@@ -396,7 +396,6 @@ export async function createRouter({
           'devportal.kuadrant.io',
           'v1alpha1',
           'apikeys',
-          namespace
         );
       } catch (error) {
         console.warn('failed to list apikeys during cascade delete:', error);
@@ -414,11 +413,12 @@ export async function createRouter({
       const deletionResults = await Promise.allSettled(
         relatedRequests.map(async (request: any) => {
           const requestName = request.metadata.name;
-          console.log(`deleting apikey: ${namespace}/${requestName}`);
+          const requestNamespace = request.metadata.namespace;
+          console.log(`deleting apikey: ${requestNamespace}/${requestName}`);
           await k8sClient.deleteCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
-            namespace,
+            requestNamespace,
             'apikeys',
             requestName
           );
@@ -935,12 +935,13 @@ export async function createRouter({
 
       const status = req.query.status as string;
       const namespace = req.query.namespace as string;
+      const apiProductName = req.query.apiProductName as string;
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
       }
 
       let filteredItems = data.items || [];
@@ -964,9 +965,14 @@ export async function createRouter({
         );
       }
 
+      if (apiProductName) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
+
       if (status) {
         filteredItems = filteredItems.filter((req: any) => {
-          // Inline condition parsing (avoiding cross-package import)
           let phase: string = 'Pending';
           if (req.status?.conditions && req.status.conditions.length > 0) {
             const approved = req.status.conditions.find(
@@ -1011,18 +1017,21 @@ export async function createRouter({
 
       // extract userId from authenticated credentials, not from query params
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-      const namespace = req.query.namespace as string;
+      const apiProductName = req.query.apiProductName as string;
 
-      let data;
-      if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
-      } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
-      }
+      // scope to the user's consumer namespace — all their keys live there
+      const consumerNs = getConsumerNamespace(userEntityRef);
+      const data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', consumerNs);
 
-      const filteredItems = (data.items || []).filter(
+      let filteredItems = (data.items || []).filter(
         (req: any) => req.spec?.requestedBy?.userId === userEntityRef
       );
+
+      if (apiProductName) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
 
       res.json({ items: filteredItems });
     } catch (error) {

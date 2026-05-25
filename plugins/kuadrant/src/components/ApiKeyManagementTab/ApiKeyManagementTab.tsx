@@ -134,13 +134,8 @@ export const ApiKeyManagementTab = ({
     loading: requestsLoading,
     error: requestsError,
   } = useAsync(async () => {
-    const data = await kuadrantApi.getRequestsByNamespace(namespace);
-    // filter by apiproduct name and namespace (APIKey lives in consumer's NS, refs APIProduct in owner's NS)
-    return (data.items || []).filter(
-      (r: APIKey) =>
-        r.spec.apiProductRef.name === apiProductName &&
-        r.spec.apiProductRef.namespace === namespace, // APIKey refs APIProduct in owner's namespace
-    );
+    const data = await kuadrantApi.getRequestsByApiProduct(apiProductName);
+    return data.items || [];
   }, [apiProductName, namespace, refresh, kuadrantApi]);
 
   const {

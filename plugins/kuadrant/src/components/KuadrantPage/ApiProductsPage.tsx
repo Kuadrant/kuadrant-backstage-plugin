@@ -456,11 +456,8 @@ const ResourceList = () => {
     setDeleteStats(null);
 
     try {
-      const data = await kuadrantApi.getRequestsByNamespace(namespace);
-      const related = (data.items || []).filter(
-        (r: any) =>
-          r.spec.apiName === name && r.spec.apiNamespace === namespace,
-      );
+      const data = await kuadrantApi.getAllRequestsByApiProduct(name);
+      const related = data.items || [];
       const approved = related.filter(
         (r: any) => r.status?.phase === "Approved",
       ).length;
