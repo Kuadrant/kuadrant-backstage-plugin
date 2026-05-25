@@ -390,6 +390,8 @@ export async function createRouter({
       }
       console.log(`cascading delete: finding apikeys for ${namespace}/${name}`);
 
+      // list cluster-wide because API keys live in consumer namespaces
+      // (e.g. kuadrant-guest-05957230), not in the APIProduct's namespace
       let allRequests;
       try {
         allRequests = await k8sClient.listCustomResources(
@@ -409,7 +411,7 @@ export async function createRouter({
 
       console.log(`found ${relatedRequests.length} apikeys to delete`);
 
-      // delete each APIKey - controller's OwnerReference handles Secret cleanup
+      // delete each APIKey using its own namespace (consumer NS, not the APIProduct NS)
       const deletionResults = await Promise.allSettled(
         relatedRequests.map(async (request: any) => {
           const requestName = request.metadata.name;
@@ -935,13 +937,15 @@ export async function createRouter({
 
       const status = req.query.status as string;
       const namespace = req.query.namespace as string;
+      // filter by the APIProduct that the key references (keys live in consumer namespaces)
       const apiProductName = req.query.apiProductName as string;
+      const apiProductNamespace = req.query.apiProductNamespace as string;
 
       let data;
       if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests', namespace);
       } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeyrequests');
       }
 
       let filteredItems = data.items || [];
@@ -968,6 +972,12 @@ export async function createRouter({
       if (apiProductName) {
         filteredItems = filteredItems.filter(
           (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
+
+      if (apiProductNamespace) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.namespace === apiProductNamespace
         );
       }
 
@@ -1015,13 +1025,25 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      // extract userId from authenticated credentials, not from query params
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
+      // filter by the APIProduct that the key references
       const apiProductName = req.query.apiProductName as string;
+      const apiProductNamespace = req.query.apiProductNamespace as string;
 
-      // scope to the user's consumer namespace — all their keys live there
+      // API keys live in the user's consumer namespace (e.g. kuadrant-guest-05957230),
+      // not in the APIProduct's namespace, so we derive it from the authenticated user
       const consumerNs = getConsumerNamespace(userEntityRef);
-      const data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', consumerNs);
+      let data;
+      try {
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', consumerNs);
+      } catch (error: any) {
+        // consumer namespace doesn't exist yet — user has never requested a key
+        if (error.message?.includes('404') || error.statusCode === 404) {
+          res.json({ items: [] });
+          return;
+        }
+        throw error;
+      }
 
       let filteredItems = (data.items || []).filter(
         (req: any) => req.spec?.requestedBy?.userId === userEntityRef
@@ -1030,6 +1052,12 @@ export async function createRouter({
       if (apiProductName) {
         filteredItems = filteredItems.filter(
           (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
+
+      if (apiProductNamespace) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.namespace === apiProductNamespace
         );
       }
 

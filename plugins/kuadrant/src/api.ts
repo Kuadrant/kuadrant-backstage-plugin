@@ -73,16 +73,18 @@ export interface KuadrantAPI {
   /**
    * Fetch the current user's API key requests for a specific APIProduct
    * @param apiProductName - Name of the APIProduct
+   * @param apiProductNamespace - Namespace of the APIProduct
    * @returns Promise with list of the user's API key requests for this product
    */
-  getRequestsByApiProduct(apiProductName: string): Promise<KuadrantList<APIKey>>;
+  getRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>>;
 
   /**
    * Fetch all API key requests for a specific APIProduct (admin view)
    * @param apiProductName - Name of the APIProduct
+   * @param apiProductNamespace - Namespace of the APIProduct
    * @returns Promise with list of all API key requests for this product
    */
-  getAllRequestsByApiProduct(apiProductName: string): Promise<KuadrantList<APIKey>>;
+  getAllRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>>;
 
   /**
    * Fetch a single API key request
@@ -379,18 +381,20 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(url, "Failed to fetch API Key requests by namespace.");
   }
 
-  async getRequestsByApiProduct(apiProductName: string): Promise<KuadrantList<APIKey>> {
+  async getRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>> {
     const baseUrl = await this.getBaseUrl();
+    const params = new URLSearchParams({ apiProductName, apiProductNamespace });
     return this.fetchWithRetry(
-      `${baseUrl}kuadrant/requests/my?apiProductName=${encodeURIComponent(apiProductName)}`,
+      `${baseUrl}kuadrant/requests/my?${params.toString()}`,
       "Failed to fetch API Key requests by API product.",
     );
   }
 
-  async getAllRequestsByApiProduct(apiProductName: string): Promise<KuadrantList<APIKey>> {
+  async getAllRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>> {
     const baseUrl = await this.getBaseUrl();
+    const params = new URLSearchParams({ apiProductName, apiProductNamespace });
     return this.fetchWithRetry(
-      `${baseUrl}kuadrant/requests?apiProductName=${encodeURIComponent(apiProductName)}`,
+      `${baseUrl}kuadrant/requests?${params.toString()}`,
       "Failed to fetch all API Key requests by API product.",
     );
   }

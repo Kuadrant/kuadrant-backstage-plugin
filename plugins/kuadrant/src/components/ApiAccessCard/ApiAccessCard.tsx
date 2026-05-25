@@ -54,9 +54,10 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     setUserEmail(profile.email || '');
   }, [identityApi]);
 
-  // fetch user's approved keys
+  // fetch user's approved keys for this API product
+  // backend filters by apiProductRef.name and scopes to the user's consumer namespace
   const { value: requests, loading: keysLoading, error: keysError } = useAsync(async () => {
-    const data = await kuadrantApi.getRequestsByApiProduct(apiProductName);
+    const data = await kuadrantApi.getRequestsByApiProduct(apiProductName, namespace);
     const allRequests = data.items || [];
     return allRequests.filter((r: APIKey) =>
       r.status?.phase === 'Approved'
