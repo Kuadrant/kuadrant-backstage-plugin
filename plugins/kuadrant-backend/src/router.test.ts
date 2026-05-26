@@ -747,29 +747,30 @@ describe('createRouter', () => {
     });
 
     it('handles partial success when some API key requests do not exist', async () => {
-      // Mock permission check - user has updateOwn permission
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY }, // updateAll denied
-      ]);
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
-      ]);
-
       const requests = [
         { namespace, name: 'request-1' },
         { namespace, name: 'request-2' },
         { namespace, name: 'request-3' },
       ];
 
+      // Per-request permission checks (verifyApiKeyUpdatePermission)
+      // request-1: updateAll DENY, updateOwn ALLOW
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      // request-2: fails before permission check (APIKeyRequest not found)
+      // request-3: updateAll DENY, updateOwn ALLOW
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
       mockK8sClient.getCustomResource
-        // request-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // request-2
-        .mockRejectedValueOnce(new Error('APIKeyRequest not found')) // fetch APIKeyRequest - fail
-        // request-3
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
+        // request-1: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'))
+        .mockResolvedValueOnce(mockAPIProduct)
+        // request-2: fetch APIKeyRequest - fail
+        .mockRejectedValueOnce(new Error('APIKeyRequest not found'))
+        // request-3: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api'))
+        .mockResolvedValueOnce(mockAPIProduct);
 
       mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
@@ -823,26 +824,26 @@ describe('createRouter', () => {
     });
 
     it('handles partial success when some API products do not exist', async () => {
-      // Mock permission check - user has updateOwn permission
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY }, // updateAll denied
-      ]);
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
-      ]);
-
       const requests = [
         { namespace, name: 'request-1' },
         { namespace, name: 'request-2' },
       ];
 
+      // Per-request permission checks
+      // request-1: updateAll DENY, updateOwn ALLOW
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      // request-2: updateAll DENY, updateOwn ALLOW (but APIProduct not found)
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
       mockK8sClient.getCustomResource
-        // request-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - success
-        // request-2
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'missing-api')) // fetch APIKeyRequest
-        .mockRejectedValueOnce(new Error('APIProduct not found')); // fetch APIProduct - fail
+        // request-1: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'))
+        .mockResolvedValueOnce(mockAPIProduct)
+        // request-2: fetch APIKeyRequest, then APIProduct fails (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'missing-api'))
+        .mockRejectedValueOnce(new Error('APIProduct not found'));
 
       mockK8sClient.createCustomResource.mockResolvedValueOnce({} as any);
 
@@ -861,37 +862,40 @@ describe('createRouter', () => {
         namespace,
         name: 'request-2',
         success: false,
-        error: 'APIProduct not found',
+        error: expect.stringContaining('missing-api'),
       });
 
       expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(1);
     });
 
     it('handles partial success when user owns some but not all API products', async () => {
-      // Mock permission check - user has updateOwn permission (not admin)
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY }, // updateAll denied
-      ]);
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateOwn allowed
-      ]);
-
       const requests = [
         { namespace, name: 'request-1' },
         { namespace, name: 'request-2' },
         { namespace, name: 'request-3' },
       ];
 
+      // Per-request permission checks
+      // request-1: updateAll DENY, updateOwn ALLOW
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      // request-2: updateAll DENY, updateOwn ALLOW (but ownership fails)
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      // request-3: updateAll DENY, updateOwn ALLOW
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
       mockK8sClient.getCustomResource
-        // request-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct - owned by current user
-        // request-2
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockOtherAPIProduct) // fetch APIProduct - owned by other user
-        // request-3
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct - owned by current user
+        // request-1: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'))
+        .mockResolvedValueOnce(mockAPIProduct) // owned by current user
+        // request-2: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api'))
+        .mockResolvedValueOnce(mockOtherAPIProduct) // owned by other user
+        // request-3: fetch APIKeyRequest, then APIProduct (inside verifyApiKeyUpdatePermission)
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api'))
+        .mockResolvedValueOnce(mockAPIProduct); // owned by current user
 
       mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
@@ -912,7 +916,7 @@ describe('createRouter', () => {
         namespace,
         name: 'request-2',
         success: false,
-        error: 'You can only reject requests for your own API products.',
+        error: 'you can only update requests for your own api products',
       });
       expect(response.body.results[2]).toEqual({
         namespace,
@@ -924,27 +928,21 @@ describe('createRouter', () => {
     });
 
     it('handles partial success when approval creation fails', async () => {
-      // Mock permission check - admin user
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateAll allowed
-      ]);
-
       const requests = [
         { namespace, name: 'request-1' },
         { namespace, name: 'request-2' },
         { namespace, name: 'request-3' },
       ];
 
+      // Per-request permission checks - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // request-1
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // request-2
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // request-3
+
       mockK8sClient.getCustomResource
-        // request-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // request-2
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // request-3
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'))
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'toystore-api'))
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-3', 'toystore-api'));
 
       mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any) // request-1 succeeds
@@ -976,23 +974,19 @@ describe('createRouter', () => {
     });
 
     it('allows admin to reject all requests regardless of ownership', async () => {
-      // Mock permission check - admin user
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateAll allowed
-      ]);
-
       const requests = [
         { namespace, name: 'request-1' },
         { namespace, name: 'request-2' },
       ];
 
+      // Per-request permission checks - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // request-1
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // request-2
+
+      // Admin still fetches APIKeyRequests but skips ownership check
       mockK8sClient.getCustomResource
-        // request-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // request-2
-        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockOtherAPIProduct); // fetch APIProduct
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'))
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-2', 'other-api'));
 
       mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any)
@@ -1015,55 +1009,65 @@ describe('createRouter', () => {
         success: true,
       });
 
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledTimes(2);
       expect(mockK8sClient.createCustomResource).toHaveBeenCalledTimes(2);
     });
 
-    it('returns 403 when user has no update permissions', async () => {
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY }, // updateAll denied
-      ]);
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.DENY }, // updateOwn denied
-      ]);
+    it('returns per-request failure when user has no update permissions', async () => {
+      // Per-request permission check: updateAll DENY, updateOwn DENY
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      mockK8sClient.getCustomResource
+        .mockResolvedValueOnce(createMockAPIKeyRequest('request-1', 'toystore-api'));
 
       const response = await request(app)
         .post('/requests/bulk-reject')
         .send({ requests: [{ namespace: 'toystore', name: 'request-1' }] })
-        .expect(403);
+        .expect(200);
 
-      expect(response.body).toEqual({ error: 'unauthorised' });
+      expect(response.body.results).toHaveLength(1);
+      expect(response.body.results[0]).toEqual({
+        namespace: 'toystore',
+        name: 'request-1',
+        success: false,
+        error: 'unauthorised',
+      });
       expect(mockK8sClient.createCustomResource).not.toHaveBeenCalled();
     });
 
     it('returns proper response format with mixed results', async () => {
-      // Mock permission check - admin user
-      mockAuthorizeFn.mockResolvedValueOnce([
-        { result: AuthorizeResult.ALLOW }, // updateAll allowed
-      ]);
-
       const requests = [
         { namespace, name: 'success-1' },
         { namespace, name: 'fail-request-missing' },
-        { namespace, name: 'fail-apiproduct-missing' },
+        { namespace, name: 'fail-no-apiproductref' },
         { namespace, name: 'success-2' },
         { namespace, name: 'fail-approval-error' },
       ];
 
+      const noApiProductRefRequest = {
+        ...createMockAPIKeyRequest('fail-no-apiproductref', ''),
+        spec: { planTier: 'gold', requestedBy: { userId: 'user:default/consumer' } },
+      };
+
+      // Per-request permission checks - admin user
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // success-1
+      // fail-request-missing: fails before permission check
+      // fail-no-apiproductref: fails before permission check (no apiProductRef)
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // success-2
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]); // fail-approval-error
+
       mockK8sClient.getCustomResource
-        // success-1
-        .mockResolvedValueOnce(createMockAPIKeyRequest('success-1', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // fail-request-missing
-        .mockRejectedValueOnce(new Error('APIKeyRequest not found')) // fetch APIKeyRequest - fail
-        // fail-apiproduct-missing
-        .mockResolvedValueOnce(createMockAPIKeyRequest('fail-apiproduct-missing', 'missing-product')) // fetch APIKeyRequest
-        .mockRejectedValueOnce(new Error('APIProduct not found')) // fetch APIProduct - fail
-        // success-2
-        .mockResolvedValueOnce(createMockAPIKeyRequest('success-2', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct) // fetch APIProduct
-        // fail-approval-error
-        .mockResolvedValueOnce(createMockAPIKeyRequest('fail-approval-error', 'toystore-api')) // fetch APIKeyRequest
-        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct
+        // success-1: fetch APIKeyRequest
+        .mockResolvedValueOnce(createMockAPIKeyRequest('success-1', 'toystore-api'))
+        // fail-request-missing: fetch APIKeyRequest - fail
+        .mockRejectedValueOnce(new Error('APIKeyRequest not found'))
+        // fail-no-apiproductref: fetch APIKeyRequest - no apiProductRef
+        .mockResolvedValueOnce(noApiProductRefRequest)
+        // success-2: fetch APIKeyRequest
+        .mockResolvedValueOnce(createMockAPIKeyRequest('success-2', 'toystore-api'))
+        // fail-approval-error: fetch APIKeyRequest
+        .mockResolvedValueOnce(createMockAPIKeyRequest('fail-approval-error', 'toystore-api'));
 
       mockK8sClient.createCustomResource
         .mockResolvedValueOnce({} as any) // success-1
@@ -1090,7 +1094,7 @@ describe('createRouter', () => {
       });
       expect(response.body.results[2]).toMatchObject({
         namespace,
-        name: 'fail-apiproduct-missing',
+        name: 'fail-no-apiproductref',
         success: false,
         error: expect.any(String),
       });

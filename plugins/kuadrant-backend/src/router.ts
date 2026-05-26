@@ -1363,27 +1363,7 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
-      // try update all permission first (admin)
-      const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyUpdateAllPermission }],
-        { credentials },
-      );
-
-      const canUpdateAll = updateAllDecision[0].result === AuthorizeResult.ALLOW;
-
-      if (!canUpdateAll) {
-        // fallback to update own permission
-        const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
-          { credentials },
-        );
-
-        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-      }
-
-      const { requests } = parsed.data;
+      const { requests, comment } = parsed.data;
       const reviewedBy = userEntityRef;
       const results = [];
 
@@ -1397,28 +1377,19 @@ export async function createRouter({
             reqRef.name,
           );
 
-          const spec = request.spec as any;
-
-          const apiProduct = await k8sClient.getCustomResource(
-            'devportal.kuadrant.io',
-            'v1alpha1',
-            reqRef.namespace,
-            'apiproducts',
-            spec.apiProductRef?.name,
-          );
-
-          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-
-          // if user only has updateOwn permission, verify ownership of the api product
-          if (!canUpdateAll && owner !== userEntityRef) {
-            results.push({
-              namespace: reqRef.namespace,
-              name: reqRef.name,
-              success: false,
-              error: 'You can only reject requests for your own API products.'
-            });
-            continue;
+          const apiProductName = (request.spec as any)?.apiProductRef?.name;
+          if (!apiProductName) {
+            throw new InputError('apiProductRef.name is required in APIKeyRequest spec');
           }
+
+          await verifyApiKeyUpdatePermission(
+            credentials,
+            userEntityRef,
+            reqRef.namespace,
+            apiProductName,
+            k8sClient,
+            permissions,
+          );
 
           const approvalName = `${reqRef.name}-denial-${randomBytes(4).toString('hex')}`;
           const approval = {
@@ -1433,6 +1404,7 @@ export async function createRouter({
               approved: false,
               reviewedBy,
               reviewedAt: new Date().toISOString(),
+              ...(comment && { comment }),
             },
           };
 
