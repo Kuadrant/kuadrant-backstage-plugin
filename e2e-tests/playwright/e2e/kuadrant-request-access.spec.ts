@@ -169,13 +169,13 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     // verify tier options show limits (e.g., "bronze (10 per minute)")
     const tierListbox = page.getByRole("listbox");
     const tierWithLimits = tierListbox.getByRole("option").first();
-    const tierText = await tierWithLimits.textContent();
+    const tierText = tierWithLimits;
 
     // tier text should contain the tier name and optionally limits like "(10 per minute)"
-    expect(
+    await expect(
       tierText,
       "Tier option should show tier name and limits",
-    ).toBeTruthy();
+    ).toHaveText(/.+/);
   });
 
   test("should enable Submit button only when API and Tier are selected", async ({
@@ -250,8 +250,8 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await useCaseField.fill(testUseCase);
 
     // verify text was entered
-    const fieldValue = await useCaseField.inputValue();
-    expect(fieldValue).toBe(testUseCase);
+    const fieldValue = useCaseField;
+    await expect(fieldValue).toHaveValue(testUseCase);
   });
 
   test("should successfully submit a request and close dialog", async ({
@@ -380,8 +380,11 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     const useCaseFieldReopened = dialog.getByTestId("usecase-input");
-    const fieldValue = await useCaseFieldReopened.inputValue();
-    expect(fieldValue, "Use case field should be empty after reset").toBe("");
+    const fieldValue = useCaseFieldReopened;
+    await expect(
+      fieldValue,
+      "Use case field should be empty after reset",
+    ).toHaveValue("");
   });
 
   test("should display helper text for fields", async ({ page }) => {

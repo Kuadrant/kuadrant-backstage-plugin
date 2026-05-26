@@ -25,7 +25,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
 
     // Check for skeleton loaders (Material-UI Skeleton creates spans with specific classes)
     // We look for the MuiSkeleton class which is present during loading
-    const skeletons = page.locator('.MuiSkeleton-root');
+    const skeletons = page.locator(".MuiSkeleton-root");
 
     // Either skeletons are visible (still loading) or they're gone (loaded fast)
     // We can't guarantee we'll catch them, but if we do, they should be proper skeletons
@@ -37,8 +37,10 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       await expect(firstSkeleton).toBeVisible();
 
       // Skeletons should have the text variant or rect variant class
-      const hasTextVariant = await firstSkeleton.evaluate((el) =>
-        el.classList.contains('MuiSkeleton-text') || el.classList.contains('MuiSkeleton-rect')
+      const hasTextVariant = await firstSkeleton.evaluate(
+        (el) =>
+          el.classList.contains("MuiSkeleton-text") ||
+          el.classList.contains("MuiSkeleton-rect"),
       );
       expect(hasTextVariant).toBe(true);
     }
@@ -49,7 +51,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       await expect(spinner).toHaveCount(0);
 
       // No skeletons should be visible after loading
-      const visibleSkeletons = page.locator('.MuiSkeleton-root:visible');
+      const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
       await expect(visibleSkeletons).toHaveCount(0);
     }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
@@ -62,16 +64,16 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     page,
   }) => {
     // Use network throttling to increase chance of catching skeletons
-    await page.route('**/api/kuadrant/apiproducts*', async (route) => {
+    await page.route("**/api/kuadrant/apiproducts*", async (route) => {
       // Delay the response slightly to make skeleton more visible
-      await new Promise(resolve => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 100));
       await route.continue();
     });
 
     await page.goto("/kuadrant/api-products");
 
     // Check for skeleton loaders during initial load
-    const skeletons = page.locator('.MuiSkeleton-root');
+    const skeletons = page.locator(".MuiSkeleton-root");
     const skeletonCount = await skeletons.count();
 
     if (skeletonCount > 0) {
@@ -83,7 +85,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     await expect(async () => {
       const spinner = page.locator('[role="progressbar"]:visible');
       await expect(spinner).toHaveCount(0);
-      const visibleSkeletons = page.locator('.MuiSkeleton-root:visible');
+      const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
       await expect(visibleSkeletons).toHaveCount(0);
     }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
@@ -97,11 +99,13 @@ test.describe("Kuadrant Skeleton Loaders", () => {
   }) => {
     // Navigate to catalog and wait for it to load
     await page.goto("/catalog?filters[kind]=api");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("load").catch(() => {});
 
     // Wait for catalog to be ready
     await expect(async () => {
-      const catalogHeading = page.locator("h1, h2").filter({ hasText: /catalog/i });
+      const catalogHeading = page
+        .locator("h1, h2")
+        .filter({ hasText: /catalog/i });
       await expect(catalogHeading.first()).toBeVisible();
     }).toPass({ timeout: TIMEOUTS.SLOW });
 
@@ -112,12 +116,9 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     if (hasApiLink > 0) {
       await apiLink.click();
 
-      // The ApiAccessCard might show skeletons while loading
-      const skeletons = page.locator('.MuiSkeleton-root');
-
       // Eventually page should be fully loaded without skeletons
       await expect(async () => {
-        const visibleSkeletons = page.locator('.MuiSkeleton-root:visible');
+        const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
         await expect(visibleSkeletons).toHaveCount(0);
       }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
@@ -139,7 +140,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       await page.goto(url);
 
       // Wait for initial load
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // The Backstage Progress component renders as a CircularProgress with role="progressbar"
       // but we want to make sure it's not being used for page-level loading
@@ -148,7 +149,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       // Check that we're using skeletons OR the page is already loaded
       await expect(async () => {
         const progressBars = page.locator('[role="progressbar"]:visible');
-        const skeletons = page.locator('.MuiSkeleton-root:visible');
+        const skeletons = page.locator(".MuiSkeleton-root:visible");
         const progressCount = await progressBars.count();
         const skeletonCount = await skeletons.count();
 
@@ -157,7 +158,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
         if (progressCount > 0 && skeletonCount === 0) {
           // Only acceptable if it's a small inline spinner (like in a button)
           const isInButton = await progressBars.first().evaluate((el) => {
-            return el.closest('button') !== null;
+            return el.closest("button") !== null;
           });
           expect(isInButton).toBe(true);
         }
@@ -170,7 +171,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
   }) => {
     // First, navigate to API Products list to find a valid product
     await page.goto("/kuadrant/api-products");
-    await page.waitForLoadState("networkidle").catch(() => {});
+    await page.waitForLoadState("load").catch(() => {});
 
     // Wait for page to load
     await expect(async () => {
@@ -179,19 +180,18 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
     // Try to find a link to an API Product detail page
-    const productLink = page.locator('a[href*="/kuadrant/api-products/"]').first();
+    const productLink = page
+      .locator('a[href*="/kuadrant/api-products/"]')
+      .first();
     const hasProductLink = await productLink.count();
 
     if (hasProductLink > 0) {
       // Click to navigate to detail page
       await productLink.click();
 
-      // Check for skeletons during load
-      const skeletons = page.locator('.MuiSkeleton-root');
-
       // Wait for full load
       await expect(async () => {
-        const visibleSkeletons = page.locator('.MuiSkeleton-root:visible');
+        const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
         await expect(visibleSkeletons).toHaveCount(0);
       }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
