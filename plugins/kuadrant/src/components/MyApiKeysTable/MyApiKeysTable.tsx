@@ -88,7 +88,7 @@ const ExpandedRowContent = ({ request }: ExpandedRowProps) => {
         <Box className={classes.rejectedBanner}>
           <WarningIcon color="error" fontSize="small" />
           <Typography variant="body2">
-            This API key was rejected.{" "}
+            This API key was denied.{" "}
             <Link to={`/catalog/default/api/${apiProductName}/api-keys`}>
               Request a new API key
             </Link>
@@ -167,13 +167,12 @@ export const MyApiKeysTable = () => {
     );
   }, [data?.requests, optimisticallyDeleted]);
 
-  // normalize phase to UI status (Denied → Rejected for display)
-  const toUiStatus = (phase: ReturnType<typeof getAPIKeyPhase>) =>
-    phase === 'Denied' ? 'Rejected' : phase;
+  // pass through phase as-is for UI display
+  const toUiStatus = (phase: ReturnType<typeof getAPIKeyPhase>) => phase;
 
   // filter options from data
   const filterSections: FilterSection[] = useMemo(() => {
-    const statusCounts = { Approved: 0, Pending: 0, Rejected: 0, Failed: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Denied: 0, Failed: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
@@ -199,9 +198,9 @@ export const MyApiKeysTable = () => {
           { value: "Approved", label: "Active", count: statusCounts.Approved },
           { value: "Pending", label: "Pending", count: statusCounts.Pending },
           {
-            value: "Rejected",
-            label: "Rejected",
-            count: statusCounts.Rejected,
+            value: "Denied",
+            label: "Denied",
+            count: statusCounts.Denied,
           },
           { value: "Failed", label: "Failed", count: statusCounts.Failed },
         ],

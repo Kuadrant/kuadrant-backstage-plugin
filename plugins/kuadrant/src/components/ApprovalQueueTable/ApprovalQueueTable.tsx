@@ -386,7 +386,7 @@ const BulkAlertDialog = ({
             <Box className={classes.statRow}>
               <CheckCircleIcon style={{ color: '#4caf50' }} />
               <Typography variant="body1">
-                <strong>{successResults.length}</strong> API key{successResults.length !== 1 ? 's' : ''} {isApprove ? 'approved' : 'rejected'} successfully
+                <strong>{successResults.length}</strong> API key{successResults.length !== 1 ? 's' : ''} {isApprove ? 'approved' : 'denied'} successfully
               </Typography>
             </Box>
           </Box>
@@ -536,7 +536,7 @@ export const ApprovalQueueTable = () => {
   const filterSections: FilterSection[] = useMemo(() => {
     if (!value?.allRequests) return [];
 
-    const statusCounts = { Approved: 0, Pending: 0, Rejected: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Denied: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
@@ -566,9 +566,9 @@ export const ApprovalQueueTable = () => {
             count: statusCounts.Approved,
           },
           {
-            value: "Rejected",
-            label: "Rejected",
-            count: statusCounts.Rejected,
+            value: "Denied",
+            label: "Denied",
+            count: statusCounts.Denied,
           },
         ],
       },
@@ -660,7 +660,7 @@ export const ApprovalQueueTable = () => {
         ),
       );
       setRefresh((r) => r + 1);
-      const action = dialogState.action === "approve" ? "approved" : "rejected";
+      const action = dialogState.action === "approve" ? "approved" : "denied";
       alertApi.post({
         message: `API key ${action}`,
         severity: "success",
@@ -720,7 +720,7 @@ export const ApprovalQueueTable = () => {
       const failedItems = bulkResponse.filter((res: any) => !res.success);
       const totalSuccess = failedItems.length === 0;
 
-      const action = isApprove ? "approved" : "rejected";
+      const action = isApprove ? "approved" : "denied";
 
       setBulkDialogState({
         open: false,

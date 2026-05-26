@@ -647,10 +647,9 @@ export const ApiKeyManagementTab = ({
       render: (row: APIKey) => {
         const phase = getAPIKeyPhase(row.status?.conditions || []);
         const isPending = phase === "Pending";
-        const displayLabel = phase === "Denied" ? "Rejected" : phase;
         return (
           <Chip
-            label={displayLabel}
+            label={phase}
             size="small"
             icon={isPending ? <HourglassEmptyIcon /> : <CancelIcon />}
             color={isPending ? "default" : "secondary"}
@@ -855,7 +854,7 @@ export const ApiKeyManagementTab = ({
         {rejectedRequests.length > 0 && (
           <Grid item>
             <Table
-              title="Rejected Requests"
+              title="Denied Requests"
               options={{
                 paging: rejectedRequests.length > 5,
                 pageSize: 20,
