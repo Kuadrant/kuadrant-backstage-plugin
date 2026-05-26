@@ -5,9 +5,9 @@ import {
   Chip,
   Button,
   IconButton,
-  CircularProgress,
   makeStyles,
 } from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
 import AddIcon from "@material-ui/icons/Add";
 import DeleteIcon from "@material-ui/icons/Delete";
 import EditIcon from "@material-ui/icons/Edit";
@@ -749,20 +749,12 @@ const ResourceList = () => {
       </Header>
       <Content>
         {loading && (
-          <Box
-            display="flex"
-            flexDirection="column"
-            alignItems="center"
-            justifyContent="center"
-            minHeight={300}
-          >
-            <CircularProgress />
-            <Typography variant="h6" style={{ marginTop: 16 }}>
-              Loading data...
-            </Typography>
-            <Typography variant="body2" color="textSecondary">
-              Preparing your data... This should only take a moment.
-            </Typography>
+          <Box p={2}>
+            {[...Array(5)].map((_, i) => (
+              <Box key={i} p={2}>
+                <Skeleton variant="text" width="100%" />
+              </Box>
+            ))}
           </Box>
         )}
         {error && <ResponseErrorPanel error={error} />}
