@@ -1108,6 +1108,190 @@ describe('createRouter', () => {
     });
   });
 
+  describe('DELETE /requests/:namespace/:name', () => {
+    const consumerNamespace = 'kuadrant-consumer-abc123';
+    const apiKeyName = 'toystore-api-abc123';
+    const ownerNamespace = 'toystore';
+
+    const mockAPIKey = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKey',
+      metadata: {
+        name: apiKeyName,
+        namespace: consumerNamespace,
+      },
+      spec: {
+        apiProductRef: {
+          name: 'toystore-api',
+          namespace: ownerNamespace,
+        },
+        planTier: 'gold',
+        useCase: 'Testing API integration',
+        requestedBy: {
+          userId: mockUserEntityRef,
+          email: 'testuser@example.com',
+        },
+        secretRef: {
+          name: 'testuser-toystore-secret',
+        },
+      },
+      status: { conditions: [] },
+    };
+
+    const mockOtherUserAPIKey = {
+      ...mockAPIKey,
+      spec: {
+        ...mockAPIKey.spec,
+        requestedBy: {
+          userId: mockOtherUserEntityRef,
+          email: 'otheruser@example.com',
+        },
+      },
+    };
+
+    const mockAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'toystore-api',
+        namespace: ownerNamespace,
+        annotations: {
+          'backstage.io/owner': mockUserEntityRef,
+        },
+      },
+      spec: {},
+    };
+
+    const mockOtherAPIProduct = {
+      ...mockAPIProduct,
+      metadata: {
+        ...mockAPIProduct.metadata,
+        annotations: {
+          'backstage.io/owner': mockOtherUserEntityRef,
+        },
+      },
+    };
+
+    it('allows consumer to delete their own APIKey', async () => {
+      // deleteAll denied, deleteOwn allowed
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockAPIKey);
+      mockK8sClient.deleteCustomResource.mockResolvedValueOnce({} as any);
+
+      await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(204);
+
+      expect(mockK8sClient.deleteCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        consumerNamespace,
+        'apikeys',
+        apiKeyName,
+      );
+    });
+
+    it('allows owner to delete APIKey for their own API product', async () => {
+      // deleteAll denied, deleteOwn allowed
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      // APIKey belongs to other user, but testuser owns the API product
+      mockK8sClient.getCustomResource
+        .mockResolvedValueOnce(mockOtherUserAPIKey) // fetch APIKey
+        .mockResolvedValueOnce(mockAPIProduct); // fetch APIProduct — owned by testuser
+      mockK8sClient.deleteCustomResource.mockResolvedValueOnce({} as any);
+
+      await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(204);
+
+      expect(mockK8sClient.deleteCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        consumerNamespace,
+        'apikeys',
+        apiKeyName,
+      );
+    });
+
+    it('allows admin to delete any APIKey', async () => {
+      // deleteAll allowed
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockOtherUserAPIKey);
+      mockK8sClient.deleteCustomResource.mockResolvedValueOnce({} as any);
+
+      await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(204);
+
+      expect(mockK8sClient.deleteCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        consumerNamespace,
+        'apikeys',
+        apiKeyName,
+      );
+
+      // admin path should NOT fetch APIProduct for ownership
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledTimes(1);
+    });
+
+    it('returns 403 when consumer tries to delete another users APIKey', async () => {
+      // deleteAll denied, deleteOwn allowed
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      // APIKey belongs to other user, API product also owned by other user
+      mockK8sClient.getCustomResource
+        .mockResolvedValueOnce(mockOtherUserAPIKey) // fetch APIKey
+        .mockResolvedValueOnce(mockOtherAPIProduct); // fetch APIProduct — owned by otheruser
+
+      const response = await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(403);
+
+      expect(response.body.error).toContain('you can only delete');
+      expect(mockK8sClient.deleteCustomResource).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when user has no delete permissions', async () => {
+      // deleteAll denied, deleteOwn denied
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockAPIKey);
+
+      const response = await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(403);
+
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.deleteCustomResource).not.toHaveBeenCalled();
+    });
+  });
+
   describe('PATCH /apiproducts/:namespace/:name', () => {
     const namespace = 'toystore';
     const name = 'toystore-api';

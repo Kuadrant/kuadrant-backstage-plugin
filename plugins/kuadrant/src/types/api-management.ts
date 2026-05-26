@@ -36,6 +36,10 @@ export interface APIKeySpec {
     name: string;
     namespace: string;
   };
+  apiKeyRef?: {
+    name: string;
+    namespace: string;
+  };
   planTier: PlanTier;
   useCase: string;
   requestedBy: {

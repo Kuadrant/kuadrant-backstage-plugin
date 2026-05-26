@@ -1473,8 +1473,8 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
-      // get request to verify ownership
-      const request = await k8sClient.getCustomResource(
+      // get the APIKey to verify ownership
+      const apiKey = await k8sClient.getCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
@@ -1482,9 +1482,7 @@ export async function createRouter({
         name,
       );
 
-      const requestUserId = request.spec?.requestedBy?.userId;
-
-      // check if user can delete all requests or just their own
+      // check if user can delete all requests (admin)
       const deleteAllDecision = await permissions.authorize(
         [{ permission: kuadrantApiKeyDeleteAllPermission }],
         { credentials }
@@ -1503,13 +1501,40 @@ export async function createRouter({
           throw new NotAllowedError('unauthorised');
         }
 
-        // verify ownership
-        if (requestUserId !== userEntityRef) {
-          throw new NotAllowedError('you can only delete your own api key requests');
+        const requestUserId = apiKey.spec?.requestedBy?.userId;
+
+        if (requestUserId === userEntityRef) {
+          // consumer deleting their own key — allowed
+        } else {
+          // check if user owns the referenced APIProduct
+          const apiProductName = apiKey.spec?.apiProductRef?.name;
+          const apiProductNamespace = apiKey.spec?.apiProductRef?.namespace;
+
+          if (!apiProductName || !apiProductNamespace) {
+            throw new NotAllowedError('cannot verify ownership: APIKey has no apiProductRef');
+          }
+
+          let apiProduct;
+          try {
+            apiProduct = await k8sClient.getCustomResource(
+              'devportal.kuadrant.io',
+              'v1alpha1',
+              apiProductNamespace,
+              'apiproducts',
+              apiProductName,
+            );
+          } catch (error) {
+            throw new NotAllowedError(`cannot verify ownership: APIProduct '${apiProductName}' not found`);
+          }
+
+          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
+          if (owner !== userEntityRef) {
+            throw new NotAllowedError('you can only delete your own api keys or keys for api products you own');
+          }
         }
       }
 
-      // controller owns the Secret via OwnerReference - it will be garbage collected
+      // delete the APIKey — controller handles cascade cleanup
       await k8sClient.deleteCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
