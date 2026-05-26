@@ -1240,71 +1240,33 @@ export async function createRouter({
       const credentials = await httpAuth.credentials(req);
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
 
-      // try update all permission first (admin)
-      const updateAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyUpdateAllPermission }],
-        { credentials },
-      );
-
-      const canUpdateAll = updateAllDecision[0].result === AuthorizeResult.ALLOW;
-
-      if (!canUpdateAll) {
-        // fallback to update own permission
-        const updateOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyUpdateOwnPermission }],
-          { credentials },
-        );
-
-        if (updateOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-      }
-
-      const { requests } = parsed.data;
+      const { requests, comment } = parsed.data;
       const reviewedBy = userEntityRef;
       const results = [];
 
       for (const reqRef of requests) {
         try {
-          // if user only has updateOwn permission, verify ownership of the api product
-          if (!canUpdateAll) {
-            const request = await k8sClient.getCustomResource(
-              'devportal.kuadrant.io',
-              'v1alpha1',
-              reqRef.namespace,
-              'apikeyrequests',
-              reqRef.name,
-            );
-            const apiProductName = request.spec?.apiProductRef?.name;
-            if (!apiProductName) {
-              results.push({
-                namespace: reqRef.namespace,
-                name: reqRef.name,
-                success: false,
-                error: 'API key request has no associated API product.'
-              });
-              continue;
-            }
+          const request = await k8sClient.getCustomResource(
+            'devportal.kuadrant.io',
+            'v1alpha1',
+            reqRef.namespace,
+            'apikeyrequests',
+            reqRef.name,
+          );
 
-            const apiProduct = await k8sClient.getCustomResource(
-              'devportal.kuadrant.io',
-              'v1alpha1',
-              reqRef.namespace,
-              'apiproducts',
-              apiProductName,
-            );
-            const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-
-            if (owner !== userEntityRef) {
-              results.push({
-                namespace: reqRef.namespace,
-                name: reqRef.name,
-                success: false,
-                error: 'You can only approve requests for your own API products.'
-              });
-              continue;
-            }
+          const apiProductName = (request.spec as any)?.apiProductRef?.name;
+          if (!apiProductName) {
+            throw new InputError('apiProductRef.name is required in APIKeyRequest spec');
           }
+
+          await verifyApiKeyUpdatePermission(
+            credentials,
+            userEntityRef,
+            reqRef.namespace,
+            apiProductName,
+            k8sClient,
+            permissions,
+          );
 
           const approvalName = `${reqRef.name}-approval-${randomBytes(4).toString('hex')}`;
           const approval = {
@@ -1319,6 +1281,7 @@ export async function createRouter({
               approved: true,
               reviewedBy,
               reviewedAt: new Date().toISOString(),
+              ...(comment && { comment }),
             },
           };
 
