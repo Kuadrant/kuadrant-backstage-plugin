@@ -1211,7 +1211,7 @@ export async function createRouter({
         approval,
       );
 
-      res.status(204).send();
+      res.json({ success: true });
     } catch (error) {
       console.error('error rejecting api key request:', error);
       if (error instanceof NotAllowedError) {
