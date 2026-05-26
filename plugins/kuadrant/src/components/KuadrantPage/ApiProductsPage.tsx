@@ -456,11 +456,9 @@ const ResourceList = () => {
     setDeleteStats(null);
 
     try {
-      const data = await kuadrantApi.getRequestsByNamespace(namespace);
-      const related = (data.items || []).filter(
-        (r: any) =>
-          r.spec.apiName === name && r.spec.apiNamespace === namespace,
-      );
+      // fetch all keys for this product across all consumer namespaces (admin view)
+      const data = await kuadrantApi.getAllRequestsByApiProduct(name, namespace);
+      const related = data.items || [];
       const approved = related.filter(
         (r: any) => r.status?.phase === "Approved",
       ).length;

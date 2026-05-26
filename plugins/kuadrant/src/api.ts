@@ -71,6 +71,22 @@ export interface KuadrantAPI {
   getRequestsByNamespace(namespace: string): Promise<KuadrantList<APIKey>>;
 
   /**
+   * Fetch the current user's API key requests for a specific APIProduct
+   * @param apiProductName - Name of the APIProduct
+   * @param apiProductNamespace - Namespace of the APIProduct
+   * @returns Promise with list of the user's API key requests for this product
+   */
+  getRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>>;
+
+  /**
+   * Fetch all API key requests for a specific APIProduct (admin view)
+   * @param apiProductName - Name of the APIProduct
+   * @param apiProductNamespace - Namespace of the APIProduct
+   * @returns Promise with list of all API key requests for this product
+   */
+  getAllRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>>;
+
+  /**
    * Fetch a single API key request
    * @param namespace - API key request name
    * @param name - Kubernetes namespace
@@ -363,6 +379,24 @@ export class KuadrantApiClient implements KuadrantAPI {
       ? `${baseUrl}kuadrant/requests/my?namespace=${namespace}`
       : `${baseUrl}kuadrant/requests/my`;
     return this.fetchWithRetry(url, "Failed to fetch API Key requests by namespace.");
+  }
+
+  async getRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>> {
+    const baseUrl = await this.getBaseUrl();
+    const params = new URLSearchParams({ apiProductName, apiProductNamespace });
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/requests/my?${params.toString()}`,
+      "Failed to fetch API Key requests by API product.",
+    );
+  }
+
+  async getAllRequestsByApiProduct(apiProductName: string, apiProductNamespace: string): Promise<KuadrantList<APIKey>> {
+    const baseUrl = await this.getBaseUrl();
+    const params = new URLSearchParams({ apiProductName, apiProductNamespace });
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/requests?${params.toString()}`,
+      "Failed to fetch all API Key requests by API product.",
+    );
   }
 
   async getRequest(namespace: string, name: string): Promise<APIKey> {

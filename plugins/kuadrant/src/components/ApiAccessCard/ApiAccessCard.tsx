@@ -24,7 +24,6 @@ import { RequestAccessDialog } from '../RequestAccessDialog';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiKeyCreatePermission } from '../../permissions';
 import { APIKey, APIProduct, Plan } from "../../types/api-management";
-import { getAPIKeyPhase } from '../../utils/apikeys';
 
 export interface ApiAccessCardProps {
   // deprecated: use entity annotations instead
@@ -55,12 +54,13 @@ export const ApiAccessCard = ({ namespace: propNamespace }: ApiAccessCardProps) 
     setUserEmail(profile.email || '');
   }, [identityApi]);
 
-  // fetch user's approved keys
+  // fetch user's approved keys for this API product
+  // backend filters by apiProductRef.name and scopes to the user's consumer namespace
   const { value: requests, loading: keysLoading, error: keysError } = useAsync(async () => {
-    const data = await kuadrantApi.getRequestsByNamespace(namespace)
+    const data = await kuadrantApi.getRequestsByApiProduct(apiProductName, namespace);
     const allRequests = data.items || [];
     return allRequests.filter((r: APIKey) =>
-      r.spec.apiProductRef?.name === apiProductName && getAPIKeyPhase(r.status?.conditions || []) === 'Approved'
+      r.status?.phase === 'Approved'
     );
   }, [namespace, apiProductName, kuadrantApi, refresh]);
 

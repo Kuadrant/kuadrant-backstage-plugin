@@ -122,13 +122,9 @@ export const ApiKeyManagementTab = ({
     loading: requestsLoading,
     error: requestsError,
   } = useAsync(async () => {
-    const data = await kuadrantApi.getRequestsByNamespace(namespace);
-    // filter by apiproduct name and namespace (APIKey lives in consumer's NS, refs APIProduct in owner's NS)
-    return (data.items || []).filter(
-      (r: APIKey) =>
-        r.spec.apiProductRef.name === apiProductName &&
-        r.spec.apiProductRef.namespace === namespace, // APIKey refs APIProduct in owner's namespace
-    );
+    // backend filters by apiProductRef.name and scopes to user's consumer namespace
+    const data = await kuadrantApi.getRequestsByApiProduct(apiProductName, namespace);
+    return data.items || [];
   }, [apiProductName, namespace, refresh, kuadrantApi]);
 
   const {
@@ -176,12 +172,12 @@ export const ApiKeyManagementTab = ({
     error: updateRequestPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyUpdateOwnPermission);
 
-  const handleDeleteRequest = async (name: string) => {
+  const handleDeleteRequest = async (requestNamespace: string, name: string) => {
     // optimistic update - remove from UI immediately
     setOptimisticallyDeleted((prev) => new Set(prev).add(name));
     setDeleting(name);
     try {
-      await kuadrantApi.deleteRequest(namespace, name);
+      await kuadrantApi.deleteRequest(requestNamespace, name);
       alertApi.post({
         message: "API key deleted successfully",
         severity: "success",
@@ -283,7 +279,7 @@ export const ApiKeyManagementTab = ({
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialogState.request) return;
-    await handleDeleteRequest(deleteDialogState.request.metadata.name);
+    await handleDeleteRequest(deleteDialogState.request.metadata.namespace, deleteDialogState.request.metadata.name);
     setDeleteDialogState({ open: false, request: null });
   };
 

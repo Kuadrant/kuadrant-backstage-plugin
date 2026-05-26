@@ -390,13 +390,14 @@ export async function createRouter({
       }
       console.log(`cascading delete: finding apikeys for ${namespace}/${name}`);
 
+      // list cluster-wide because API keys live in consumer namespaces
+      // (e.g. kuadrant-guest-05957230), not in the APIProduct's namespace
       let allRequests;
       try {
         allRequests = await k8sClient.listCustomResources(
           'devportal.kuadrant.io',
           'v1alpha1',
           'apikeys',
-          namespace
         );
       } catch (error) {
         console.warn('failed to list apikeys during cascade delete:', error);
@@ -410,15 +411,16 @@ export async function createRouter({
 
       console.log(`found ${relatedRequests.length} apikeys to delete`);
 
-      // delete each APIKey - controller's OwnerReference handles Secret cleanup
+      // delete each APIKey using its own namespace (consumer NS, not the APIProduct NS)
       const deletionResults = await Promise.allSettled(
         relatedRequests.map(async (request: any) => {
           const requestName = request.metadata.name;
-          console.log(`deleting apikey: ${namespace}/${requestName}`);
+          const requestNamespace = request.metadata.namespace;
+          console.log(`deleting apikey: ${requestNamespace}/${requestName}`);
           await k8sClient.deleteCustomResource(
             'devportal.kuadrant.io',
             'v1alpha1',
-            namespace,
+            requestNamespace,
             'apikeys',
             requestName
           );
@@ -935,6 +937,9 @@ export async function createRouter({
 
       const status = req.query.status as string;
       const namespace = req.query.namespace as string;
+      // filter by the APIProduct that the key references (keys live in consumer namespaces)
+      const apiProductName = req.query.apiProductName as string;
+      const apiProductNamespace = req.query.apiProductNamespace as string;
 
       let data;
       if (namespace) {
@@ -964,9 +969,20 @@ export async function createRouter({
         );
       }
 
+      if (apiProductName) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
+
+      if (apiProductNamespace) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.namespace === apiProductNamespace
+        );
+      }
+
       if (status) {
         filteredItems = filteredItems.filter((req: any) => {
-          // Inline condition parsing (avoiding cross-package import)
           let phase: string = 'Pending';
           if (req.status?.conditions && req.status.conditions.length > 0) {
             const approved = req.status.conditions.find(
@@ -1009,20 +1025,41 @@ export async function createRouter({
         throw new NotAllowedError('unauthorised');
       }
 
-      // extract userId from authenticated credentials, not from query params
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
-      const namespace = req.query.namespace as string;
+      // filter by the APIProduct that the key references
+      const apiProductName = req.query.apiProductName as string;
+      const apiProductNamespace = req.query.apiProductNamespace as string;
 
+      // API keys live in the user's consumer namespace (e.g. kuadrant-guest-05957230),
+      // not in the APIProduct's namespace, so we derive it from the authenticated user
+      const consumerNs = getConsumerNamespace(userEntityRef);
       let data;
-      if (namespace) {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', namespace);
-      } else {
-        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys');
+      try {
+        data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', consumerNs);
+      } catch (error: any) {
+        // consumer namespace doesn't exist yet — user has never requested a key
+        if (error.message?.includes('404') || error.statusCode === 404) {
+          res.json({ items: [] });
+          return;
+        }
+        throw error;
       }
 
-      const filteredItems = (data.items || []).filter(
+      let filteredItems = (data.items || []).filter(
         (req: any) => req.spec?.requestedBy?.userId === userEntityRef
       );
+
+      if (apiProductName) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.name === apiProductName
+        );
+      }
+
+      if (apiProductNamespace) {
+        filteredItems = filteredItems.filter(
+          (req: any) => req.spec?.apiProductRef?.namespace === apiProductNamespace
+        );
+      }
 
       res.json({ items: filteredItems });
     } catch (error) {
