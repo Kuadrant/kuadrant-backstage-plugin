@@ -420,20 +420,22 @@ export class KuadrantApiClient implements KuadrantAPI {
     requests: Array<{ namespace: string; name: string }>,
     reviewedBy: string): Promise<Array<BulkOperationResult>> {
     const baseUrl = await this.getBaseUrl();
-    return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-approve`, {
+    const response = await this.fetchWithoutRetry<{ results: Array<BulkOperationResult> }>(`${baseUrl}kuadrant/requests/bulk-approve`, {
       method: 'POST',
       body: JSON.stringify({ requests, reviewedBy }),
     }, "Failed to bulk approve APIKey requests.");
+    return response.results;
   }
 
   async bulkRejectRequests(
     requests: Array<{ namespace: string; name: string }>,
     reviewedBy: string): Promise<Array<BulkOperationResult>> {
     const baseUrl = await this.getBaseUrl();
-    return this.fetchWithoutRetry(`${baseUrl}kuadrant/requests/bulk-reject`, {
+    const response = await this.fetchWithoutRetry<{ results: Array<BulkOperationResult> }>(`${baseUrl}kuadrant/requests/bulk-reject`, {
       method: 'POST',
       body: JSON.stringify({ requests, reviewedBy }),
     }, "Failed to bulk reject APIKey requests");
+    return response.results;
   }
 
   // ===== API Keys/Secrets Implementation =====
