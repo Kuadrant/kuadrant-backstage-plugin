@@ -28,7 +28,6 @@ import {
   kuadrantApiKeyUpdateOwnPermission,
   kuadrantApiKeyUpdateAllPermission,
   kuadrantApiKeyDeleteOwnPermission,
-  kuadrantApiKeyDeleteAllPermission,
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
 } from './permissions';
@@ -1482,56 +1481,18 @@ export async function createRouter({
         name,
       );
 
-      // check if user can delete all requests (admin)
-      const deleteAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyDeleteAllPermission }],
+      const deleteOwnDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyDeleteOwnPermission }],
         { credentials }
       );
 
-      const canDeleteAll = deleteAllDecision[0].result === AuthorizeResult.ALLOW;
+      if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
 
-      if (!canDeleteAll) {
-        // check if user can delete their own requests
-        const deleteOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyDeleteOwnPermission }],
-          { credentials }
-        );
-
-        if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-
-        const requestUserId = apiKey.spec?.requestedBy?.userId;
-
-        if (requestUserId === userEntityRef) {
-          // consumer deleting their own key — allowed
-        } else {
-          // check if user owns the referenced APIProduct
-          const apiProductName = apiKey.spec?.apiProductRef?.name;
-          const apiProductNamespace = apiKey.spec?.apiProductRef?.namespace;
-
-          if (!apiProductName || !apiProductNamespace) {
-            throw new NotAllowedError('cannot verify ownership: APIKey has no apiProductRef');
-          }
-
-          let apiProduct;
-          try {
-            apiProduct = await k8sClient.getCustomResource(
-              'devportal.kuadrant.io',
-              'v1alpha1',
-              apiProductNamespace,
-              'apiproducts',
-              apiProductName,
-            );
-          } catch (error) {
-            throw new NotAllowedError(`cannot verify ownership: APIProduct '${apiProductName}' not found`);
-          }
-
-          const owner = apiProduct.metadata?.annotations?.['backstage.io/owner'];
-          if (owner !== userEntityRef) {
-            throw new NotAllowedError('you can only delete your own api keys or keys for api products you own');
-          }
-        }
+      const requestUserId = apiKey.spec?.requestedBy?.userId;
+      if (requestUserId !== userEntityRef) {
+        throw new NotAllowedError('you can only delete your own api key requests');
       }
 
       // delete the APIKey — controller handles cascade cleanup

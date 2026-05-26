@@ -279,15 +279,10 @@ export const ApiKeyManagementTab = ({
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialogState.request) return;
-    const apiKeyRef = deleteDialogState.request.spec?.apiKeyRef;
-    if (apiKeyRef) {
-      await handleDeleteRequest(apiKeyRef.namespace, apiKeyRef.name);
-    } else {
-      await handleDeleteRequest(
-        deleteDialogState.request.metadata.namespace,
-        deleteDialogState.request.metadata.name,
-      );
-    }
+    await handleDeleteRequest(
+      deleteDialogState.request.metadata.namespace,
+      deleteDialogState.request.metadata.name,
+    );
     setDeleteDialogState({ open: false, request: null });
   };
 
