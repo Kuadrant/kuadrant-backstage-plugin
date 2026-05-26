@@ -136,7 +136,7 @@ export interface KuadrantAPI {
    * @param namespace - Kubernetes namespace
    * @param name - API key request name
    * @param reviewedBy - Reviewed By User / System
-   * @returns Promise with the rejected API key
+   * @returns Promise with the denied API key
    */
   rejectRequest(namespace: string, name: string, reviewedBy: string): Promise<APIKey>;
 
