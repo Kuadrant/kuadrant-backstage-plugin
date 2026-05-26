@@ -1520,7 +1520,22 @@ export async function createRouter({
       );
 
       const requestUserId = existing.spec?.requestedBy?.userId;
-      const currentPhase = existing.status?.phase || 'Pending';
+
+      let currentPhase = 'Pending';
+      const conditions = existing.status?.conditions;
+      if (conditions && conditions.length > 0) {
+        const approved = conditions.find(
+          (c: any) => c.type === 'Approved' && c.status === 'True'
+        );
+        if (approved) {
+          currentPhase = 'Approved';
+        } else {
+          const denied = conditions.find(
+            (c: any) => c.type === 'Denied' && c.status === 'True'
+          );
+          if (denied) currentPhase = 'Denied';
+        }
+      }
 
       // only pending requests can be edited
       if (currentPhase !== 'Pending') {
