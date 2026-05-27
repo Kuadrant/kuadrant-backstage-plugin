@@ -154,13 +154,7 @@ const AppBase = () => {
               <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
               <Route
                 path="/kuadrant/api-key-approval"
-                element={
-                  <RequirePermission
-                    permission={kuadrantApiKeyApprovePermission}
-                  >
-                    <ApiKeyApprovalPage />
-                  </RequirePermission>
-                }
+                element={<ApiKeyApprovalPage />}
               />
               <Route
                 path="/kuadrant/api-keys/:namespace/:name"

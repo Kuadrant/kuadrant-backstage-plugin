@@ -142,8 +142,12 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       // Wait for initial load
       await page.waitForLoadState("load").catch(() => {});
 
+      // Wait for global app loader to disappear (it uses CircularProgress but is app infrastructure)
+      // The loader is a centered, full-height box
+      await page.waitForTimeout(500); // Give the loader time to disappear
+
       // The Backstage Progress component renders as a CircularProgress with role="progressbar"
-      // but we want to make sure it's not being used for page-level loading
+      // but we want to make sure it's not being used for page-level loading in Kuadrant components
       // (it's still OK for inline operations like delete buttons)
 
       // Check that we're using skeletons OR the page is already loaded
