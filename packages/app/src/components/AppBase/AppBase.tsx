@@ -26,7 +26,6 @@ import {
   ApiKeyDetailPage,
   ApiProductDetailPage,
   ApiProductsPage,
-  kuadrantApiKeyApprovePermission,
   MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
