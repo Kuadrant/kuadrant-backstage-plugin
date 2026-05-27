@@ -1,6 +1,6 @@
 import React from 'react';
 import { Typography, Box } from '@material-ui/core';
-import { Progress } from '@backstage/core-components';
+import { Skeleton } from '@material-ui/lab';
 import { Permission } from '@backstage/plugin-permission-common';
 import { useKuadrantPermission } from '../../utils/permissions';
 
@@ -15,7 +15,15 @@ export const PermissionGate = ({ children, permission, fallback, errorMessage }:
   const { allowed, loading, error } = useKuadrantPermission(permission);
 
   if (loading) {
-    return <Progress />;
+    return (
+      <Box p={2}>
+        {[...Array(5)].map((_, i) => (
+          <Box key={i} p={2}>
+            <Skeleton variant="text" width="100%" />
+          </Box>
+        ))}
+      </Box>
+    );
   }
 
   if (error) {

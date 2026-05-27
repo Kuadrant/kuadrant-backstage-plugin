@@ -37,9 +37,6 @@ test.describe("Kuadrant Plugin", () => {
       'nav a[href="/kuadrant/api-products"]',
     );
     const myApiKeysLink = page.locator('nav a[href="/kuadrant/my-api-keys"]');
-    const apiKeyApprovalLink = page.locator(
-      'nav a[href="/kuadrant/api-key-approval"]',
-    );
 
     await expect(apiProductsLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     await expect(myApiKeysLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });

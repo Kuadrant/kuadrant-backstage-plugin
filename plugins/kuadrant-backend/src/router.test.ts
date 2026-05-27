@@ -1133,6 +1133,302 @@ describe('createRouter', () => {
     });
   });
 
+  describe('GET /requests', () => {
+    const namespace = 'toystore';
+
+    const createMockAPIKeyRequest = (name: string, apiProductName: string, status: string) => ({
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKeyRequest',
+      metadata: { name, namespace, creationTimestamp: '2024-12-02T10:00:00Z' },
+      spec: {
+        apiProductRef: { name: apiProductName },
+        apiKeyRef: { name: `${name}-apikey`, namespace: 'consumer-ns' },
+        planTier: 'gold',
+        useCase: 'Testing',
+        requestedBy: { userId: 'user:default/consumer', email: 'consumer@example.com' },
+      },
+      status: {
+        conditions: status === 'Approved' ? [{ type: 'Approved', status: 'True' }]
+          : status === 'Denied' ? [{ type: 'Denied', status: 'True' }]
+          : [],
+      },
+    });
+
+    const mockAPIProduct = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIProduct',
+      metadata: {
+        name: 'toystore-api',
+        namespace,
+        annotations: { 'backstage.io/owner': mockUserEntityRef },
+      },
+      spec: {},
+    };
+
+    it('lists apikeyrequests with correct CRD and namespace', async () => {
+      // readAll allowed
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [createMockAPIKeyRequest('req-1', 'toystore-api', 'Pending')],
+      });
+
+      const response = await request(app)
+        .get(`/requests?namespace=${namespace}`)
+        .expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        'apikeyrequests',
+        namespace,
+      );
+      expect(response.body.items).toHaveLength(1);
+    });
+
+    it('lists all apikeyrequests cluster-wide when no namespace provided', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({ items: [] });
+
+      await request(app).get('/requests').expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        'apikeyrequests',
+      );
+    });
+
+    it('filters by owned API products when user has readOwn permission', async () => {
+      // readAll denied, readOwn allowed
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources
+        .mockResolvedValueOnce({
+          items: [
+            createMockAPIKeyRequest('req-1', 'toystore-api', 'Pending'),
+            createMockAPIKeyRequest('req-2', 'other-api', 'Pending'),
+          ],
+        })
+        .mockResolvedValueOnce({
+          items: [mockAPIProduct],
+        });
+
+      const response = await request(app).get('/requests').expect(200);
+
+      // only req-1 returned (toystore-api owned by testuser)
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0].metadata.name).toBe('req-1');
+    });
+
+    it('filters by status', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          createMockAPIKeyRequest('req-approved', 'toystore-api', 'Approved'),
+          createMockAPIKeyRequest('req-pending', 'toystore-api', 'Pending'),
+          createMockAPIKeyRequest('req-denied', 'toystore-api', 'Denied'),
+        ],
+      });
+
+      const response = await request(app)
+        .get('/requests?status=Approved')
+        .expect(200);
+
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0].metadata.name).toBe('req-approved');
+    });
+
+    it('returns 403 when user has no read permissions', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app).get('/requests').expect(403);
+      expect(response.body.error).toBe('unauthorised');
+    });
+  });
+
+  describe('GET /requests/my', () => {
+    const createMockAPIKey = (name: string, apiProductName: string, apiProductNamespace: string, userId: string) => ({
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKey',
+      metadata: { name, namespace: 'kuadrant-testuser-c7a65229', creationTimestamp: '2024-12-02T10:00:00Z' },
+      spec: {
+        apiProductRef: { name: apiProductName, namespace: apiProductNamespace },
+        planTier: 'gold',
+        useCase: 'Testing',
+        requestedBy: { userId, email: 'test@example.com' },
+        secretRef: { name: `${name}-secret` },
+      },
+      status: { conditions: [] },
+    });
+
+    it('lists apikeys from derived consumer namespace with correct CRD', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [createMockAPIKey('key-1', 'toystore-api', 'toystore', mockUserEntityRef)],
+      });
+
+      const response = await request(app).get('/requests/my').expect(200);
+
+      // verify correct CRD plural and derived consumer namespace (not a query param)
+      const listCall = mockK8sClient.listCustomResources.mock.calls[0];
+      expect(listCall[0]).toBe('devportal.kuadrant.io');
+      expect(listCall[1]).toBe('v1alpha1');
+      expect(listCall[2]).toBe('apikeys');
+      expect(listCall[3]).toMatch(/^kuadrant-testuser-/);
+
+      expect(response.body.items).toHaveLength(1);
+    });
+
+    it('filters items by authenticated user identity', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          createMockAPIKey('key-own', 'toystore-api', 'toystore', mockUserEntityRef),
+          createMockAPIKey('key-other', 'toystore-api', 'toystore', mockOtherUserEntityRef),
+        ],
+      });
+
+      const response = await request(app).get('/requests/my').expect(200);
+
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0].metadata.name).toBe('key-own');
+    });
+
+    it('filters by apiProductName and apiProductNamespace', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          createMockAPIKey('key-toystore', 'toystore-api', 'toystore', mockUserEntityRef),
+          createMockAPIKey('key-petstore', 'petstore-api', 'petstore', mockUserEntityRef),
+        ],
+      });
+
+      const response = await request(app)
+        .get('/requests/my?apiProductName=toystore-api&apiProductNamespace=toystore')
+        .expect(200);
+
+      expect(response.body.items).toHaveLength(1);
+      expect(response.body.items[0].metadata.name).toBe('key-toystore');
+    });
+
+    it('returns empty array when consumer namespace does not exist', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      const error404 = new Error('404 not found');
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(error404);
+
+      const response = await request(app).get('/requests/my').expect(200);
+      expect(response.body.items).toEqual([]);
+    });
+
+    it('returns 403 when user has no read permissions', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app).get('/requests/my').expect(403);
+      expect(response.body.error).toBe('unauthorised');
+    });
+  });
+
+  describe('DELETE /requests/:namespace/:name', () => {
+    const consumerNamespace = 'kuadrant-consumer-abc123';
+    const apiKeyName = 'toystore-api-abc123';
+
+    const mockAPIKey = {
+      apiVersion: 'devportal.kuadrant.io/v1alpha1',
+      kind: 'APIKey',
+      metadata: {
+        name: apiKeyName,
+        namespace: consumerNamespace,
+      },
+      spec: {
+        apiProductRef: {
+          name: 'toystore-api',
+          namespace: 'toystore',
+        },
+        planTier: 'gold',
+        useCase: 'Testing API integration',
+        requestedBy: {
+          userId: mockUserEntityRef,
+          email: 'testuser@example.com',
+        },
+        secretRef: {
+          name: 'testuser-toystore-secret',
+        },
+      },
+      status: { conditions: [] },
+    };
+
+    const mockOtherUserAPIKey = {
+      ...mockAPIKey,
+      spec: {
+        ...mockAPIKey.spec,
+        requestedBy: {
+          userId: mockOtherUserEntityRef,
+          email: 'otheruser@example.com',
+        },
+      },
+    };
+
+    it('allows consumer to delete their own APIKey', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockAPIKey);
+      mockK8sClient.deleteCustomResource.mockResolvedValueOnce({} as any);
+
+      await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(204);
+
+      expect(mockK8sClient.deleteCustomResource).toHaveBeenCalledWith(
+        'devportal.kuadrant.io',
+        'v1alpha1',
+        consumerNamespace,
+        'apikeys',
+        apiKeyName,
+      );
+    });
+
+    it('returns 403 when consumer tries to delete another users APIKey', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockOtherUserAPIKey);
+
+      const response = await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(403);
+
+      expect(response.body.error).toContain('you can only delete');
+      expect(mockK8sClient.deleteCustomResource).not.toHaveBeenCalled();
+    });
+
+    it('returns 403 when user has no delete permissions', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockAPIKey);
+
+      const response = await request(app)
+        .delete(`/requests/${consumerNamespace}/${apiKeyName}`)
+        .expect(403);
+
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.deleteCustomResource).not.toHaveBeenCalled();
+    });
+  });
+
   describe('PATCH /apiproducts/:namespace/:name', () => {
     const namespace = 'toystore';
     const name = 'toystore-api';

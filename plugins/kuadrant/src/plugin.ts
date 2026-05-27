@@ -45,7 +45,7 @@ export const ApiKeyApprovalPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'ApiKeyApprovalPage',
     component: () =>
-      import('./components/ApiKeyApprovalPage').then(m => m.ApiKeyApprovalPage),
+      import('./components/ApiKeyApprovalPage').then(m => m.ApiKeyApprovalPageWithPermissions),
     mountPoint: rootRouteRef,
   }),
 );

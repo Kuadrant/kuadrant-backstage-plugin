@@ -474,7 +474,9 @@ export class Common {
 
     // extract role from email (e.g., "owner1@kuadrant.local" -> "owner1")
     const role = userEmail.split("@")[0];
-    const quickLoginButton = popup.locator(`[data-testid="quick-login-${role}"]`);
+    const quickLoginButton = popup.locator(
+      `[data-testid="quick-login-${role}"]`,
+    );
     await quickLoginButton.click({ timeout: 10000 });
     await popup.waitForEvent("close", { timeout: 10000 });
 

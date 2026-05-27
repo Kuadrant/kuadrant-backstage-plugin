@@ -122,7 +122,7 @@ export async function waitForKuadrantPageReady(page: Page): Promise<void> {
   await page.waitForURL(/\/kuadrant\/api-products/, {
     timeout: TIMEOUTS.VERY_SLOW,
   });
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("load").catch(() => {});
 
   await expect(async () => {
     // no visible spinners
@@ -150,7 +150,7 @@ export async function waitForApiKeysPageReady(
   headingPattern: RegExp = /api key/i,
 ): Promise<void> {
   await page.waitForURL(urlPattern, { timeout: TIMEOUTS.VERY_SLOW });
-  await page.waitForLoadState("networkidle").catch(() => {});
+  await page.waitForLoadState("load").catch(() => {});
 
   await expect(async () => {
     // no visible spinners

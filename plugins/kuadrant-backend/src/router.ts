@@ -28,7 +28,6 @@ import {
   kuadrantApiKeyUpdateOwnPermission,
   kuadrantApiKeyUpdateAllPermission,
   kuadrantApiKeyDeleteOwnPermission,
-  kuadrantApiKeyDeleteAllPermission,
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
 } from './permissions';
@@ -1408,8 +1407,8 @@ export async function createRouter({
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
       const { namespace, name } = req.params;
 
-      // get request to verify ownership
-      const request = await k8sClient.getCustomResource(
+      // get the APIKey to verify ownership
+      const apiKey = await k8sClient.getCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',
         namespace,
@@ -1417,34 +1416,21 @@ export async function createRouter({
         name,
       );
 
-      const requestUserId = request.spec?.requestedBy?.userId;
-
-      // check if user can delete all requests or just their own
-      const deleteAllDecision = await permissions.authorize(
-        [{ permission: kuadrantApiKeyDeleteAllPermission }],
+      const deleteOwnDecision = await permissions.authorize(
+        [{ permission: kuadrantApiKeyDeleteOwnPermission }],
         { credentials }
       );
 
-      const canDeleteAll = deleteAllDecision[0].result === AuthorizeResult.ALLOW;
-
-      if (!canDeleteAll) {
-        // check if user can delete their own requests
-        const deleteOwnDecision = await permissions.authorize(
-          [{ permission: kuadrantApiKeyDeleteOwnPermission }],
-          { credentials }
-        );
-
-        if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
-          throw new NotAllowedError('unauthorised');
-        }
-
-        // verify ownership
-        if (requestUserId !== userEntityRef) {
-          throw new NotAllowedError('you can only delete your own api key requests');
-        }
+      if (deleteOwnDecision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
       }
 
-      // controller owns the Secret via OwnerReference - it will be garbage collected
+      const requestUserId = apiKey.spec?.requestedBy?.userId;
+      if (requestUserId !== userEntityRef) {
+        throw new NotAllowedError('you can only delete your own api key requests');
+      }
+
+      // delete the APIKey — controller handles cascade cleanup
       await k8sClient.deleteCustomResource(
         'devportal.kuadrant.io',
         'v1alpha1',

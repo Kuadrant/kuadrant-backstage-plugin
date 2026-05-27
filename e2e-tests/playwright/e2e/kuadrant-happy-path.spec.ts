@@ -147,7 +147,9 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
 
     // verify API product appears in table (scope to table to avoid matching toast)
     const table = page.locator("table");
-    const apiProductRow = table.getByRole("link", { name: testData.displayName });
+    const apiProductRow = table.getByRole("link", {
+      name: testData.displayName,
+    });
     await expect(
       apiProductRow,
       "Created API should appear in table",
@@ -179,7 +181,9 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     await common.dexQuickLogin("consumer1@kuadrant.local");
 
     await page.goto("/catalog/default/api/toystore-api");
-    await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, { timeout: TIMEOUTS.VERY_SLOW });
+    await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, {
+      timeout: TIMEOUTS.VERY_SLOW,
+    });
 
     // click API Keys tab
     const apiKeysTab = page.getByRole("tab", { name: /api keys/i });
@@ -375,5 +379,65 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
       breadcrumbLink,
       "Breadcrumb link should be visible",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+  });
+
+  test("9. consumer1 deletes their API key", async ({ page }) => {
+    const common = new Common(page);
+    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await page.goto("/kuadrant/my-api-keys");
+    await waitForApiKeysPageReady(page);
+
+    // find the first row in the table
+    const firstRow = page.locator("table tbody tr").first();
+    await expect(
+      firstRow,
+      "Consumer should see at least one API key",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+
+    // click the delete button in the Actions column
+    const deleteButton = firstRow.getByRole("button", { name: /delete/i });
+    await expect(deleteButton, "Delete button should be visible").toBeVisible({
+      timeout: TIMEOUTS.DEFAULT,
+    });
+    await deleteButton.click();
+
+    // confirm deletion in dialog
+    const confirmDialog = page.getByRole("dialog");
+    await expect(
+      confirmDialog,
+      "Delete confirmation dialog should open",
+    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+
+    // verify dialog has expected title
+    const dialogTitle = confirmDialog.getByText(/delete api key/i);
+    await expect(
+      dialogTitle,
+      "Dialog should have 'Delete API Key' title",
+    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+
+    // click confirm button
+    const confirmButton = confirmDialog.getByRole("button", {
+      name: /delete/i,
+    });
+    await confirmButton.click();
+
+    // verify dialog closes
+    await expect(
+      confirmDialog,
+      "Delete dialog should close after confirmation",
+    ).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
+
+    // verify success message appeared
+    const successMessage = page.getByText(/api key deleted/i);
+    await expect(successMessage, "Success message should appear").toBeVisible({
+      timeout: TIMEOUTS.DEFAULT,
+    });
+
+    // verify the key is removed — table should be empty after deleting the only key
+    const emptyState = page.getByText(/no api keys found/i);
+    await expect(
+      emptyState,
+      "Table should show empty state after deleting the only key",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
   });
 });

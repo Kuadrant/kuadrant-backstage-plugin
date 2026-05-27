@@ -25,9 +25,8 @@ import InfoOutlinedIcon from '@material-ui/icons/InfoOutlined';
 import AddIcon from '@material-ui/icons/Add';
 import { useApi } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
-import { Alert } from '@material-ui/lab';
+import { Alert, Skeleton } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
-import { Progress } from '@backstage/core-components';
 import { ApiProductPolicies, PlanPoliciesProps, AuthPoliciesProps, RateLimitPoliciesProps } from '../ApiProductPolicies';
 import { validateURL } from '../../utils/validation';
 import { APIProduct } from "../../types/api-management.ts";
@@ -251,7 +250,13 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
           </Alert>
         )}
         {loading ? (
-          <Progress />
+          <Box p={2}>
+            {[...Array(8)].map((_, i) => (
+              <Box key={i} mb={2}>
+                <Skeleton variant="text" width="100%" />
+              </Box>
+            ))}
+          </Box>
         ) : (
           <>
             {/* API product info section */}

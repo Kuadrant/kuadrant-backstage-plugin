@@ -172,12 +172,12 @@ export const ApiKeyManagementTab = ({
     error: updateRequestPermissionError,
   } = useKuadrantPermission(kuadrantApiKeyUpdateOwnPermission);
 
-  const handleDeleteRequest = async (requestNamespace: string, name: string) => {
+  const handleDeleteRequest = async (deleteNamespace: string, deleteName: string) => {
     // optimistic update - remove from UI immediately
-    setOptimisticallyDeleted((prev) => new Set(prev).add(name));
-    setDeleting(name);
+    setOptimisticallyDeleted((prev) => new Set(prev).add(deleteName));
+    setDeleting(deleteName);
     try {
-      await kuadrantApi.deleteRequest(requestNamespace, name);
+      await kuadrantApi.deleteRequest(deleteNamespace, deleteName);
       alertApi.post({
         message: "API key deleted successfully",
         severity: "success",
@@ -190,7 +190,7 @@ export const ApiKeyManagementTab = ({
       // rollback optimistic update on error
       setOptimisticallyDeleted((prev) => {
         const next = new Set(prev);
-        next.delete(name);
+        next.delete(deleteName);
         return next;
       });
       alertApi.post({
@@ -279,7 +279,10 @@ export const ApiKeyManagementTab = ({
 
   const handleDeleteConfirm = async () => {
     if (!deleteDialogState.request) return;
-    await handleDeleteRequest(deleteDialogState.request.metadata.namespace, deleteDialogState.request.metadata.name);
+    await handleDeleteRequest(
+      deleteDialogState.request.metadata.namespace,
+      deleteDialogState.request.metadata.name,
+    );
     setDeleteDialogState({ open: false, request: null });
   };
 

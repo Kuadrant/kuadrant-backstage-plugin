@@ -12,15 +12,6 @@ if (args.some((arg) => arg.includes("showcase-localization-fr"))) {
   process.env.LOCALE = "en";
 }
 
-const k8sSpecificConfig = {
-  use: {
-    actionTimeout: 15 * 1000,
-  },
-  expect: {
-    timeout: 15 * 1000, // Global expect timeout
-  },
-};
-
 export default defineConfig({
   timeout: 90 * 1000,
   testDir: "./playwright",

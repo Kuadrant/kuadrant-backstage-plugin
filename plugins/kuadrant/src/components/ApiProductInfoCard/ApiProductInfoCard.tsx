@@ -1,8 +1,9 @@
 import React from 'react';
 import { useEntity } from '@backstage/plugin-catalog-react';
 import { useApi, identityApiRef } from '@backstage/core-plugin-api';
-import { InfoCard, Progress, ResponseErrorPanel } from '@backstage/core-components';
+import { InfoCard, ResponseErrorPanel } from '@backstage/core-components';
 import { Typography, Box, makeStyles } from '@material-ui/core';
+import { Skeleton } from '@material-ui/lab';
 import useAsync from 'react-use/lib/useAsync';
 import { useKuadrantPermission } from '../../utils/permissions';
 import { kuadrantApiProductReadAllPermission } from '../../permissions';
@@ -62,7 +63,13 @@ export const ApiProductInfoCard = () => {
   if (loading || permLoading) {
     return (
       <InfoCard title="API Product Information">
-        <Progress />
+        <Box p={2}>
+          {[...Array(5)].map((_, i) => (
+            <Box key={i} mb={2}>
+              <Skeleton variant="text" width="100%" />
+            </Box>
+          ))}
+        </Box>
       </InfoCard>
     );
   }

@@ -31,15 +31,17 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show OIDC tab", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
       await expect(oidcTab).toBeVisible({ timeout: TIMEOUTS.SLOW });
     });
 
-    test("should show OIDC Provider Discovery card in OIDC tab", async ({ page }) => {
+    test("should show OIDC Provider Discovery card in OIDC tab", async ({
+      page,
+    }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // click on OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -51,7 +53,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show identity provider URL in OIDC tab", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // click on OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -63,7 +65,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show token endpoint URL in OIDC tab", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // click on OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -75,7 +77,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show curl example in OIDC tab", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // click on OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -87,7 +89,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should NOT show API Key Approval field", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for page to load
       const productCard = page.getByText("API Product").first();
@@ -104,7 +106,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show API Key Approval field", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       const apiKeyApproval = page.getByText("API Key Approval");
       await expect(apiKeyApproval).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -112,7 +114,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should NOT show OIDC tab", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for page to load
       const productCard = page.getByText("API Product").first();
@@ -130,7 +132,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("should show OIDC tab and API Key Approval", async ({ page }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // should show OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -141,9 +143,11 @@ test.describe("Auth Scheme UI Behaviour", () => {
       await expect(apiKeyApproval).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     });
 
-    test("should show OIDC Provider Discovery when clicking OIDC tab", async ({ page }) => {
+    test("should show OIDC Provider Discovery when clicking OIDC tab", async ({
+      page,
+    }) => {
       await page.goto(apiProductPath);
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // click on OIDC tab
       const oidcTab = page.getByRole("tab", { name: "OIDC" });
@@ -158,7 +162,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
   test.describe("Catalog Entity Page - API Keys Tab", () => {
     test("OIDC-only API should NOT show API Keys tab", async ({ page }) => {
       await page.goto("/catalog/default/api/gamestore-api");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for entity page to load
       const entityPage = page.locator("main");
@@ -172,7 +176,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("API Key-enabled API should show API Keys tab", async ({ page }) => {
       await page.goto("/catalog/default/api/toystore-api");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for entity page to load
       const entityPage = page.locator("main");
@@ -185,7 +189,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
     test("Mixed auth API should show API Keys tab", async ({ page }) => {
       await page.goto("/catalog/default/api/gamestore-admin");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for entity page to load
       const entityPage = page.locator("main");
@@ -198,9 +202,11 @@ test.describe("Auth Scheme UI Behaviour", () => {
   });
 
   test.describe("Catalog Entity Page - Kuadrant API Keys Card", () => {
-    test("OIDC-only API should NOT show Kuadrant API Keys card on Overview", async ({ page }) => {
+    test("OIDC-only API should NOT show Kuadrant API Keys card on Overview", async ({
+      page,
+    }) => {
       await page.goto("/catalog/default/api/gamestore-api");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for entity page to load
       const entityPage = page.locator("main");
@@ -212,9 +218,11 @@ test.describe("Auth Scheme UI Behaviour", () => {
       expect(cardVisible).toBe(false);
     });
 
-    test("API Key-enabled API should show Kuadrant API Keys card on Overview", async ({ page }) => {
+    test("API Key-enabled API should show Kuadrant API Keys card on Overview", async ({
+      page,
+    }) => {
       await page.goto("/catalog/default/api/toystore-api");
-      await page.waitForLoadState("networkidle").catch(() => {});
+      await page.waitForLoadState("load").catch(() => {});
 
       // wait for entity page to load
       const entityPage = page.locator("main");
