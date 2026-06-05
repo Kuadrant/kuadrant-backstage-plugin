@@ -890,6 +890,9 @@ p, role:default/api-consumer, kuadrant.ratelimitpolicy.list, read, allow
 p, role:default/api-consumer, kuadrant.httproute.list, read, allow
 
 # api owner: publishes apis they own, approves requests for their apis
+p, role:default/api-owner, kuadrant.httproute.list, read, allow
+p, role:default/api-owner, kuadrant.ratelimitpolicy.list, read, allow
+p, role:default/api-owner, kuadrant.authpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.read, read, allow
 p, role:default/api-owner, kuadrant.planpolicy.list, read, allow
 p, role:default/api-owner, kuadrant.apiproduct.create, create, allow
