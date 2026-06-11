@@ -23,6 +23,7 @@ import {
 } from '@backstage/core-plugin-api';
 import useAsync from 'react-use/lib/useAsync';
 import { kuadrantApiRef } from '../../api';
+import { formatPlanLimits } from '../../utils/policies';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -283,10 +284,8 @@ export const SimpleRequestAccessDialog = ({
             ) : availableTiers.length === 0 ? (
               <MenuItem disabled>No tiers available</MenuItem>
             ) : (
-              availableTiers.map((plan: { tier: string; limits?: Record<string, number> }) => {
-                const limitDesc = Object.entries(plan.limits || {})
-                  .map(([key, val]) => `${val} per ${key}`)
-                  .join(', ');
+              availableTiers.map((plan: { tier: string; limits?: any }) => {
+                const limitDesc = formatPlanLimits(plan.limits);
                 return (
                   <MenuItem key={plan.tier} value={plan.tier}>
                     {plan.tier} {limitDesc ? `(${limitDesc})` : ''}

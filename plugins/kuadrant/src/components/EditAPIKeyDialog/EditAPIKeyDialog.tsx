@@ -17,6 +17,7 @@ import {
 import { useApi } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
 import { APIKey } from "../../types/api-management";
+import { formatPlanLimits } from '../../utils/policies';
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -117,9 +118,7 @@ export const EditAPIKeyDialog = ({
             disabled={saving}
           >
             {availablePlans.map((plan) => {
-              const limitDesc = Object.entries(plan.limits || {})
-                .map(([key, val]) => `${val} per ${key}`)
-                .join(", ");
+              const limitDesc = formatPlanLimits(plan.limits);
               return (
                 <MenuItem key={plan.tier} value={plan.tier}>
                   {plan.tier} {limitDesc ? `(${limitDesc})` : ""}

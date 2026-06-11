@@ -14,6 +14,7 @@ import {
 import { Link } from "@backstage/core-components";
 import { APIProduct, Plan } from "../../types/api-management";
 import { getLifecycleChipStyle } from "../../utils/styles";
+import { getPlanLimitLines } from "../../utils/policies";
 
 const useStyles = makeStyles((theme) => ({
   label: {
@@ -229,12 +230,11 @@ export const ApiProductDetails = ({
                     <Chip label={plan.tier} size="small" />
                   </TableCell>
                   <TableCell>
-                    {plan.limits &&
-                      Object.entries(plan.limits).map(([key, value]) => (
-                        <Typography key={key} variant="body2">
-                          {String(value)} per {key}
-                        </Typography>
-                      ))}
+                    {getPlanLimitLines(plan.limits).map((line, idx) => (
+                      <Typography key={idx} variant="body2">
+                        {line}
+                      </Typography>
+                    ))}
                   </TableCell>
                 </TableRow>
               ))}

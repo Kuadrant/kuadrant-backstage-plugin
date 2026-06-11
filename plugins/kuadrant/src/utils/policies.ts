@@ -1,3 +1,29 @@
+import { PlanLimits } from '../types/api-management';
+
+/**
+ * Return PlanLimits as an array of human-readable strings.
+ * Handles standard period fields (daily/weekly/monthly/yearly) and
+ * custom limits (array of { limit, window }).
+ */
+export const getPlanLimitLines = (limits: PlanLimits | undefined): string[] => {
+  if (!limits) return [];
+  const parts: string[] = [];
+  if (limits.daily) parts.push(`${limits.daily} per day`);
+  if (limits.weekly) parts.push(`${limits.weekly} per week`);
+  if (limits.monthly) parts.push(`${limits.monthly} per month`);
+  if (limits.yearly) parts.push(`${limits.yearly} per year`);
+  if (limits.custom) {
+    for (const item of limits.custom) {
+      parts.push(`${item.limit} per ${item.window}`);
+    }
+  }
+  return parts;
+};
+
+/** Convenience wrapper that joins limit lines with a comma for single-line display. */
+export const formatPlanLimits = (limits: PlanLimits | undefined): string =>
+  getPlanLimitLines(limits).join(', ');
+
 /**
  * Find a policy that targets a specific APIProduct
  *

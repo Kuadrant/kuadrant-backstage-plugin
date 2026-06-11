@@ -1,4 +1,72 @@
-import { getPolicyForRoute } from './policies';
+import { getPolicyForRoute, getPlanLimitLines, formatPlanLimits } from './policies';
+
+describe('getPlanLimitLines', () => {
+  it('returns empty array for undefined', () => {
+    expect(getPlanLimitLines(undefined)).toEqual([]);
+  });
+
+  it('returns empty array for empty object', () => {
+    expect(getPlanLimitLines({})).toEqual([]);
+  });
+
+  it('handles daily limit', () => {
+    expect(getPlanLimitLines({ daily: 100 })).toEqual(['100 per day']);
+  });
+
+  it('handles weekly limit', () => {
+    expect(getPlanLimitLines({ weekly: 500 })).toEqual(['500 per week']);
+  });
+
+  it('handles monthly limit', () => {
+    expect(getPlanLimitLines({ monthly: 1000 })).toEqual(['1000 per month']);
+  });
+
+  it('handles yearly limit', () => {
+    expect(getPlanLimitLines({ yearly: 10000 })).toEqual(['10000 per year']);
+  });
+
+  it('handles custom limits array with one entry', () => {
+    expect(getPlanLimitLines({ custom: [{ limit: 50, window: '1m' }] })).toEqual(['50 per 1m']);
+  });
+
+  it('handles custom limits array with multiple entries', () => {
+    expect(getPlanLimitLines({ custom: [{ limit: 10, window: '10s' }, { limit: 100, window: '1h' }] }))
+      .toEqual(['10 per 10s', '100 per 1h']);
+  });
+
+  it('combines standard and custom limits in order', () => {
+    expect(getPlanLimitLines({ daily: 200, custom: [{ limit: 5, window: '1s' }] }))
+      .toEqual(['200 per day', '5 per 1s']);
+  });
+
+  it('emits one line per standard field present', () => {
+    expect(getPlanLimitLines({ daily: 10, monthly: 100, yearly: 1000 }))
+      .toEqual(['10 per day', '100 per month', '1000 per year']);
+  });
+});
+
+describe('formatPlanLimits', () => {
+  it('returns empty string for undefined', () => {
+    expect(formatPlanLimits(undefined)).toBe('');
+  });
+
+  it('returns empty string for empty object', () => {
+    expect(formatPlanLimits({})).toBe('');
+  });
+
+  it('joins multiple limits with comma', () => {
+    expect(formatPlanLimits({ daily: 100, monthly: 1000 })).toBe('100 per day, 1000 per month');
+  });
+
+  it('formats custom limits correctly', () => {
+    expect(formatPlanLimits({ custom: [{ limit: 50, window: '1m' }] })).toBe('50 per 1m');
+  });
+
+  it('formats mixed standard and custom limits', () => {
+    expect(formatPlanLimits({ daily: 200, custom: [{ limit: 5, window: '1s' }] }))
+      .toBe('200 per day, 5 per 1s');
+  });
+});
 
 describe('getPolicyForRoute', () => {
   describe('null and undefined policies', () => {
