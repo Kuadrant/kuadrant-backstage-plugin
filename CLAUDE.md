@@ -40,6 +40,8 @@ For specific topics, refer to these focused guides:
 
 | Document | Topics Covered |
 |----------|---------------|
+| [docs/overview.md](docs/overview.md) | High-level portal overview, personas, workflow summary |
+| [docs/getting-started.md](docs/getting-started.md) | End-to-end tutorial: publish an API and manage consumer access |
 | [docs/plugin-architecture.md](docs/plugin-architecture.md) | Plugin architecture, component diagrams, data flows, design decisions, security |
 | [docs/repository-guide.md](docs/repository-guide.md) | Monorepo structure, dynamic plugins, build system, Kubernetes config |
 | [docs/backend-security.md](docs/backend-security.md) | Backend security tenets, input validation, authentication, error handling |
@@ -47,6 +49,8 @@ For specific topics, refer to these focused guides:
 | [docs/plugin-integration.md](docs/plugin-integration.md) | Adding plugins, routes, entity pages, common pitfalls |
 | [docs/kuadrant-resources.md](docs/kuadrant-resources.md) | CRDs, namespace organisation, approval modes, catalog sync |
 | [docs/ui-patterns.md](docs/ui-patterns.md) | Table patterns, delete dialogs, frontend permissions, sidebar menu config |
+| [docs/api-reference.md](docs/api-reference.md) | Backend REST API endpoints, request/response shapes, auth requirements |
+| [docs/e2e-testing.md](docs/e2e-testing.md) | E2E test setup, Playwright configuration, test structure |
 | [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
 | [docs/oinc.md](docs/oinc.md) | oinc dev environment, cluster setup, RHDH integration testing |
 
@@ -89,7 +93,7 @@ make kind-delete                # delete cluster
 ```
 
 The kind cluster includes:
-- Kuadrant operator v1.3.0
+- Kuadrant operator 1.5+ (or RHCL 1.4+)
 - Gateway API CRDs
 - Istio service mesh
 - Custom CRDs (APIProduct, APIKey)
@@ -159,8 +163,8 @@ Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `
 
 ### Backend
 - Router: [`plugins/kuadrant-backend/src/router.ts`](plugins/kuadrant-backend/src/router.ts)
-- Kubernetes Client: [`plugins/kuadrant-backend/src/KubernetesClient.ts`](plugins/kuadrant-backend/src/KubernetesClient.ts)
-- Entity Provider: [`plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts`](plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts)
+- Kubernetes Client: [`plugins/kuadrant-backend/src/k8s-client.ts`](plugins/kuadrant-backend/src/k8s-client.ts)
+- Entity Provider: [`plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts`](plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts)
 
 ### Frontend
 - Plugin entry: [`plugins/kuadrant/src/plugin.ts`](plugins/kuadrant/src/plugin.ts)
@@ -173,5 +177,4 @@ Common component values: `authentication`, `rbac`, `plugins`, `configuration`, `
 - RBAC policies: [`rbac-policy.csv`](rbac-policy.csv)
 
 ### CRDs
-- APIProduct: [`kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml`](kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml)
-- APIKey: [`kuadrant-dev-setup/crds/devportal.kuadrant.io_apikeys.yaml`](kuadrant-dev-setup/crds/devportal.kuadrant.io_apikeys.yaml)
+CRDs (APIProduct, APIKey) are installed from the upstream operator via kustomize during `make kind-create`. See [`kuadrant-dev-setup/Makefile`](kuadrant-dev-setup/Makefile).
