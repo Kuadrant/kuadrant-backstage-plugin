@@ -28,7 +28,7 @@ In short: frontend plugins are bundled by the consuming app (so source is fine),
 The plugins require a Kubernetes cluster with Kuadrant installed. You can either:
 
 1. **Use an existing cluster** with:
-   - [Kuadrant operator 1.4+](https://docs.kuadrant.io/latest/getting-started/) installed
+   - [Kuadrant 1.5+](https://docs.kuadrant.io/latest/getting-started/) or [RHCL 1.4+](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4#Install) installed
 
 2. **Use the development setup** (recommended for testing):
 
@@ -51,6 +51,7 @@ This section covers installing the Kuadrant plugins on a Red Hat Developer Hub d
 
 ### Prerequisites
 
+- [Kuadrant 1.5+](https://docs.kuadrant.io/latest/getting-started/) or [RHCL 1.4+](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4#Install) installed
 - Red Hat Developer Hub
 
 The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.8.4** (based on Backstage 1.42.5).
