@@ -171,15 +171,6 @@ export class KuadrantK8sClient {
     }
   }
 
-  async listSecrets(namespace: string): Promise<K8sList> {
-    try {
-      const response = await this.coreApi.listNamespacedSecret(namespace);
-      return { items: (response.body.items || []) as unknown as K8sResource[] };
-    } catch (error: any) {
-      throw new Error(`failed to list secrets: ${error.message}`);
-    }
-  }
-
   async getSecret(namespace: string, name: string): Promise<K8sResource> {
     try {
       const response = await this.coreApi.readNamespacedSecret(name, namespace);
@@ -194,50 +185,6 @@ export class KuadrantK8sClient {
       await this.coreApi.deleteNamespacedSecret(name, namespace);
     } catch (error: any) {
       throw new Error(`failed to delete secret: ${error.message}`);
-    }
-  }
-
-  async createConfigMap(namespace: string, configMap: K8sResource): Promise<K8sResource> {
-    try {
-      const response = await this.coreApi.createNamespacedConfigMap(namespace, configMap as k8s.V1ConfigMap);
-      return response.body as K8sResource;
-    } catch (error: any) {
-      throw new Error(`failed to create configmap: ${error.message}`);
-    }
-  }
-
-  async listConfigMaps(namespace: string, labelSelector?: string): Promise<K8sList> {
-    try {
-      const response = await this.coreApi.listNamespacedConfigMap(namespace, undefined, undefined, undefined, undefined, labelSelector);
-      return { items: (response.body.items || []) as unknown as K8sResource[] };
-    } catch (error: any) {
-      throw new Error(`failed to list configmaps: ${error.message}`);
-    }
-  }
-
-  async getConfigMap(namespace: string, name: string): Promise<K8sResource> {
-    try {
-      const response = await this.coreApi.readNamespacedConfigMap(name, namespace);
-      return response.body as K8sResource;
-    } catch (error: any) {
-      throw new Error(`failed to get configmap: ${error.message}`);
-    }
-  }
-
-  async updateConfigMap(namespace: string, name: string, configMap: K8sResource): Promise<K8sResource> {
-    try {
-      const response = await this.coreApi.replaceNamespacedConfigMap(name, namespace, configMap as k8s.V1ConfigMap);
-      return response.body as K8sResource;
-    } catch (error: any) {
-      throw new Error(`failed to update configmap: ${error.message}`);
-    }
-  }
-
-  async deleteConfigMap(namespace: string, name: string): Promise<void> {
-    try {
-      await this.coreApi.deleteNamespacedConfigMap(name, namespace);
-    } catch (error: any) {
-      throw new Error(`failed to delete configmap: ${error.message}`);
     }
   }
 
@@ -324,38 +271,6 @@ export class KuadrantK8sClient {
       return response.body as K8sResource;
     } catch (error: any) {
       throw new Error(`failed to patch ${plural}/${name}: ${error.message}`);
-    }
-  }
-
-  async patchCustomResourceStatus(
-    group: string,
-    version: string,
-    namespace: string,
-    plural: string,
-    name: string,
-    status: any,
-  ): Promise<K8sResource> {
-    try {
-      // get the existing resource first
-      const existing = await this.getCustomResource(group, version, namespace, plural, name);
-
-      // replace the entire resource with updated status
-      const updated = {
-        ...existing,
-        status,
-      };
-
-      const response = await this.customApi.replaceNamespacedCustomObjectStatus(
-        group,
-        version,
-        namespace,
-        plural,
-        name,
-        updated,
-      );
-      return response.body as K8sResource;
-    } catch (error: any) {
-      throw new Error(`failed to patch ${plural}/${name} status: ${error.message}`);
     }
   }
 
