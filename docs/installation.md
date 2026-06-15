@@ -961,8 +961,12 @@ rules:
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
   - apiGroups: ["devportal.kuadrant.io"]
     resources:
-      - apikeys/status
-    verbs: ["get", "patch", "update"]
+      - apikeyrequests
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources:
+      - apikeyapprovals
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
   - apiGroups: ["gateway.networking.k8s.io"]
     resources:
       - gateways
@@ -971,11 +975,11 @@ rules:
   - apiGroups: [""]
     resources:
       - namespaces
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create"]
   - apiGroups: [""]
     resources:
       - secrets
-    verbs: ["get", "list", "watch", "create", "delete"]
+    verbs: ["get", "create", "delete"]
 ```
 
 ---
