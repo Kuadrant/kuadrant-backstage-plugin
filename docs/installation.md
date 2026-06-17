@@ -911,17 +911,24 @@ p, role:default/api-owner, catalog.entity.read, read, allow
 # api admin: platform engineers who manage all api products
 p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
 p, role:default/api-admin, kuadrant.planpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.authpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.ratelimitpolicy.list, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.create, create, allow
 p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
 p, role:default/api-admin, kuadrant.apiproduct.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apiproduct.list, read, allow
+p, role:default/api-admin, kuadrant.httproute.list, read, allow
 p, role:default/api-admin, kuadrant.apikey.create, create, allow, apiproduct:*/*
 p, role:default/api-admin, kuadrant.apikey.read.all, read, allow
 p, role:default/api-admin, kuadrant.apikey.update.all, update, allow
 p, role:default/api-admin, kuadrant.apikey.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apikey.approve, update, allow
 p, role:default/api-admin, catalog.entity.read, read, allow
+p, role:default/api-admin, policy.entity.read, read, allow
+p, role:default/api-admin, policy.entity.create, create, allow
+p, role:default/api-admin, policy.entity.update, update, allow
+p, role:default/api-admin, policy.entity.delete, delete, allow
 
 # assign groups to roles
 g, group:default/api-consumers, role:default/api-consumer
@@ -961,8 +968,12 @@ rules:
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
   - apiGroups: ["devportal.kuadrant.io"]
     resources:
-      - apikeys/status
-    verbs: ["get", "patch", "update"]
+      - apikeyrequests
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources:
+      - apikeyapprovals
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
   - apiGroups: ["gateway.networking.k8s.io"]
     resources:
       - gateways
@@ -971,11 +982,11 @@ rules:
   - apiGroups: [""]
     resources:
       - namespaces
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create"]
   - apiGroups: [""]
     resources:
       - secrets
-    verbs: ["get", "list", "watch", "create", "delete"]
+    verbs: ["get", "create", "delete"]
 ```
 
 ---
