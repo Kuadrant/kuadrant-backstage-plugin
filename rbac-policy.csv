@@ -17,7 +17,6 @@ p, role:default/api-admin, kuadrant.apikey.update.all, update, allow
 p, role:default/api-admin, kuadrant.apikey.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apikey.approve, update, allow
 p, role:default/api-admin, catalog.entity.read, read, allow
-p, role:default/api-admin, catalog.entity.read, read, allow, api
 p, role:default/api-admin, policy.entity.read, read, allow
 p, role:default/api-admin, policy.entity.create, create, allow
 p, role:default/api-admin, policy.entity.update, update, allow
@@ -42,7 +41,6 @@ p, role:default/api-owner, kuadrant.apikey.update.own, update, allow
 p, role:default/api-owner, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-owner, kuadrant.apikey.approve, update, allow
 p, role:default/api-owner, catalog.entity.read, read, allow
-p, role:default/api-owner, catalog.entity.read, read, allow, api
 
 # api consumer: browses apis, requests access
 # can do: read all apiproducts (for catalog browsing), create requests, manage own api keys, edit own pending requests
@@ -59,7 +57,6 @@ p, role:default/api-consumer, kuadrant.apikey.read.own, read, allow
 p, role:default/api-consumer, kuadrant.apikey.update.own, update, allow
 p, role:default/api-consumer, kuadrant.apikey.delete.own, delete, allow
 p, role:default/api-consumer, catalog.entity.read, read, allow
-p, role:default/api-consumer, catalog.entity.read, read, allow, api
 
 # example: restrict specific apis to specific roles
 # p, role:default/partner, kuadrant.apikey.create, create, allow, apiproduct:toystore/toystore-api
@@ -71,4 +68,4 @@ g, group:default/api-owners, role:default/api-owner
 g, group:default/api-consumers, role:default/api-consumer
 
 # assign individual users to roles (for development with guest auth)
-g, user:default/guest, role:default/api-owner
+g, user:default/guest, role:default/api-admin

@@ -28,7 +28,7 @@ In short: frontend plugins are bundled by the consuming app (so source is fine),
 The plugins require a Kubernetes cluster with Kuadrant installed. You can either:
 
 1. **Use an existing cluster** with:
-   - [Kuadrant operator 1.4+](https://docs.kuadrant.io/latest/getting-started/) installed
+   - [Kuadrant 1.5+](https://docs.kuadrant.io/latest/getting-started/) or [RHCL 1.4+](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4#Install) installed
 
 2. **Use the development setup** (recommended for testing):
 
@@ -51,6 +51,7 @@ This section covers installing the Kuadrant plugins on a Red Hat Developer Hub d
 
 ### Prerequisites
 
+- [Kuadrant 1.5+](https://docs.kuadrant.io/latest/getting-started/) or [RHCL 1.4+](https://docs.redhat.com/en/documentation/red_hat_connectivity_link/1.4#Install) installed
 - Red Hat Developer Hub
 
 The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.8.4** (based on Backstage 1.42.5).
@@ -396,43 +397,58 @@ plugins:
       dynamicPlugins:
         frontend:
           internal.plugin-kuadrant:
+            apiFactories:
+              - importName: kuadrantApiFactory
             appIcons:
               - name: kuadrantIcon
                 importName: KuadrantIcon
-            dynamicRoutes:
-              - path: /kuadrant
-                importName: KuadrantPage
-              - path: /kuadrant/api-products
-                importName: ApiProductsPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Products
-              - path: /kuadrant/my-api-keys
-                importName: MyApiKeysPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: My API Keys
-              - path: /kuadrant/api-key-approval
-                importName: ApiKeyApprovalPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Key Approval
-              - path: /kuadrant/api-products/:namespace/:name
-                importName: ApiProductDetailPage
-              - path: /kuadrant/api-keys/:namespace/:name
-                importName: ApiKeyDetailPage
+              - name: apiIcon
+                importName: ApiIcon
+              - name: keyIcon
+                importName: KeyIcon
+              - name: approvalIcon
+                importName: ApprovalIcon
             menuItems:
-              kuadrant:
-                icon: kuadrantIcon
-                title: Kuadrant
               kuadrant.api-products:
                 parent: kuadrant
               kuadrant.my-api-keys:
                 parent: kuadrant
               kuadrant.api-key-approval:
                 parent: kuadrant
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: Kuadrant
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: apiIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: keyIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: approvalIcon
+                  text: API Key Approval
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+            entityTabs:
+              - mountPoint: entity.page.api-keys
+                path: /api-keys
+                title: API Keys
+              - mountPoint: entity.page.api-product-info
+                path: /api-product-info
+                title: API Product Info
             mountPoints:
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-keys/cards
                 importName: EntityKuadrantApiKeyManagementTab
                 config:
                   layout:
@@ -440,7 +456,7 @@ plugins:
                   if:
                     allOf:
                       - isKind: api
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-product-info/cards
                 importName: EntityKuadrantApiProductInfoContent
                 config:
                   layout:
@@ -852,8 +868,15 @@ plugins:
                 importName: ApiProductDetailPage
               - path: /kuadrant/api-keys/:namespace/:name
                 importName: ApiKeyDetailPage
+            entityTabs:
+              - mountPoint: entity.page.api-keys
+                path: /api-keys
+                title: API Keys
+              - mountPoint: entity.page.api-product-info
+                path: /api-product-info
+                title: API Product Info
             mountPoints:
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-keys/cards
                 importName: EntityKuadrantApiKeyManagementTab
                 config:
                   layout:
@@ -861,7 +884,7 @@ plugins:
                   if:
                     allOf:
                       - isKind: api
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-product-info/cards
                 importName: EntityKuadrantApiProductInfoContent
                 config:
                   layout:
@@ -910,17 +933,24 @@ p, role:default/api-owner, catalog.entity.read, read, allow
 # api admin: platform engineers who manage all api products
 p, role:default/api-admin, kuadrant.planpolicy.read, read, allow
 p, role:default/api-admin, kuadrant.planpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.authpolicy.list, read, allow
+p, role:default/api-admin, kuadrant.ratelimitpolicy.list, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.create, create, allow
 p, role:default/api-admin, kuadrant.apiproduct.read.all, read, allow
 p, role:default/api-admin, kuadrant.apiproduct.update.all, update, allow
 p, role:default/api-admin, kuadrant.apiproduct.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apiproduct.list, read, allow
+p, role:default/api-admin, kuadrant.httproute.list, read, allow
 p, role:default/api-admin, kuadrant.apikey.create, create, allow, apiproduct:*/*
 p, role:default/api-admin, kuadrant.apikey.read.all, read, allow
 p, role:default/api-admin, kuadrant.apikey.update.all, update, allow
 p, role:default/api-admin, kuadrant.apikey.delete.all, delete, allow
 p, role:default/api-admin, kuadrant.apikey.approve, update, allow
 p, role:default/api-admin, catalog.entity.read, read, allow
+p, role:default/api-admin, policy.entity.read, read, allow
+p, role:default/api-admin, policy.entity.create, create, allow
+p, role:default/api-admin, policy.entity.update, update, allow
+p, role:default/api-admin, policy.entity.delete, delete, allow
 
 # assign groups to roles
 g, group:default/api-consumers, role:default/api-consumer
@@ -960,8 +990,12 @@ rules:
     verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
   - apiGroups: ["devportal.kuadrant.io"]
     resources:
-      - apikeys/status
-    verbs: ["get", "patch", "update"]
+      - apikeyrequests
+    verbs: ["get", "list", "watch"]
+  - apiGroups: ["devportal.kuadrant.io"]
+    resources:
+      - apikeyapprovals
+    verbs: ["get", "list", "watch", "create", "patch", "update"]
   - apiGroups: ["gateway.networking.k8s.io"]
     resources:
       - gateways
@@ -970,11 +1004,11 @@ rules:
   - apiGroups: [""]
     resources:
       - namespaces
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create"]
   - apiGroups: [""]
     resources:
       - secrets
-    verbs: ["get", "list", "watch", "create", "delete"]
+    verbs: ["get", "create", "delete"]
 ```
 
 ---
