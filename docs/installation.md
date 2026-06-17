@@ -397,43 +397,58 @@ plugins:
       dynamicPlugins:
         frontend:
           internal.plugin-kuadrant:
+            apiFactories:
+              - importName: kuadrantApiFactory
             appIcons:
               - name: kuadrantIcon
                 importName: KuadrantIcon
-            dynamicRoutes:
-              - path: /kuadrant
-                importName: KuadrantPage
-              - path: /kuadrant/api-products
-                importName: ApiProductsPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Products
-              - path: /kuadrant/my-api-keys
-                importName: MyApiKeysPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: My API Keys
-              - path: /kuadrant/api-key-approval
-                importName: ApiKeyApprovalPage
-                menuItem:
-                  icon: kuadrantIcon
-                  text: API Key Approval
-              - path: /kuadrant/api-products/:namespace/:name
-                importName: ApiProductDetailPage
-              - path: /kuadrant/api-keys/:namespace/:name
-                importName: ApiKeyDetailPage
+              - name: apiIcon
+                importName: ApiIcon
+              - name: keyIcon
+                importName: KeyIcon
+              - name: approvalIcon
+                importName: ApprovalIcon
             menuItems:
-              kuadrant:
-                icon: kuadrantIcon
-                title: Kuadrant
               kuadrant.api-products:
                 parent: kuadrant
               kuadrant.my-api-keys:
                 parent: kuadrant
               kuadrant.api-key-approval:
                 parent: kuadrant
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: Kuadrant
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: apiIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: keyIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: approvalIcon
+                  text: API Key Approval
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+            entityTabs:
+              - mountPoint: entity.page.api-keys
+                path: /api-keys
+                title: API Keys
+              - mountPoint: entity.page.api-product-info
+                path: /api-product-info
+                title: API Product Info
             mountPoints:
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-keys/cards
                 importName: EntityKuadrantApiKeyManagementTab
                 config:
                   layout:
@@ -441,7 +456,7 @@ plugins:
                   if:
                     allOf:
                       - isKind: api
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-product-info/cards
                 importName: EntityKuadrantApiProductInfoContent
                 config:
                   layout:
@@ -853,8 +868,15 @@ plugins:
                 importName: ApiProductDetailPage
               - path: /kuadrant/api-keys/:namespace/:name
                 importName: ApiKeyDetailPage
+            entityTabs:
+              - mountPoint: entity.page.api-keys
+                path: /api-keys
+                title: API Keys
+              - mountPoint: entity.page.api-product-info
+                path: /api-product-info
+                title: API Product Info
             mountPoints:
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-keys/cards
                 importName: EntityKuadrantApiKeyManagementTab
                 config:
                   layout:
@@ -862,7 +884,7 @@ plugins:
                   if:
                     allOf:
                       - isKind: api
-              - mountPoint: entity.page.api/cards
+              - mountPoint: entity.page.api-product-info/cards
                 importName: EntityKuadrantApiProductInfoContent
                 config:
                   layout:
