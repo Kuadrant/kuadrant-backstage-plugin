@@ -22,7 +22,6 @@ describe('createRouter', () => {
       getCustomResource: jest.fn(),
       patchCustomResource: jest.fn(),
       getSecret: jest.fn(),
-      patchCustomResourceStatus: jest.fn(),
       listCustomResources: jest.fn(),
       createCustomResource: jest.fn(),
       deleteCustomResource: jest.fn(),
