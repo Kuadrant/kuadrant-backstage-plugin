@@ -1,16 +1,13 @@
 import React from 'react';
 import { Box, Grid, Typography, Chip, useTheme } from '@material-ui/core';
-import { StatusCondition } from "../../types/api-management";
+import { StatusCondition, PlanLimits } from "../../types/api-management";
+import { formatPlanLimits } from '../../utils/policies';
 
 export type PlanPoliciesProps = {
   statusCondition: StatusCondition | null;
   discoveredPlans: Array<{
     tier: string;
-    limits?: {
-      daily?: number;
-      monthly?: number;
-      yearly?: number;
-    };
+    limits?: PlanLimits;
   }> | null;
 };
 
@@ -82,13 +79,7 @@ export const ApiProductPolicies: React.FC<ApiProductPoliciesProps> = ({
                     </Typography>
                     <Box display="flex" flexWrap="wrap" mt={1} style={{ gap: 8 }}>
                       {planPolicy.discoveredPlans.map((plan: any, idx: number) => {
-                        const limitText = plan.limits?.daily
-                          ? `${plan.limits.daily}/day`
-                          : plan.limits?.monthly
-                            ? `${plan.limits.monthly}/month`
-                            : plan.limits?.yearly
-                              ? `${plan.limits.yearly}/year`
-                              : 'No limit';
+                        const limitText = formatPlanLimits(plan.limits) || 'No limit';
                         return (
                           <Chip
                             key={idx}

@@ -21,6 +21,7 @@ import {
 } from '@backstage/core-plugin-api';
 import { kuadrantApiRef } from '../../api';
 import { Plan } from "../../types/api-management.ts";
+import { formatPlanLimits } from '../../utils/policies';
 
 export interface RequestAccessDialogProps {
   open: boolean;
@@ -166,9 +167,7 @@ export const RequestAccessDialog = ({
             disabled={creating}
           >
             {plans.map((plan: Plan) => {
-              const limitDesc = Object.entries(plan.limits || {})
-                .map(([key, val]) => `${val} per ${key}`)
-                .join(', ');
+              const limitDesc = formatPlanLimits(plan.limits);
               return (
                 <MenuItem
                   key={plan.tier}
