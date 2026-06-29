@@ -22,15 +22,24 @@
     ]
   },
   "scalprum": {
-    "name": "internal.plugin-kuadrant",
+    "name": "kuadrant.kuadrant-backstage-plugin-frontend",
     "exposedModules": {
       "PluginRoot": "./src/index.ts",
       "KuadrantPage": "./src/plugin.ts",
+      "ApiProductsPage": "./src/plugin.ts",
+      "MyApiKeysPage": "./src/plugin.ts",
+      "ApiKeyApprovalPage": "./src/plugin.ts",
+      "ApiProductDetailPage": "./src/plugin.ts",
+      "ApiKeyDetailPage": "./src/plugin.ts",
       "EntityKuadrantApiAccessCard": "./src/plugin.ts",
       "EntityKuadrantApiKeyManagementTab": "./src/plugin.ts",
       "EntityKuadrantApiKeysContent": "./src/plugin.ts",
       "EntityKuadrantApiProductInfoContent": "./src/plugin.ts",
-      "KuadrantIcon": "./src/components/KuadrantIcon"
+      "KuadrantIcon": "./src/components/KuadrantIcon",
+      "ApiIcon": "./src/components/icons",
+      "KeyIcon": "./src/components/icons",
+      "ApprovalIcon": "./src/components/icons",
+      "kuadrantApiFactory": "./src/apis"
     }
   },
   "sideEffects": false,
@@ -43,7 +52,7 @@
     "prepack": "backstage-cli package prepack",
     "postpack": "backstage-cli package postpack",
     "tsc": "tsc",
-    "export-dynamic": "janus-cli package export-dynamic-plugin --in-place",
+    "export-dynamic": "rhdh-cli plugin export",
     "export-dynamic:clean": "run export-dynamic --clean"
   },
   "dependencies": {
@@ -58,26 +67,29 @@
     "@material-ui/core": "^4.9.13",
     "@material-ui/icons": "^4.9.1",
     "@material-ui/lab": "^4.0.0-alpha.61",
+    "@mui/icons-material": "5.18.0",
     "@mui/material": "5.18.0",
     "async-retry": "^1.3.3",
     "react-router-dom": "^6.0.0",
     "react-use": "^17.2.4"
   },
   "peerDependencies": {
-    "react": "^16.13.1 || ^17.0.0 || ^18.0.0"
+    "react": "^16.13.1 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.13.1 || ^17.0.0 || ^18.0.0"
   },
   "devDependencies": {
     "@backstage/cli": "^0.34.1",
     "@backstage/core-app-api": "^1.18.0",
     "@backstage/dev-utils": "^1.1.14",
     "@backstage/test-utils": "^1.7.11",
-    "@janus-idp/cli": "^1.13.0",
+    "@red-hat-developer-hub/cli": "~1.9.0",
     "@testing-library/jest-dom": "^6.0.0",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.0.0",
     "@types/async-retry": "^1.4.9",
     "msw": "^1.0.0",
     "react": "^16.13.1 || ^17.0.0 || ^18.0.0",
+    "react-dom": "^16.13.1 || ^17.0.0 || ^18.0.0",
     "typescript": "^5.9.3"
   },
   "files": [
