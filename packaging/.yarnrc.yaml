@@ -1,0 +1,7 @@
+nodeLinker: node-modules
+enableGlobalCache: true
+supportedArchitectures:
+  cpu:
+    - x64
+  os:
+    - linux

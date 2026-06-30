@@ -1,0 +1,8 @@
+{
+  "name": "kuadrant-plugin-packaging",
+  "private": true,
+  "workspaces": [
+    "plugins/kuadrant",
+    "plugins/kuadrant-backend"
+  ]
+}
