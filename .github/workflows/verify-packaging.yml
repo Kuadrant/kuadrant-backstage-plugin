@@ -1,0 +1,33 @@
+name: Verify packaging lockfile
+on:
+  push:
+    paths:
+      - plugins/kuadrant/package.json
+      - plugins/kuadrant-backend/package.json
+      - packaging/**
+  pull_request:
+    paths:
+      - plugins/kuadrant/package.json
+      - plugins/kuadrant-backend/package.json
+      - packaging/**
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Enable Corepack
+        run: corepack enable
+      - name: Install from packaging lockfile
+        working-directory: packaging
+        run: yarn install --immutable
+      - name: Fail if lockfile changed
+        run: |
+          if ! git diff --exit-code packaging/yarn.lock; then
+            echo ""
+            echo "packaging/yarn.lock is out of sync with the plugin package.json files."
+            echo "Run 'yarn install' in the packaging/ directory and commit the result."
+            exit 1
+          fi

@@ -1,0 +1,15 @@
+{
+  "extends": "@backstage/cli/config/tsconfig.json",
+  "include": [
+    "plugins/kuadrant/src",
+    "plugins/kuadrant/dev",
+    "plugins/kuadrant-backend/src"
+  ],
+  "exclude": ["node_modules"],
+  "compilerOptions": {
+    "outDir": "../dist-types",
+    "rootDir": ".",
+    "skipLibCheck": true,
+    "preserveSymlinks": true
+  }
+}

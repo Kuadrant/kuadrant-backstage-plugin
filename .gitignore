@@ -17,7 +17,7 @@ coverage
 # Dependencies
 node_modules/
 
-# Yarn 3 files
+# Yarn 4 files
 **/.pnp.*
 **/.yarn/*
 !**/.yarn/patches
