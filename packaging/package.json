@@ -2,6 +2,9 @@
   "name": "kuadrant-plugin-packaging",
   "private": true,
   "packageManager": "yarn@4.12.0",
+  "scripts": {
+    "tsc": "tsc"
+  },
   "workspaces": [
     "plugins/kuadrant",
     "plugins/kuadrant-backend"
