@@ -10,7 +10,7 @@
     "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
     "dev": "yarn dev:setup-dex && concurrently \"yarn:dev:*\"",
     "dev:setup-dex": "bash scripts/setup-dex.sh",
-    "dev:dex": "docker run --rm --name kuadrant-dex -p 5556:5556 -v \"$(pwd)/kuadrant-dev-setup/dex/config.yaml:/etc/dex/config.yaml:ro\" -v \"$(pwd)/kuadrant-dev-setup/dex/web:/srv/dex/web:ro\" ghcr.io/dexidp/dex:latest dex serve /etc/dex/config.yaml",
+    "dev:dex": "docker run --rm --name kuadrant-dex -p 5556:5556 -v \"$(pwd)/kuadrant-dev-setup/dex/config.yaml:/etc/dex/config.yaml:ro\" -v \"$(pwd)/kuadrant-dev-setup/dex/web:/srv/dex/web:ro\" ghcr.io/dexidp/dex:v2.45.1 dex serve /etc/dex/config.yaml",
     "dev:backend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
     "dev:frontend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=app",
     "build": "turbo run build",
