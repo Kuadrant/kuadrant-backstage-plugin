@@ -1,6 +1,11 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
-import { waitForKuadrantPageReady, TIMEOUTS } from "../utils/kuadrant-helpers";
+import {
+  waitForKuadrantPageReady,
+  requestApiKey,
+  generateTestId,
+  TIMEOUTS,
+} from "../utils/kuadrant-helpers";
 
 test.describe("Kuadrant Plugin", () => {
   let common: Common;
@@ -14,7 +19,7 @@ test.describe("Kuadrant Plugin", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("admin@kuadrant.local");
   });
 
   test("should display Kuadrant menu section in sidebar", async ({ page }) => {
@@ -121,63 +126,51 @@ test.describe("Kuadrant Plugin", () => {
   });
 
   test("should navigate to API Key detail page", async ({ page }) => {
-    await page.goto("/kuadrant/my-api-keys");
+    // seed a key of our own rather than depending on the environment having
+    // one: with nothing to click, this test used to pass without navigating
+    // anywhere.
+    await requestApiKey(page, `detail navigation ${generateTestId()}`);
 
-    // wait for page to load
-    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
-    await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
-
-    // look for view details button (eye icon)
     const viewDetailsButton = page
       .getByRole("button", { name: /view details/i })
       .first();
-    const buttonVisible = await viewDetailsButton
-      .isVisible()
-      .catch(() => false);
+    await expect(
+      viewDetailsButton,
+      "the key just requested should offer a view details button",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await viewDetailsButton.click();
 
-    if (buttonVisible) {
-      await viewDetailsButton.click();
+    // should navigate to detail page
+    await page.waitForURL(/\/kuadrant\/api-keys\/[^/]+\/[^/]+/);
 
-      // should navigate to detail page
-      await page.waitForURL(/\/kuadrant\/api-keys\/[^/]+\/[^/]+/);
-
-      // verify detail page content
-      const breadcrumb = page.getByText("API keys").first();
-      await expect(breadcrumb).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    }
-    // test passes if no API keys exist (nothing to view)
+    // verify detail page content
+    const breadcrumb = page.getByText("API keys").first();
+    await expect(breadcrumb).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
   test("should display API Key detail page with correct sections", async ({
     page,
   }) => {
-    // navigate directly to a known API key detail page
-    await page.goto("/kuadrant/my-api-keys");
+    await requestApiKey(page, `detail sections ${generateTestId()}`);
 
-    const heading = page.locator("h1, h2").filter({ hasText: /my api keys/i });
-    await expect(heading.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
-
-    // find first row in table and click view details
     const viewDetailsButton = page
       .getByRole("button", { name: /view details/i })
       .first();
-    const buttonVisible = await viewDetailsButton
-      .isVisible()
-      .catch(() => false);
+    await expect(
+      viewDetailsButton,
+      "the key just requested should offer a view details button",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await viewDetailsButton.click();
+    await page.waitForURL(/\/kuadrant\/api-keys\/[^/]+\/[^/]+/);
 
-    if (buttonVisible) {
-      await viewDetailsButton.click();
-      await page.waitForURL(/\/kuadrant\/api-keys\/[^/]+\/[^/]+/);
+    // verify detail page sections
+    const detailsCard = page.getByText("API Key Details");
+    await expect(detailsCard.first()).toBeVisible({
+      timeout: TIMEOUTS.DEFAULT,
+    });
 
-      // verify detail page sections
-      const detailsCard = page.getByText("API Key Details");
-      await expect(detailsCard.first()).toBeVisible({
-        timeout: TIMEOUTS.DEFAULT,
-      });
-
-      // verify View API button exists
-      const viewApiButton = page.getByTestId("view-api-button");
-      await expect(viewApiButton).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    }
+    // verify View API button exists
+    const viewApiButton = page.getByTestId("view-api-button");
+    await expect(viewApiButton).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 });

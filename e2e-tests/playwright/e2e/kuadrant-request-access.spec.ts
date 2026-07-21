@@ -1,6 +1,16 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
-import { TIMEOUTS, waitForApiKeysPageReady } from "../utils/kuadrant-helpers";
+import {
+  TIMEOUTS,
+  apiKeyTableTotal,
+  waitForApiKeysPageReady,
+  selectFirstOption,
+  openSelect,
+} from "../utils/kuadrant-helpers";
+
+// a demo APIProduct seeded by setup-cluster.sh. named so a test can narrow the
+// table to it rather than counting every row on a paginated page.
+const targetApi = "owner1-payment-api";
 
 /**
  * E2E tests for SimpleRequestAccessDialog
@@ -73,8 +83,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       timeout: TIMEOUTS.DEFAULT,
     });
 
-    // click to open dropdown
-    await apiSelect.click();
+    // click to open dropdown (retried: the menu can be dismissed by the
+    // re-render as the products fetch settles)
+    await openSelect(page, dialog, "api-select");
 
     // verify dropdown shows published APIs (like toystore-api)
     const listbox = page.getByRole("listbox");
@@ -106,8 +117,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select an API (toystore-api should have plans)
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
+    await openSelect(page, dialog, "api-select");
 
     const listbox = page.getByRole("listbox");
     const toystoreOption = listbox
@@ -130,7 +140,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeEnabled({ timeout: TIMEOUTS.DEFAULT });
 
     // click tiers dropdown
-    await tierSelect.click();
+    await openSelect(page, dialog, "tier-select");
 
     // verify tiers are populated
     const tierListbox = page.getByRole("listbox");
@@ -154,8 +164,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select toystore-api
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
+    await openSelect(page, dialog, "api-select");
     const listbox = page.getByRole("listbox");
     const toystoreOption = listbox
       .getByRole("option", { name: /toystore/i })
@@ -163,8 +172,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await toystoreOption.click();
 
     // open tiers dropdown
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
+    await openSelect(page, dialog, "tier-select");
 
     // verify tier options show limits (e.g., "bronze (10 per minute)")
     const tierListbox = page.getByRole("listbox");
@@ -201,11 +209,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeDisabled({ timeout: TIMEOUTS.DEFAULT });
 
     // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const apiListbox = page.getByRole("listbox");
-    const apiOption = apiListbox.getByRole("option").first();
-    await apiOption.click();
+    await selectFirstOption(page, dialog, "api-select");
 
     // submit should still be disabled (no tier selected)
     await expect(
@@ -214,11 +218,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeDisabled({ timeout: TIMEOUTS.DEFAULT });
 
     // select tier
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    const tierListbox = page.getByRole("listbox");
-    const tierOption = tierListbox.getByRole("option").first();
-    await tierOption.click();
+    await selectFirstOption(page, dialog, "tier-select");
 
     // submit should now be enabled
     await expect(
@@ -269,18 +269,10 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    const apiOption = listbox.getByRole("option").first();
-    await apiOption.click();
+    await selectFirstOption(page, dialog, "api-select");
 
     // select tier
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    const tierOption = listbox.getByRole("option").first();
-    await tierOption.click();
+    await selectFirstOption(page, dialog, "tier-select");
 
     // fill use case
     const useCaseField = dialog.getByTestId("usecase-input");
@@ -314,15 +306,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "api-select");
 
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "tier-select");
 
     // intercept the request to slow it down
     await page.route("**/api/kuadrant/requests", async (route) => {
@@ -359,10 +345,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "api-select");
 
     // fill use case
     const useCaseField = dialog.getByTestId("usecase-input");
@@ -409,10 +392,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // verify Tiers field helper text appears after selecting API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "api-select");
 
     const tierHelperText = dialog.getByText(
       /select an api to view available tiers/i,
@@ -423,106 +403,104 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
-  test("should display error message when request fails", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
-    await page.goto("/kuadrant/my-api-keys");
-    await waitForApiKeysPageReady(page);
+  // these two stub a 500 to check the ui surfaces it, so the guards in
+  // fixtures/test.ts would otherwise fail them on their own fixture.
+  test.describe("simulated backend failures", () => {
+    test.use({ allowExpectedErrors: true });
 
-    const requestButton = page.getByTestId("request-access-button");
-    await requestButton.click();
+    test("should display error message when request fails", async ({
+      page,
+    }) => {
+      const common = new Common(page);
+      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await page.goto("/kuadrant/my-api-keys");
+      await waitForApiKeysPageReady(page);
 
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+      const requestButton = page.getByTestId("request-access-button");
+      await requestButton.click();
 
-    // intercept the request to simulate a server error
-    await page.route("**/api/kuadrant/requests", async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error: "Server error: Failed to create API key request",
-        }),
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+
+      // intercept the request to simulate a server error
+      await page.route("**/api/kuadrant/requests", async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error: "Server error: Failed to create API key request",
+          }),
+        });
       });
+
+      // select API and tier
+      await selectFirstOption(page, dialog, "api-select");
+
+      await selectFirstOption(page, dialog, "tier-select");
+
+      // submit
+      const submitButton = dialog.getByTestId("submit-button");
+      await submitButton.click();
+
+      // wait a moment for the error to be processed
+      await page.waitForTimeout(1000);
+
+      // verify error message is displayed (permanent alert)
+      const errorAlert = page.getByText(/failed to request api key/i);
+      await expect(errorAlert, "Error message should be displayed").toBeVisible(
+        {
+          timeout: TIMEOUTS.DEFAULT,
+        },
+      );
     });
 
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    test("should display user-friendly error for email validation failure", async ({
+      page,
+    }) => {
+      const common = new Common(page);
+      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await page.goto("/kuadrant/my-api-keys");
+      await waitForApiKeysPageReady(page);
 
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+      const requestButton = page.getByTestId("request-access-button");
+      await requestButton.click();
 
-    // submit
-    const submitButton = dialog.getByTestId("submit-button");
-    await submitButton.click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // wait a moment for the error to be processed
-    await page.waitForTimeout(1000);
-
-    // verify error message is displayed (permanent alert)
-    const errorAlert = page.getByText(/failed to request api key/i);
-    await expect(errorAlert, "Error message should be displayed").toBeVisible({
-      timeout: TIMEOUTS.DEFAULT,
-    });
-  });
-
-  test("should display user-friendly error for email validation failure", async ({
-    page,
-  }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
-    await page.goto("/kuadrant/my-api-keys");
-    await waitForApiKeysPageReady(page);
-
-    const requestButton = page.getByTestId("request-access-button");
-    await requestButton.click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-
-    // intercept request to simulate email validation error
-    await page.route("**/api/kuadrant/requests", async (route) => {
-      await route.fulfill({
-        status: 500,
-        contentType: "application/json",
-        body: JSON.stringify({
-          error:
-            'failed to create apikeys: APIKey.devportal.kuadrant.io "test-key" is invalid: spec.requestedBy.email: Invalid value: "admin": spec.requestedBy.email in body should match \'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\'',
-        }),
+      // intercept request to simulate email validation error
+      await page.route("**/api/kuadrant/requests", async (route) => {
+        await route.fulfill({
+          status: 500,
+          contentType: "application/json",
+          body: JSON.stringify({
+            error:
+              'failed to create apikeys: APIKey.devportal.kuadrant.io "test-key" is invalid: spec.requestedBy.email: Invalid value: "admin": spec.requestedBy.email in body should match \'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\'',
+          }),
+        });
       });
+
+      // select API and tier
+      await selectFirstOption(page, dialog, "api-select");
+
+      await selectFirstOption(page, dialog, "tier-select");
+
+      // submit
+      const submitButton = dialog.getByTestId("submit-button");
+      await submitButton.click();
+
+      // wait for error processing
+      await page.waitForTimeout(1000);
+
+      // verify user-friendly error message for email validation
+      const emailErrorAlert = page.getByText(
+        /invalid email format.*contact your administrator/i,
+      );
+      await expect(
+        emailErrorAlert,
+        "User-friendly email validation error should be displayed",
+      ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
     });
-
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    // submit
-    const submitButton = dialog.getByTestId("submit-button");
-    await submitButton.click();
-
-    // wait for error processing
-    await page.waitForTimeout(1000);
-
-    // verify user-friendly error message for email validation
-    const emailErrorAlert = page.getByText(
-      /invalid email format.*contact your administrator/i,
-    );
-    await expect(
-      emailErrorAlert,
-      "User-friendly email validation error should be displayed",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
   test("should refresh My API Keys table after successful request", async ({
@@ -533,9 +511,19 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
-    // count initial number of rows
-    const initialRows = page.locator("table tbody tr");
-    const initialCount = await initialRows.count();
+    // the total, not the visible rows: the table pages at 20, so a bare count
+    // stops growing once the first page is full and this test would then never
+    // see its own request arrive. wait for the body to render before taking the
+    // baseline - reading it mid-load returns 0 and the comparison is then
+    // against a number that was never true.
+    await expect(
+      page
+        .locator("table tbody tr")
+        .first()
+        .or(page.getByText(/no api keys found/i)),
+      "the keys table should finish loading before the baseline is taken",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    const initialCount = await apiKeyTableTotal(page);
 
     const requestButton = page.getByTestId("request-access-button");
     await requestButton.click();
@@ -544,15 +532,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "api-select", targetApi);
 
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectFirstOption(page, dialog, "tier-select");
 
     // submit
     const submitButton = dialog.getByTestId("submit-button");
@@ -561,15 +543,11 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     // wait for dialog to close
     await expect(dialog).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-    // wait a moment for table to refresh
-    await page.waitForTimeout(2000);
-
-    // verify table has been updated (should have one more row)
-    const updatedRows = page.locator("table tbody tr");
-    const updatedCount = await updatedRows.count();
-    expect(
-      updatedCount,
-      "Table should have one more row after successful request",
-    ).toBeGreaterThan(initialCount);
+    await expect
+      .poll(() => apiKeyTableTotal(page), {
+        timeout: TIMEOUTS.SLOW,
+        message: "Table should have one more row after successful request",
+      })
+      .toBe(initialCount + 1);
   });
 });
