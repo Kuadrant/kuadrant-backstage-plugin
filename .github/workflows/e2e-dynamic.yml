@@ -1,0 +1,99 @@
+name: E2E (dynamic plugins)
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  OINC_VERSION: v0.3.1
+  OCP_VERSION: "4.21"
+  KUADRANT_VERSION: "1.5.1"
+  RHDH_BASE_IMAGE: quay.io/rhdh-community/rhdh:1.10
+  RHDH_IMAGE_REPOSITORY: localhost/kuadrant-rhdh-e2e
+  RHDH_IMAGE_TAG: ci
+  RHDH_CHART_VERSION: "6.2.2"
+  RHDH_URL: http://rhdh.localhost:9080
+  DEX_URL: http://dex.localhost:9080
+
+jobs:
+  e2e-rhdh-dynamic:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Free disk space
+        run: |
+          sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/lib/android \
+            /opt/hostedtoolcache/CodeQL /usr/local/share/boost || true
+          df -h /
+
+      - name: Configure local routes
+        run: |
+          echo "127.0.0.1 rhdh.localhost" | sudo tee -a /etc/hosts
+          echo "127.0.0.1 dex.localhost" | sudo tee -a /etc/hosts
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Install oinc
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/oinc" \
+            "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
+          chmod +x "$RUNNER_TEMP/oinc"
+          sudo mv "$RUNNER_TEMP/oinc" /usr/local/bin/oinc
+
+      - name: Install Helm
+        uses: azure/setup-helm@v4
+
+      - name: Install e2e dependencies
+        run: make e2e-deps PLAYWRIGHT_INSTALL_ARGS=--with-deps
+
+      - name: Build and start dynamic RHDH
+        run: make dynamic-up
+
+      - name: Run e2e tests
+        run: make e2e-specs
+
+      - name: RHDH diagnostics on failure
+        if: failure()
+        run: |
+          kubectl -n rhdh get pods,route,svc || true
+          kubectl -n rhdh logs -l app.kubernetes.io/component=backstage --all-containers --tail=300 || true
+          kubectl -n kuadrant-system get pods -o wide || true
+          kubectl -n localhost get pods || true
+          kubectl -n localhost logs deployment/dex --tail=100 || true
+          curl -fsS "$DEX_URL/.well-known/openid-configuration" || true
+
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-dynamic
+          path: e2e-tests/playwright-report/
+          retention-days: 7
+
+      - name: Upload test artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts-dynamic
+          path: e2e-tests/test-results/
+          retention-days: 7
+
+      - name: Teardown oinc cluster
+        if: always()
+        run: make teardown

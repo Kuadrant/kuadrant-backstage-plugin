@@ -2,13 +2,14 @@
 
 ## Workflows
 
-Three GitHub Actions workflows live in `.github/workflows/`:
+GitHub Actions workflows live in `.github/workflows/`:
 
-| Workflow                     | Trigger                                     | Purpose                                        |
-| ---------------------------- | ------------------------------------------- | ---------------------------------------------- |
-| `ci.yml`                     | PRs, merge queue, pushes to main, or manual | Build, lint, type-check, unit tests, e2e tests |
-| `publish.yml`                | GitHub Release published, or manual         | Publish packages to npm                        |
-| `contributor-governance.yml` | Issues and PRs                              | Run the shared contributor-governance checks   |
+| Workflow                     | Trigger                                     | Purpose                                                      |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `ci.yml`                     | PRs, merge queue, pushes to main, or manual | Build, lint, type-check, unit tests, static-plugin e2e tests |
+| `e2e-dynamic.yml`            | Manual (`workflow_dispatch`)                | Full e2e suite against dynamic plugins in RHDH               |
+| `publish.yml`                | GitHub Release published, or manual         | Publish packages to npm                                      |
+| `contributor-governance.yml` | Issues and PRs                              | Run the shared contributor-governance checks                 |
 
 ## Release Flow
 
@@ -85,9 +86,11 @@ before publication. Without this step, the frontend would be missing
 - **build-validate**: Lint, prettier, type-check, build, verify output bundles exist
 - **export-plugins**: Build and verify the frontend and backend dynamic exports
 - **unittests**: Backend and frontend unit tests
-- **e2e-tests**: Spins up a kind cluster with Kuadrant, starts Backstage, runs Playwright tests
+- **e2e-tests**: Spins up a kind cluster with Kuadrant, starts Backstage with the plugins statically linked, and runs Playwright
 
 E2e test artifacts (Playwright report, videos on failure) are uploaded and retained for 7 days.
+
+The static path remains the default required PR check. The dynamic-plugin workflow is manual-only because it also builds an RHDH image and boots an oinc cluster. It runs the same full Playwright suite against the current branch's exported dynamic plugins. Its build and cluster commands are shared with the local Make targets; see [E2E Testing](e2e-testing.md#running-against-rhdh-dynamic-plugins).
 
 ## npm Trusted Publishing
 

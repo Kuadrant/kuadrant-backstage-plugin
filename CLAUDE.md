@@ -120,9 +120,27 @@ yarn test                       # run kuadrant e2e tests
 yarn test:smoke                 # run smoke tests only
 ```
 
-Tests available:
-- `kuadrant-plugin.spec.ts` - basic navigation and rendering tests
-- `kuadrant-rbac.spec.ts` - comprehensive RBAC permission tests covering all personas
+**Dynamic-plugin E2E (manually dispatched in CI):**
+```bash
+make e2e-dynamic                # build, bake, boot oinc, run the specs, tear down
+make preflight                  # check required tooling, change nothing
+```
+Needs oinc (pinned version), docker, helm, kubectl, curl, python3 and node/yarn, and
+installs none of them; it does run `yarn install` and `playwright install chromium`, as
+CI does. Cluster is left up on failure for inspection.
+
+For manual testing, run the same phases without the one-shot teardown:
+```bash
+make dynamic-up                 # build and leave the RHDH environment running
+make e2e-deps                   # install Playwright locally (once)
+make e2e-specs                  # run the specs against it (repeatable, no rebuild)
+make teardown                   # delete the cluster (no-op if there is none)
+```
+`dynamic-up` leaves RHDH at `http://rhdh.localhost:9080` and always rebuilds the image.
+It signs in through dex with the same five personas as `yarn dev`, so the whole spec set
+runs there. It deliberately skips Playwright installation for browser-only manual
+testing. After `e2e-deps`, `e2e-specs` forwards `PLAYWRIGHT_ARGS` and needs no rebuild.
+See [docs/e2e-testing.md](docs/e2e-testing.md) and [docs/oinc.md](docs/oinc.md).
 
 ### Linting and Formatting
 ```bash
@@ -138,12 +156,16 @@ yarn export-dynamic -- -- --dev # export all dynamic plugins for local dev
 ```
 
 ### Testing Different Roles
-```bash
-yarn user:consumer              # switch to API Consumer
-yarn user:owner                 # switch to API Owner
-yarn user:default               # restore default permissions
-```
-After switching roles, restart with `yarn dev`.
+
+`yarn dev` starts a local dex container on `:5556`; `make dynamic-up` deploys dex on the
+oinc cluster from the same files. Either way, sign in through the dex quick-login picker
+as one of five personas: `admin@kuadrant.local`, `owner1@`, `owner2@`, `consumer1@`,
+`consumer2@` (passwords match usernames). Sign out and back in to switch.
+
+Personas live in [`kuadrant-dev-setup/dex/config.yaml`](kuadrant-dev-setup/dex/config.yaml)
+and [`catalog-entities/kuadrant-users.yaml`](catalog-entities/kuadrant-users.yaml); their
+group membership maps to roles in [`rbac-policy.csv`](rbac-policy.csv). Adding a persona
+is a one-file edit that both environments pick up.
 
 ## Testing Infrastructure
 

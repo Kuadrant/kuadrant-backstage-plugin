@@ -5,6 +5,8 @@
 plugins
 !plugins/auth-backend-module-oidc-provider
 !plugins/dynamic-plugins-info-backend
+!plugins/kuadrant
+!plugins/kuadrant-backend
 !plugins/licensed-users-info-backend
 !plugins/scalprum-backend
 *.local.yaml
