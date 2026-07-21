@@ -37,7 +37,7 @@ kind-create: $(KIND) $(HELM)
 	@kubectl cluster-info --context kind-$(CLUSTER_NAME)
 	@echo ""
 	@echo "creating rhdh service account and rbac..."
-	@kubectl apply -f rbac/rhdh-rbac.yaml
+	@kubectl apply -f rbac/rhdh-cluster-role.yaml -f rbac/rhdh-rbac.yaml
 	@echo ""
 	@echo "configure kubernetes integration with backstage using rhdh service account..."
 	@./scripts/kube-env-setup.sh
