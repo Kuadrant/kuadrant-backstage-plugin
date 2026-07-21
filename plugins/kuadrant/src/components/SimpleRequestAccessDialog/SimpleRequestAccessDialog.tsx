@@ -314,7 +314,7 @@ export const SimpleRequestAccessDialog = ({
           label="Use case"
           placeholder="Briefly describe your specific use case of using this API key"
           multiline
-          rows={2}
+          minRows={2}
           fullWidth
           margin="normal"
           value={useCase}
