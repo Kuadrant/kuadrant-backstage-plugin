@@ -184,7 +184,7 @@ export const RequestAccessDialog = ({
           label="Use Case (optional)"
           placeholder="Describe how you plan to use this API"
           multiline
-          rows={3}
+          minRows={3}
           fullWidth
           margin="normal"
           value={useCase}

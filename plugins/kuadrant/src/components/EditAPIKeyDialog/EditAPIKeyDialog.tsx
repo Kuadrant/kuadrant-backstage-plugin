@@ -132,7 +132,7 @@ export const EditAPIKeyDialog = ({
           label="Use Case"
           placeholder="Describe how you plan to use this API"
           multiline
-          rows={3}
+          minRows={3}
           fullWidth
           margin="normal"
           value={useCase}

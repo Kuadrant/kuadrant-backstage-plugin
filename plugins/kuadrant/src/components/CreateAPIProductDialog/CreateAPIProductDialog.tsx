@@ -471,7 +471,7 @@ export const CreateAPIProductDialog = ({ open, onClose, onSuccess }: CreateAPIPr
               placeholder="API description"
               margin="normal"
               multiline
-              rows={2}
+              minRows={2}
               required
               disabled={creating}
               InputLabelProps={{
