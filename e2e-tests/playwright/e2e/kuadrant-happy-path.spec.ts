@@ -1,7 +1,8 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
 import {
   TIMEOUTS,
+  apiKeyTableTotal,
   createTestAPIProductData,
   waitForKuadrantPageReady,
   waitForApiKeysPageReady,
@@ -38,55 +39,59 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test.afterAll(async ({ browser }) => {
     if (!testCreated) return;
 
+    const context = await browser.newContext();
     try {
-      const context = await browser.newContext();
       const page = await context.newPage();
       const common = new Common(page);
 
       await common.dexQuickLogin("owner1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
 
-      const heading = page
-        .locator("h1, h2")
-        .filter({ hasText: /api products/i })
-        .first();
-      await heading
-        .waitFor({ state: "visible", timeout: TIMEOUTS.SLOW })
-        .catch(() => {});
+      // wait for the table, not just the heading: searching before the rows
+      // arrive filters an empty table and finds nothing.
+      await waitForKuadrantPageReady(page);
 
-      const apiProductRow = page
-        .locator("tr")
-        .filter({ hasText: testData.displayName });
-      const rowVisible = await apiProductRow.isVisible().catch(() => false);
-
-      if (rowVisible) {
-        const deleteButton = apiProductRow.getByRole("button", {
-          name: /delete api product/i,
-        });
-        await deleteButton.click();
-
-        const confirmDialog = page.getByRole("dialog");
-        const dialogVisible = await confirmDialog
-          .isVisible()
-          .catch(() => false);
-
-        if (dialogVisible) {
-          const confirmInput = confirmDialog.getByRole("textbox");
-          await confirmInput.fill(testData.name);
-
-          const confirmButton = confirmDialog.getByRole("button", {
-            name: /delete/i,
-          });
-          await confirmButton.click();
-          await confirmDialog
-            .waitFor({ state: "hidden", timeout: TIMEOUTS.SLOW })
-            .catch(() => {});
-        }
+      // narrow before looking: the products table pages at 20, so past that the
+      // row is simply not on screen and the old isVisible() check quietly
+      // decided there was nothing to clean up. that is why a long-lived cluster
+      // fills with leftover e2e-test-api-* products, which then pages the demo
+      // products the other specs look for off their own first page.
+      const search = page.getByRole("textbox", { name: "Search" });
+      if (await search.count()) {
+        await search.fill(testData.name);
       }
 
-      await context.close();
+      // matched on the id, which both name and displayName carry: the search
+      // indexes the resource name, but the row renders the display name.
+      const apiProductRow = page
+        .locator("tbody tr")
+        .filter({ hasText: testData.id })
+        .first();
+      await apiProductRow.waitFor({ state: "visible", timeout: TIMEOUTS.SLOW });
+
+      await apiProductRow
+        .getByRole("button", { name: /delete api product/i })
+        .click();
+
+      const confirmDialog = page.getByRole("dialog");
+      await confirmDialog.waitFor({
+        state: "visible",
+        timeout: TIMEOUTS.DEFAULT,
+      });
+      await confirmDialog.getByRole("textbox").fill(testData.name);
+      await confirmDialog.getByRole("button", { name: /delete/i }).click();
+      await confirmDialog.waitFor({ state: "hidden", timeout: TIMEOUTS.SLOW });
     } catch (error) {
-      console.warn("Cleanup failed:", error);
+      // a failed cleanup leaks a product into the cluster, so say so loudly
+      // enough to be found in a log rather than filing it under "warning", and
+      // fail the suite rather than let a leak pass silently.
+      console.error(
+        `Cleanup failed - ${testData.name} is still on the cluster:`,
+        error,
+      );
+      throw error;
+    } finally {
+      await context.close();
     }
   });
 
@@ -124,7 +129,16 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     // select an HTTPRoute
     const httprouteSelect = page.locator('[data-testid="httproute-select"]');
     await httprouteSelect.scrollIntoViewIfNeeded();
-    await httprouteSelect.click({ timeout: TIMEOUTS.DEFAULT });
+    // disabled while the routes load, and a click on a disabled MUI Select is
+    // swallowed - the failure then reads as "options never appeared". the open
+    // is retried because a re-render as the fetch settles can dismiss the menu.
+    await expect(httprouteSelect).toBeEnabled({ timeout: TIMEOUTS.SLOW });
+    await expect(async () => {
+      await httprouteSelect.click({ timeout: TIMEOUTS.DEFAULT });
+      await expect(
+        page.getByRole("listbox").getByRole("option").first(),
+      ).toBeVisible({ timeout: TIMEOUTS.QUICK });
+    }).toPass({ timeout: TIMEOUTS.SLOW, intervals: [250, 500, 1000] });
 
     // wait for dropdown options and select toystore
     const toystoreOption = page
@@ -145,7 +159,13 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     });
     testCreated = true;
 
-    // verify API product appears in table (scope to table to avoid matching toast)
+    // verify API product appears in table (scope to table to avoid matching
+    // toast). narrowed first: the table pages at 20, so a newly created product
+    // is not necessarily on the visible page.
+    const search = page.getByRole("textbox", { name: "Search" });
+    if (await search.count()) {
+      await search.fill(testData.name);
+    }
     const table = page.locator("table");
     const apiProductRow = table.getByRole("link", {
       name: testData.displayName,
@@ -218,7 +238,8 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
       timeout: TIMEOUTS.DEFAULT,
     });
 
-    // click the select to open dropdown
+    // click the select to open dropdown, once the plans have loaded
+    await expect(tierSelect).toBeEnabled({ timeout: TIMEOUTS.SLOW });
     await tierSelect.click();
 
     // wait for dropdown and select first option
@@ -261,10 +282,19 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
 
-    // should see consumer1's request in the approval queue table
-    const consumerRequest = page.getByText(/consumer1/i).first();
+    // should see consumer1's request in the approval queue. narrowed to the api
+    // step 3 requested against - toystore-api, not the product created in step
+    // 1 - because the queue pages at 20 and on a reused cluster the newest
+    // request is not reliably on the visible page.
+    const search = page.getByRole("textbox", { name: "Search" });
+    if (await search.count()) {
+      await search.fill("toystore-api");
+    }
     await expect(
-      consumerRequest,
+      page
+        .locator("tbody tr")
+        .filter({ hasText: /consumer1/i })
+        .first(),
       "Admin should see consumer1's request",
     ).toBeVisible({ timeout: TIMEOUTS.SLOW });
   });
@@ -277,12 +307,28 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
 
-    // owner2 should NOT see toystore requests (toystore is owned by owner1)
-    // verify the table shows no API keys
-    const noApiKeysMessage = page.getByText(/no api keys found/i);
+    // owner2 should NOT see requests for owner1's api. the claim is about that
+    // api, not about owner2's queue being empty overall - owner2 owns other
+    // demo apis, so requests for those are legitimately there and asserting a
+    // globally empty queue only held while nothing else had ever been
+    // requested. narrow to owner1's product and assert nothing comes back.
+    const search = page.getByRole("textbox", { name: "Search" });
+    if (await search.count()) {
+      await search.fill(testData.name);
+    }
     await expect(
-      noApiKeysMessage,
-      "Owner2 should see 'No API keys found' (toystore owned by owner1)",
+      page.locator("tbody tr").filter({ hasText: testData.name }),
+      "Owner2 should see no requests for owner1's api",
+    ).toHaveCount(0, { timeout: TIMEOUTS.DEFAULT });
+    // and the page says so, rather than the count being zero because nothing
+    // rendered: an empty queue shows "No API keys found", a search that matches
+    // nothing shows the table's own "No records to display".
+    await expect(
+      page
+        .getByText(/no api keys found/i)
+        .or(page.getByText(/no records to display/i))
+        .first(),
+      "the queue should report nothing matching owner1's api",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
@@ -387,12 +433,21 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
-    // find the first row in the table
-    const firstRow = page.locator("table tbody tr").first();
+    // rows for the same api product are indistinguishable in the dom, and the
+    // table pages at 20 - so counting visible rows proves nothing once the
+    // first page is full (deleting one just pulls the next row up), and
+    // asserting the table ends up empty only held while this was consumer1's
+    // only key ever. the pagination footer carries the real total, so use that
+    // where it is rendered (material-table only pages past 10 rows).
+    const totalKeys = () => apiKeyTableTotal(page);
+
+    const rows = page.locator("table tbody tr");
+    const firstRow = rows.first();
     await expect(
       firstRow,
       "Consumer should see at least one API key",
     ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    const before = await totalKeys();
 
     // click the delete button in the Actions column
     const deleteButton = firstRow.getByRole("button", { name: /delete/i });
@@ -433,11 +488,12 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
       timeout: TIMEOUTS.DEFAULT,
     });
 
-    // verify the key is removed — table should be empty after deleting the only key
-    const emptyState = page.getByText(/no api keys found/i);
-    await expect(
-      emptyState,
-      "Table should show empty state after deleting the only key",
-    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    // exactly one key fewer
+    await expect
+      .poll(totalKeys, {
+        timeout: TIMEOUTS.SLOW,
+        message: "Deleting one key should leave exactly one fewer",
+      })
+      .toBe(before - 1);
   });
 });

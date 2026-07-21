@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
 test.describe("Smoke test", () => {
   let common: Common;
@@ -12,7 +12,7 @@ test.describe("Smoke test", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("admin@kuadrant.local");
   });
 
   test("Verify the Homepage renders", async ({ page }) => {
