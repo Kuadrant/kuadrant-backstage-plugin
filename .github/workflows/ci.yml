@@ -145,7 +145,7 @@ jobs:
       - name: Setup RBAC and Kuadrant on kind cluster
         run: |
           cd kuadrant-dev-setup
-          kubectl apply -f rbac/rhdh-rbac.yaml
+          kubectl apply -f rbac/rhdh-cluster-role.yaml -f rbac/rhdh-rbac.yaml
           ./scripts/kube-env-setup.sh
           make kuadrant-install CLUSTER_NAME=kuadrant-test
           make demo-install
