@@ -47,8 +47,11 @@ staticPasswords:
 staticClients:
   - id: backstage
     redirectURIs:
+      # yarn dev (frontend on 3000, backend on 7007)
       - "http://localhost:3000/api/auth/oidc/handler/frame"
       - "http://localhost:7007/api/auth/oidc/handler/frame"
+      # oinc (make dynamic-up), where rhdh is served from a single origin
+      - "http://rhdh.localhost:9080/api/auth/oidc/handler/frame"
     name: "Backstage Local Dev"
     secret: "backstage-dev-secret"
 
