@@ -117,8 +117,10 @@ Do all of this before creating a local tag.
     successfully and specifically show all four repository CI jobs passing:
     `build-validate`, `export-plugins`, `unittests`, and `e2e-tests`. Pending,
     skipped, missing, cancelled, or failed required checks are failures.
-11. Query npm for the target version of all three packages. The version must be
-    absent from every package before a new release:
+11. Query npm for the target version of all three packages, pinning the public
+    registry with `--registry https://registry.npmjs.org/` so a configured
+    mirror cannot answer. The version must be absent from every package before
+    a new release:
     - `@kuadrant/kuadrant-backstage-plugin-frontend`
     - `@kuadrant/kuadrant-backstage-plugin-backend`
     - `@kuadrant/kuadrant-backstage-plugin-backend-dynamic`
@@ -146,8 +148,8 @@ confirmation. Stop without changing anything if they do not confirm.
 
 Immediately after confirmation, fetch the release branch again and repeat the
 clean-worktree, branch synchronization, package-version, remote-tag absence,
-release absence, and PR/CI checks. This closes the gap between preflight and
-push.
+release absence, PR/CI, and npm version-absence checks. This closes the gap
+between preflight and push.
 
 Create a signed annotated tag at the already-recorded commit:
 
@@ -175,8 +177,9 @@ object and that its peeled commit equals `HEAD_SHA` using `git ls-remote`.
 
 ## 5. Publish the GitHub Release
 
-Reconfirm that `GH_TOKEN` and `GITHUB_TOKEN` are unset and show the authenticated
-login again. Create a non-draft GitHub Release from the existing remote tag:
+Reconfirm that `GH_TOKEN` and `GITHUB_TOKEN` are unset and that the
+authenticated login still matches the one recorded in the confirmed plan; stop
+on any mismatch. Create a non-draft GitHub Release from the existing remote tag:
 
 ```shell
 gh release create "$TAG" \
@@ -208,9 +211,10 @@ gh run watch "$RUN_ID" --repo "$REPO" --compact --exit-status
 If it fails, show `gh run view "$RUN_ID" --log-failed`, inspect npm state, and
 stop. Do not automatically rerun it.
 
-After a successful workflow, poll npm for up to five minutes. For each of the
-three package names, require both the exact `@$VERSION` lookup and the `latest`
-dist-tag to resolve to `VERSION`. Report each result and the workflow URL.
+After a successful workflow, poll npm for up to five minutes, again pinning the
+public registry. For each of the three package names, require both the exact
+`@$VERSION` lookup and the `latest` dist-tag to resolve to `VERSION`. Report
+each result and the workflow URL.
 
 ## 7. Finish
 

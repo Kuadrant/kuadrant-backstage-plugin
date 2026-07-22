@@ -204,17 +204,23 @@ for PACKAGE in \
   @kuadrant/kuadrant-backstage-plugin-backend \
   @kuadrant/kuadrant-backstage-plugin-backend-dynamic
 do
-  npm view "$PACKAGE" versions --json
+  VERSIONS=$(npm view "$PACKAGE" versions --json \
+    --registry https://registry.npmjs.org/) || exit 1
+  printf '%s\n' "$VERSIONS" | node -e '
+    const data = JSON.parse(require("fs").readFileSync(0, "utf8"));
+    const versions = Array.isArray(data) ? data : [data];
+    process.exit(versions.includes(process.argv[1]) ? 1 : 0)
+  ' "$VERSION" || exit 1
 done
 ```
 
-Review all output before continuing. Any existing package version is a stop,
-not a successful preflight.
+A non-zero exit above is a stop, not a successful preflight.
 
 ### 2. Sign and push the tag
 
-Fetch and repeat the branch, version, PR/CI, remote-tag, and release checks
-immediately before tagging. Then create the signed annotated tag:
+Fetch and repeat the branch, version, PR/CI, remote-tag, release, and npm
+version-absence checks immediately before tagging. Then create the signed
+annotated tag:
 
 ```shell
 git tag -s "$TAG" "$HEAD_SHA" -m "$TAG"
@@ -281,8 +287,10 @@ for PACKAGE in \
   @kuadrant/kuadrant-backstage-plugin-backend \
   @kuadrant/kuadrant-backstage-plugin-backend-dynamic
 do
-  test "$(npm view "${PACKAGE}@${VERSION}" version)" = "$VERSION"
-  test "$(npm view "$PACKAGE" dist-tags.latest)" = "$VERSION"
+  test "$(npm view "${PACKAGE}@${VERSION}" version \
+    --registry https://registry.npmjs.org/)" = "$VERSION"
+  test "$(npm view "$PACKAGE" dist-tags.latest \
+    --registry https://registry.npmjs.org/)" = "$VERSION"
 done
 ```
 
@@ -307,8 +315,10 @@ git fetch --no-tags upstream \
   reuse it only when it is signed, annotated, and points to the synchronized
   release-branch tip. Otherwise, after confirming the exact tag name, remove
   only the local tag with `git tag -d vX.Y.Z` and rerun the full preflight.
-- If the remote tag is correct but no GitHub Release exists, rerun the complete
-  read-only preflight and resume with `gh release create --verify-tag`.
+- If the remote tag is correct but no GitHub Release exists, verify that the
+  tag is signed and points to the synchronized release-branch tip, rerun the
+  remaining read-only preflight checks while skipping the tag-absence gate,
+  and resume with `gh release create --verify-tag`.
 - If the remote tag points anywhere unexpected, stop. Do not delete or replace
   it; choose a new version or agree a recovery with the maintainers.
 
