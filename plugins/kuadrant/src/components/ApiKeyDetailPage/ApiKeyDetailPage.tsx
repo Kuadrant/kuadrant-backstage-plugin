@@ -356,6 +356,27 @@ func main() {
                     </>
                   ) : null;
                 })()}
+
+                {apiKey.spec.expiresAt && (() => {
+                  const expiryDate = new Date(apiKey.spec.expiresAt!);
+                  const isExpired = phase === 'Expired';
+                  const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+                  return (
+                    <>
+                      <Typography variant="caption" className={classes.label}>
+                        Expires On
+                      </Typography>
+                      <Typography
+                        variant="body1"
+                        className={classes.value}
+                        style={isExpired ? { color: '#d32f2f' } : undefined}
+                      >
+                        {expiryDate.toLocaleDateString()}
+                        {isExpired ? ' (Expired)' : daysLeft > 0 ? ` (${daysLeft} days left)` : ''}
+                      </Typography>
+                    </>
+                  );
+                })()}
               </Box>
             </InfoCard>
           </Grid>

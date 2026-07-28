@@ -47,12 +47,16 @@ export const RequestAccessDialog = ({
 
   const [selectedPlan, setSelectedPlan] = useState('');
   const [useCase, setUseCase] = useState('');
+  const [expiryDays, setExpiryDays] = useState('');
+  const [customDate, setCustomDate] = useState('');
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
 
   const handleClose = () => {
     setSelectedPlan('');
     setUseCase('');
+    setExpiryDays('');
+    setCustomDate('');
     setCreateError(null);
     onClose();
   };
@@ -74,6 +78,14 @@ export const RequestAccessDialog = ({
       // 2. create secret in consumer's namespace first (design doc: secret before APIKey)
       await kuadrantApi.createSecret(secretName, apiKeyValue);
 
+      // calculate expiresAt from selected preset or custom date
+      let expiresAt: string | undefined;
+      if (expiryDays === 'custom' && customDate) {
+        expiresAt = new Date(customDate).toISOString();
+      } else if (expiryDays) {
+        expiresAt = new Date(Date.now() + parseInt(expiryDays, 10) * 86400000).toISOString();
+      }
+
       try {
         // 3. create APIKey referencing the pre-existing secret
         await kuadrantApi.createRequest({
@@ -83,6 +95,7 @@ export const RequestAccessDialog = ({
           useCase: useCase.trim() || '',
           userEmail,
           secretName,
+          expiresAt,
         });
 
         alertApi.post({
@@ -93,6 +106,8 @@ export const RequestAccessDialog = ({
 
         setSelectedPlan('');
         setUseCase('');
+        setExpiryDays('');
+        setCustomDate('');
         onSuccess();
 
       } catch (apiKeyError) {
@@ -137,8 +152,7 @@ export const RequestAccessDialog = ({
             style={{ marginTop: 2 }}
           />
           <Typography variant="body2">
-            Your request will be reviewed by an API owner before access is
-            granted.
+            Your request will be reviewed by an API owner before access is granted.
           </Typography>
         </Box>
         {createError && (
@@ -192,6 +206,41 @@ export const RequestAccessDialog = ({
           helperText="Explain your intended use of this API for admin review"
           disabled={creating}
         />
+        <FormControl fullWidth margin="normal" disabled={creating}>
+          <InputLabel id="expiry-select-label">Expiration (optional)</InputLabel>
+          <Select
+            labelId="expiry-select-label"
+            value={expiryDays}
+            onChange={(e) => {
+              setExpiryDays(e.target.value as string);
+              setCustomDate('');
+            }}
+          >
+            <MenuItem value="">No expiration</MenuItem>
+            {[7, 30, 60, 90].map(days => {
+              const date = new Date(Date.now() + days * 86400000);
+              return (
+                <MenuItem key={days} value={String(days)}>
+                  {days} days ({date.toLocaleDateString()})
+                </MenuItem>
+              );
+            })}
+            <MenuItem value="custom">Custom</MenuItem>
+          </Select>
+        </FormControl>
+        {expiryDays === 'custom' && (
+          <TextField
+            label="Select date"
+            type="date"
+            fullWidth
+            margin="normal"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            disabled={creating}
+            inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split('T')[0] }}
+          />
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={creating}>

@@ -149,6 +149,20 @@ const ApprovalDialog = ({
                 {request.spec.useCase || "-"}
               </Typography>
             </Box>
+            <Box mb={2}>
+              <Typography
+                variant="body2"
+                component="span"
+                style={{ fontWeight: "bold" }}
+              >
+                Expires:
+              </Typography>{" "}
+              <Typography variant="body2" component="span">
+                {request.spec.expiresAt
+                  ? `${new Date(request.spec.expiresAt).toLocaleDateString()} (${Math.ceil((new Date(request.spec.expiresAt).getTime() - Date.now()) / 86400000)} days)`
+                  : "No expiration"}
+              </Typography>
+            </Box>
             {isReject && (
               <Box mt={2}>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -811,6 +825,22 @@ export const ApprovalQueueTable = () => {
             : "-"}
         </Typography>
       ),
+    },
+    {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row) => {
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2" color="textSecondary">No expiration</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : ""}
+          </Typography>
+        );
+      },
     },
     {
       title: "Reviewed By",

@@ -818,6 +818,7 @@ export async function createRouter({
     useCase: z.string().optional(),
     userEmail: z.string().optional(),
     secretName: z.string(), // frontend creates secret via POST /secrets first
+    expiresAt: z.string().datetime().optional(), // ISO 8601 expiry date set by consumer
   });
 
   router.post('/requests', async (req, res) => {
@@ -828,7 +829,7 @@ export async function createRouter({
 
     try {
       const credentials = await httpAuth.credentials(req);
-      const { apiProductName, namespace, planTier, useCase, userEmail, secretName: frontendSecretName } = parsed.data;
+      const { apiProductName, namespace, planTier, useCase, userEmail, secretName: frontendSecretName, expiresAt } = parsed.data;
 
       // extract userId from authenticated credentials, not from request body
       const { userEntityRef } = await getUserIdentity(req, httpAuth, userInfo);
@@ -885,6 +886,7 @@ export async function createRouter({
           planTier,
           useCase: useCase || '',
           requestedBy,
+          ...(expiresAt && { expiresAt }),
         },
       };
 
@@ -1455,6 +1457,7 @@ export async function createRouter({
       spec: z.object({
         useCase: z.string().optional(),
         planTier: z.string().optional(),
+        expiresAt: z.string().datetime().optional(),
       }).partial(),
     });
 

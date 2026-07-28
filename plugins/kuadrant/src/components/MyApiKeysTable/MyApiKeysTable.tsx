@@ -481,6 +481,26 @@ export const MyApiKeysTable = () => {
       },
     },
     {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row: APIKey) => {
+        const phase = getAPIKeyPhase(row.status?.conditions);
+        if (phase === "Expired") {
+          return <Chip label="Expired" size="small" style={{ border: "none", backgroundColor: "#757575", color: "#fff" }} />;
+        }
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : ""}
+          </Typography>
+        );
+      },
+    },
+    {
       title: "Actions",
       filtering: false,
       width: "100px",

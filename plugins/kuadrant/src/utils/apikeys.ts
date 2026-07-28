@@ -5,6 +5,7 @@ import { StatusCondition } from '../types/api-management';
  *
  * Maps conditions to phases:
  * - Empty conditions array → Pending
+ * - Expired condition (status: True) → Expired
  * - Approved condition (status: True) → Approved
  * - Denied condition (status: True) → Denied
  * - Failed condition (status: True) → Failed
@@ -14,10 +15,15 @@ import { StatusCondition } from '../types/api-management';
  */
 export function getAPIKeyPhase(
   conditions?: StatusCondition[]
-): 'Pending' | 'Approved' | 'Denied' | 'Failed' {
+): 'Pending' | 'Approved' | 'Denied' | 'Failed' | 'Expired' {
   if (!conditions || conditions.length === 0) {
     return 'Pending';
   }
+
+  const expired = conditions.find(
+    c => c.type === 'Expired' && c.status === 'True'
+  );
+  if (expired) return 'Expired';
 
   const approved = conditions.find(
     c => c.type === 'Approved' && c.status === 'True'
