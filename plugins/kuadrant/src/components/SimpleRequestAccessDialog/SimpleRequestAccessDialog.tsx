@@ -24,6 +24,7 @@ import {
 import useAsync from 'react-use/lib/useAsync';
 import { kuadrantApiRef } from '../../api';
 import { formatPlanLimits } from '../../utils/policies';
+import { useDatePickerStyles } from '../../utils/styles';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -52,6 +53,7 @@ export const SimpleRequestAccessDialog = ({
   onClose,
   onSuccess,
 }: SimpleRequestAccessDialogProps) => {
+  const classes = useDatePickerStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
@@ -353,6 +355,7 @@ export const SimpleRequestAccessDialog = ({
             InputLabelProps={{ shrink: true }}
             disabled={creating}
             inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split('T')[0] }}
+            className={classes.datePicker}
           />
         )}
       </DialogContent>

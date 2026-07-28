@@ -18,6 +18,7 @@ import { useApi } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
 import { APIKey } from "../../types/api-management";
 import { formatPlanLimits } from '../../utils/policies';
+import { useDatePickerStyles } from '../../utils/styles';
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -38,6 +39,7 @@ export const EditAPIKeyDialog = ({
   request,
   availablePlans,
 }: EditAPIKeyDialogProps) => {
+  const classes = useDatePickerStyles();
   const kuadrantApi = useApi(kuadrantApiRef);
 
   const [planTier, setPlanTier] = useState("");
@@ -192,6 +194,7 @@ export const EditAPIKeyDialog = ({
             InputLabelProps={{ shrink: true }}
             disabled={saving}
             inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split("T")[0] }}
+            className={classes.datePicker}
           />
         )}
       </DialogContent>

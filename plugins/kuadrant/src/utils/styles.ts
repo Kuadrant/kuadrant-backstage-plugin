@@ -1,4 +1,19 @@
 import { CSSProperties } from "react";
+import { makeStyles } from "@material-ui/core/styles";
+
+/**
+ * Shared hook for styling the native date picker calendar icon
+ * to be white and slightly larger — matches the dark theme of the dialogs.
+ */
+export const useDatePickerStyles = makeStyles(() => ({
+  datePicker: {
+    '& input[type="date"]::-webkit-calendar-picker-indicator': {
+      filter: 'invert(1)',
+      transform: 'scale(1.4)',
+      cursor: 'pointer',
+    },
+  },
+}));
 
 /**
  * Returns inline styles for API key status chips on the My API Keys page.

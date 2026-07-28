@@ -22,6 +22,7 @@ import {
 import { kuadrantApiRef } from '../../api';
 import { Plan } from "../../types/api-management.ts";
 import { formatPlanLimits } from '../../utils/policies';
+import { useDatePickerStyles } from '../../utils/styles';
 
 export interface RequestAccessDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ export const RequestAccessDialog = ({
   userEmail,
   plans,
 }: RequestAccessDialogProps) => {
+  const classes = useDatePickerStyles();
   const kuadrantApi = useApi(kuadrantApiRef);
   const alertApi = useApi(alertApiRef);
 
@@ -239,6 +241,7 @@ export const RequestAccessDialog = ({
             InputLabelProps={{ shrink: true }}
             disabled={creating}
             inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split('T')[0] }}
+            className={classes.datePicker}
           />
         )}
       </DialogContent>
