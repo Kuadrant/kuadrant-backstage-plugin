@@ -159,7 +159,7 @@ const ApprovalDialog = ({
               </Typography>{" "}
               <Typography variant="body2" component="span">
                 {request.spec.expiresAt
-                  ? `${new Date(request.spec.expiresAt).toLocaleDateString()} (${Math.ceil((new Date(request.spec.expiresAt).getTime() - Date.now()) / 86400000)} days)`
+                  ? (() => { const daysLeft = Math.ceil((new Date(request.spec.expiresAt!).getTime() - Date.now()) / 86400000); return `${new Date(request.spec.expiresAt!).toLocaleDateString()} (${daysLeft <= 0 ? 'Expired' : `${daysLeft} days`})`; })()
                   : "No expiration"}
               </Typography>
             </Box>
