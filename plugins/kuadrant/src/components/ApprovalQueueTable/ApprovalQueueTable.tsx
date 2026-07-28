@@ -550,7 +550,7 @@ export const ApprovalQueueTable = () => {
   const filterSections: FilterSection[] = useMemo(() => {
     if (!value?.allRequests) return [];
 
-    const statusCounts = { Approved: 0, Pending: 0, Denied: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Denied: 0, Expired: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
@@ -574,16 +574,9 @@ export const ApprovalQueueTable = () => {
         title: "Status",
         options: [
           { value: "Pending", label: "Pending", count: statusCounts.Pending },
-          {
-            value: "Approved",
-            label: "Approved",
-            count: statusCounts.Approved,
-          },
-          {
-            value: "Denied",
-            label: "Denied",
-            count: statusCounts.Denied,
-          },
+          { value: "Approved", label: "Approved", count: statusCounts.Approved },
+          { value: "Denied", label: "Denied", count: statusCounts.Denied },
+          { value: "Expired", label: "Expired", count: statusCounts.Expired },
         ],
       },
       {
@@ -837,7 +830,7 @@ export const ApprovalQueueTable = () => {
         const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
         return (
           <Typography variant="body2">
-            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : ""}
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : " (Expired)"}
           </Typography>
         );
       },

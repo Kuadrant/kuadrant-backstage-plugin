@@ -25,7 +25,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { kuadrantApiRef } from '../../api';
 import { formatPlanLimits } from '../../utils/policies';
 import { useDatePickerStyles } from '../../utils/styles';
-import { isCustomDateInvalid } from '../../utils/apikeys';
+import { isCustomDateInvalid, customDateToISO } from '../../utils/apikeys';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -137,7 +137,7 @@ export const SimpleRequestAccessDialog = ({
       // calculate expiresAt from selected preset or custom date
       let expiresAt: string | undefined;
       if (expiryDays === 'custom' && customDate) {
-        expiresAt = new Date(customDate).toISOString();
+        expiresAt = customDateToISO(customDate);
       } else if (expiryDays) {
         expiresAt = new Date(Date.now() + parseInt(expiryDays, 10) * 86400000).toISOString();
       }

@@ -1,13 +1,26 @@
 import { StatusCondition } from '../types/api-management';
 
 /**
- * Returns true if the custom date is invalid (in the past or empty).
+ * Parses a date picker value (YYYY-MM-DD) as local calendar date at end of day.
+ * Avoids UTC-parsing pitfalls where new Date("YYYY-MM-DD") is treated as UTC midnight.
+ */
+export function customDateToISO(dateStr: string): string {
+  const [year, month, day] = dateStr.split('-').map(Number);
+  return new Date(year, month - 1, day, 23, 59, 59).toISOString();
+}
+
+/**
+ * Returns true if the custom date is invalid (in the past or today).
  * Only relevant when expiryDays === 'custom'.
  */
 export function isCustomDateInvalid(expiryDays: string, customDate: string): boolean {
   if (expiryDays !== 'custom') return false;
   if (!customDate) return true;
-  return new Date(customDate) <= new Date();
+  const [year, month, day] = customDate.split('-').map(Number);
+  const selected = new Date(year, month - 1, day);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return selected <= today;
 }
 
 /**

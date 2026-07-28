@@ -19,7 +19,7 @@ import { kuadrantApiRef } from '../../api';
 import { APIKey } from "../../types/api-management";
 import { formatPlanLimits } from '../../utils/policies';
 import { useDatePickerStyles } from '../../utils/styles';
-import { isCustomDateInvalid } from '../../utils/apikeys';
+import { isCustomDateInvalid, customDateToISO } from '../../utils/apikeys';
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -76,8 +76,8 @@ export const EditAPIKeyDialog = ({
     setSaving(true);
 
     let expiresAt: string | undefined;
-    if (expiryDays === "custom" && customDate) {
-      expiresAt = new Date(customDate).toISOString();
+    if (expiryDays === 'custom' && customDate) {
+      expiresAt = customDateToISO(customDate);
     } else if (expiryDays) {
       expiresAt = new Date(Date.now() + parseInt(expiryDays, 10) * 86400000).toISOString();
     }
@@ -87,7 +87,8 @@ export const EditAPIKeyDialog = ({
         spec: {
           planTier,
           useCase: useCase.trim(),
-          expiresAt,
+          // null explicitly removes the field in Kubernetes JSON Merge Patch
+          expiresAt: expiryDays === '' ? null : expiresAt,
         },
       };
 
