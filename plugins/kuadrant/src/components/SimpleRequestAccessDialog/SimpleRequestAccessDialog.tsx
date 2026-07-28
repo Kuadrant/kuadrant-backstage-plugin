@@ -25,6 +25,7 @@ import useAsync from 'react-use/lib/useAsync';
 import { kuadrantApiRef } from '../../api';
 import { formatPlanLimits } from '../../utils/policies';
 import { useDatePickerStyles } from '../../utils/styles';
+import { isCustomDateInvalid } from '../../utils/apikeys';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -356,6 +357,8 @@ export const SimpleRequestAccessDialog = ({
             disabled={creating}
             inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split('T')[0] }}
             className={classes.datePicker}
+            error={isCustomDateInvalid(expiryDays, customDate)}
+            helperText={isCustomDateInvalid(expiryDays, customDate) ? 'Expiration date must be in the future' : undefined}
           />
         )}
       </DialogContent>
@@ -367,7 +370,7 @@ export const SimpleRequestAccessDialog = ({
           onClick={handleSubmit}
           color="primary"
           variant="contained"
-          disabled={!selectedApi || !selectedTier || creating}
+          disabled={!selectedApi || !selectedTier || creating || isCustomDateInvalid(expiryDays, customDate)}
           startIcon={
             creating ? (
               <CircularProgress size={16} color="inherit" />

@@ -1,6 +1,16 @@
 import { StatusCondition } from '../types/api-management';
 
 /**
+ * Returns true if the custom date is invalid (in the past or empty).
+ * Only relevant when expiryDays === 'custom'.
+ */
+export function isCustomDateInvalid(expiryDays: string, customDate: string): boolean {
+  if (expiryDays !== 'custom') return false;
+  if (!customDate) return true;
+  return new Date(customDate) <= new Date();
+}
+
+/**
  * Derives the APIKey approval phase from Kubernetes conditions.
  *
  * Maps conditions to phases:
