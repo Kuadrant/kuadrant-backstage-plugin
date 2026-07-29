@@ -172,7 +172,7 @@ export const MyApiKeysTable = () => {
 
   // filter options from data
   const filterSections: FilterSection[] = useMemo(() => {
-    const statusCounts = { Approved: 0, Pending: 0, Denied: 0, Failed: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Denied: 0, Failed: 0, Expired: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
@@ -197,12 +197,9 @@ export const MyApiKeysTable = () => {
         options: [
           { value: "Approved", label: "Active", count: statusCounts.Approved },
           { value: "Pending", label: "Pending", count: statusCounts.Pending },
-          {
-            value: "Denied",
-            label: "Denied",
-            count: statusCounts.Denied,
-          },
+          { value: "Denied", label: "Denied", count: statusCounts.Denied },
           { value: "Failed", label: "Failed", count: statusCounts.Failed },
+          { value: "Expired", label: "Expired", count: statusCounts.Expired },
         ],
       },
       {
@@ -477,6 +474,26 @@ export const MyApiKeysTable = () => {
         const date = new Date(row.metadata.creationTimestamp);
         return (
           <Typography variant="body2">{date.toLocaleDateString()}</Typography>
+        );
+      },
+    },
+    {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row: APIKey) => {
+        const phase = getAPIKeyPhase(row.status?.conditions);
+        if (phase === "Expired") {
+          return <Chip label="Expired" size="small" style={getMyApiKeysStatusChipStyle("Expired")} />;
+        }
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : " (Expired)"}
+          </Typography>
         );
       },
     },

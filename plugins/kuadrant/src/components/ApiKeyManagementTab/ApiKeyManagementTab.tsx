@@ -48,6 +48,7 @@ import {
   canDeleteResource,
 } from "../../utils/permissions";
 import { getAPIKeyPhase } from "../../utils/apikeys";
+import { getMyApiKeysStatusChipStyle } from "../../utils/styles";
 import { EditAPIKeyDialog } from "../EditAPIKeyDialog";
 import { ConfirmDeleteDialog } from "../ConfirmDeleteDialog";
 import { generateAuthCodeSnippets } from "../../utils/codeSnippets";
@@ -497,9 +498,10 @@ export const ApiKeyManagementTab = ({
   const pendingRequests = myRequests.filter(
     (r) => getAPIKeyPhase(r.status?.conditions) === "Pending",
   );
-  const approvedRequests = myRequests.filter(
-    (r) => getAPIKeyPhase(r.status?.conditions) === "Approved",
-  );
+  const approvedRequests = myRequests.filter((r) => {
+    const phase = getAPIKeyPhase(r.status?.conditions);
+    return phase === "Approved" || phase === "Expired";
+  });
   const rejectedRequests = myRequests.filter(
     (r) => getAPIKeyPhase(r.status?.conditions) === "Denied",
   );
@@ -522,6 +524,26 @@ export const ApiKeyManagementTab = ({
         return (
           <Typography variant="body2">
             {approvalDate ? new Date(approvalDate).toLocaleDateString() : "-"}
+          </Typography>
+        );
+      },
+    },
+    {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row: APIKey) => {
+        const phase = getAPIKeyPhase(row.status?.conditions);
+        if (phase === "Expired") {
+          return <Chip label="Expired" size="small" style={getMyApiKeysStatusChipStyle("Expired")} />;
+        }
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : " (Expired)"}
           </Typography>
         );
       },
@@ -701,6 +723,22 @@ export const ApiKeyManagementTab = ({
             : "-"}
         </Typography>
       ),
+    },
+    {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row: APIKey) => {
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2">-</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : " (Expired)"}
+          </Typography>
+        );
+      },
     },
     {
       title: "Reviewed",

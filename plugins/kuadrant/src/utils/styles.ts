@@ -1,4 +1,19 @@
 import { CSSProperties } from "react";
+import { makeStyles } from "@material-ui/core/styles";
+
+/**
+ * Shared hook for styling the native date picker calendar icon
+ * to be white and slightly larger — matches the dark theme of the dialogs.
+ */
+export const useDatePickerStyles = makeStyles(() => ({
+  datePicker: {
+    '& input[type="date"]::-webkit-calendar-picker-indicator': {
+      filter: 'invert(1)',
+      transform: 'scale(1.4)',
+      cursor: 'pointer',
+    },
+  },
+}));
 
 /**
  * Returns inline styles for API key status chips on the My API Keys page.
@@ -10,6 +25,8 @@ export const getMyApiKeysStatusChipStyle = (phase: string): CSSProperties => {
       return { ...base, backgroundColor: "#1976d2", color: "#fff" }; // Blue
     case "Denied":
       return { ...base, backgroundColor: "#d32f2f", color: "#fff" }; // Red
+    case "Expired":
+      return { ...base, backgroundColor: "#757575", color: "#fff" }; // Grey
     case "Failed":
       return { ...base, backgroundColor: "#ed6c02", color: "#fff" }; // Orange
     case "Pending":
@@ -30,6 +47,8 @@ export const getApprovalQueueStatusChipStyle = (phase: string): CSSProperties =>
       return { ...base, backgroundColor: "#2e7d32", color: "#fff" }; // Green
     case "Denied":
       return { ...base, backgroundColor: "#d32f2f", color: "#fff" }; // Red
+    case "Expired":
+      return { ...base, backgroundColor: "#757575", color: "#fff" }; // Grey
     case "Pending":
       return { ...base, backgroundColor: "#ed6c02", color: "#fff" }; // Orange
     default:

@@ -149,6 +149,20 @@ const ApprovalDialog = ({
                 {request.spec.useCase || "-"}
               </Typography>
             </Box>
+            <Box mb={2}>
+              <Typography
+                variant="body2"
+                component="span"
+                style={{ fontWeight: "bold" }}
+              >
+                Expires:
+              </Typography>{" "}
+              <Typography variant="body2" component="span">
+                {request.spec.expiresAt
+                  ? (() => { const daysLeft = Math.ceil((new Date(request.spec.expiresAt!).getTime() - Date.now()) / 86400000); return `${new Date(request.spec.expiresAt!).toLocaleDateString()} (${daysLeft <= 0 ? 'Expired' : `${daysLeft} days`})`; })()
+                  : "No expiration"}
+              </Typography>
+            </Box>
             {isReject && (
               <Box mt={2}>
                 <Typography variant="body2" color="textSecondary" gutterBottom>
@@ -536,7 +550,7 @@ export const ApprovalQueueTable = () => {
   const filterSections: FilterSection[] = useMemo(() => {
     if (!value?.allRequests) return [];
 
-    const statusCounts = { Approved: 0, Pending: 0, Denied: 0 };
+    const statusCounts = { Approved: 0, Pending: 0, Denied: 0, Expired: 0 };
     const apiProductCounts = new Map<string, number>();
     const tierCounts = new Map<string, number>();
 
@@ -560,16 +574,9 @@ export const ApprovalQueueTable = () => {
         title: "Status",
         options: [
           { value: "Pending", label: "Pending", count: statusCounts.Pending },
-          {
-            value: "Approved",
-            label: "Approved",
-            count: statusCounts.Approved,
-          },
-          {
-            value: "Denied",
-            label: "Denied",
-            count: statusCounts.Denied,
-          },
+          { value: "Approved", label: "Approved", count: statusCounts.Approved },
+          { value: "Denied", label: "Denied", count: statusCounts.Denied },
+          { value: "Expired", label: "Expired", count: statusCounts.Expired },
         ],
       },
       {
@@ -811,6 +818,22 @@ export const ApprovalQueueTable = () => {
             : "-"}
         </Typography>
       ),
+    },
+    {
+      title: "Expires",
+      field: "spec.expiresAt",
+      render: (row) => {
+        if (!row.spec.expiresAt) {
+          return <Typography variant="body2" color="textSecondary">No expiration</Typography>;
+        }
+        const expiryDate = new Date(row.spec.expiresAt);
+        const daysLeft = Math.ceil((expiryDate.getTime() - Date.now()) / 86400000);
+        return (
+          <Typography variant="body2">
+            {expiryDate.toLocaleDateString()}{daysLeft > 0 ? ` (${daysLeft}d)` : " (Expired)"}
+          </Typography>
+        );
+      },
     },
     {
       title: "Reviewed By",

@@ -45,6 +45,7 @@ export interface APIKeySpec {
   secretRef: {
     name: string;
   };
+  expiresAt?: string;
 }
 
 // Authorino v1beta3 Credentials types
@@ -127,6 +128,7 @@ export interface APIKeyRequest {
   useCase: string,
   userEmail: string,
   secretName?: string,
+  expiresAt?: string,
 }
 
 export interface APIProductSpec {

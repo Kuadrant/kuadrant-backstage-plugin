@@ -24,6 +24,8 @@ import {
 import useAsync from 'react-use/lib/useAsync';
 import { kuadrantApiRef } from '../../api';
 import { formatPlanLimits } from '../../utils/policies';
+import { useDatePickerStyles } from '../../utils/styles';
+import { isCustomDateInvalid, customDateToISO } from '../../utils/apikeys';
 
 export interface SimpleRequestAccessDialogProps {
   open: boolean;
@@ -52,6 +54,7 @@ export const SimpleRequestAccessDialog = ({
   onClose,
   onSuccess,
 }: SimpleRequestAccessDialogProps) => {
+  const classes = useDatePickerStyles();
   const config = useApi(configApiRef);
   const fetchApi = useApi(fetchApiRef);
   const alertApi = useApi(alertApiRef);
@@ -62,6 +65,8 @@ export const SimpleRequestAccessDialog = ({
   const [selectedApi, setSelectedApi] = useState('');
   const [selectedTier, setSelectedTier] = useState('');
   const [useCase, setUseCase] = useState('');
+  const [expiryDays, setExpiryDays] = useState('');
+  const [customDate, setCustomDate] = useState('');
   const [creating, setCreating] = useState(false);
 
   // Fetch all published API products
@@ -105,6 +110,8 @@ export const SimpleRequestAccessDialog = ({
     setSelectedApi('');
     setSelectedTier('');
     setUseCase('');
+    setExpiryDays('');
+    setCustomDate('');
     onClose();
   };
 
@@ -127,6 +134,14 @@ export const SimpleRequestAccessDialog = ({
       // 2. create secret first (design doc: secret must exist before APIKey)
       await kuadrantApi.createSecret(secretName, apiKeyValue);
 
+      // calculate expiresAt from selected preset or custom date
+      let expiresAt: string | undefined;
+      if (expiryDays === 'custom' && customDate) {
+        expiresAt = customDateToISO(customDate);
+      } else if (expiryDays) {
+        expiresAt = new Date(Date.now() + parseInt(expiryDays, 10) * 86400000).toISOString();
+      }
+
       // 3. create APIKey referencing the pre-existing secret
       const response = await fetchApi.fetch(
         `${backendUrl}/api/kuadrant/requests`,
@@ -142,6 +157,7 @@ export const SimpleRequestAccessDialog = ({
             useCase: useCase.trim() || '',
             userEmail: userEmail || 'unknown',
             secretName,
+            expiresAt,
           }),
         },
       );
@@ -171,14 +187,11 @@ export const SimpleRequestAccessDialog = ({
         // Extract user-friendly error message
         const rawError = errorData.error || errorData.message || `Server returned ${response.status}`;
 
-        // Try to extract validation error details from Kubernetes error messages
-        // Example: "failed to create apikeys: APIKey.devportal.kuadrant.io "name" is invalid: spec.requestedBy.email: Invalid value: "admin": spec.requestedBy.email in body should match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$'"
         let errorMsg = rawError;
 
         if (rawError.includes('spec.requestedBy.email')) {
           errorMsg = 'Invalid email format. Please contact your administrator to update your profile email.';
         } else if (rawError.includes('is invalid:')) {
-          // Extract the validation message after "is invalid:"
           const match = rawError.match(/is invalid: (.+?)(?:\s+\(|$)/);
           if (match) {
             errorMsg = `Validation error: ${match[1]}`;
@@ -309,6 +322,45 @@ export const SimpleRequestAccessDialog = ({
           disabled={creating}
           inputProps={{ 'data-testid': 'usecase-input' }}
         />
+
+        <FormControl fullWidth margin="normal" disabled={creating}>
+          <InputLabel id="simple-expiry-select-label">Expiration (optional)</InputLabel>
+          <Select
+            labelId="simple-expiry-select-label"
+            value={expiryDays}
+            onChange={e => {
+              setExpiryDays(e.target.value as string);
+              setCustomDate('');
+            }}
+          >
+            <MenuItem value="">No expiration</MenuItem>
+            {[7, 30, 60, 90].map(days => {
+              const date = new Date(Date.now() + days * 86400000);
+              return (
+                <MenuItem key={days} value={String(days)}>
+                  {days} days ({date.toLocaleDateString()})
+                </MenuItem>
+              );
+            })}
+            <MenuItem value="custom">Custom</MenuItem>
+          </Select>
+        </FormControl>
+        {expiryDays === 'custom' && (
+          <TextField
+            label="Select date"
+            type="date"
+            fullWidth
+            margin="normal"
+            value={customDate}
+            onChange={e => setCustomDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            disabled={creating}
+            inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split('T')[0] }}
+            className={classes.datePicker}
+            error={isCustomDateInvalid(expiryDays, customDate)}
+            helperText={isCustomDateInvalid(expiryDays, customDate) ? 'Expiration date must be in the future' : undefined}
+          />
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={creating} data-testid="cancel-button">
@@ -318,7 +370,7 @@ export const SimpleRequestAccessDialog = ({
           onClick={handleSubmit}
           color="primary"
           variant="contained"
-          disabled={!selectedApi || !selectedTier || creating}
+          disabled={!selectedApi || !selectedTier || creating || isCustomDateInvalid(expiryDays, customDate)}
           startIcon={
             creating ? (
               <CircularProgress size={16} color="inherit" />

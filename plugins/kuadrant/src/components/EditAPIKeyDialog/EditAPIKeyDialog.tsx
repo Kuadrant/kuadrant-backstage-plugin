@@ -18,6 +18,8 @@ import { useApi } from "@backstage/core-plugin-api";
 import { kuadrantApiRef } from '../../api';
 import { APIKey } from "../../types/api-management";
 import { formatPlanLimits } from '../../utils/policies';
+import { useDatePickerStyles } from '../../utils/styles';
+import { isCustomDateInvalid, customDateToISO } from '../../utils/apikeys';
 
 interface EditAPIKeyDialogProps {
   open: boolean;
@@ -38,10 +40,13 @@ export const EditAPIKeyDialog = ({
   request,
   availablePlans,
 }: EditAPIKeyDialogProps) => {
+  const classes = useDatePickerStyles();
   const kuadrantApi = useApi(kuadrantApiRef);
 
   const [planTier, setPlanTier] = useState("");
   const [useCase, setUseCase] = useState("");
+  const [expiryDays, setExpiryDays] = useState("");
+  const [customDate, setCustomDate] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
 
@@ -50,6 +55,14 @@ export const EditAPIKeyDialog = ({
       setPlanTier(request.spec.planTier || "");
       setUseCase(request.spec.useCase || "");
       setError("");
+      // initialise expiry from existing spec
+      if (request.spec.expiresAt) {
+        setExpiryDays("custom");
+        setCustomDate(request.spec.expiresAt.split("T")[0]);
+      } else {
+        setExpiryDays("");
+        setCustomDate("");
+      }
     }
   }, [open, request]);
 
@@ -62,11 +75,20 @@ export const EditAPIKeyDialog = ({
     setError("");
     setSaving(true);
 
+    let expiresAt: string | undefined;
+    if (expiryDays === 'custom' && customDate) {
+      expiresAt = customDateToISO(customDate);
+    } else if (expiryDays) {
+      expiresAt = new Date(Date.now() + parseInt(expiryDays, 10) * 86400000).toISOString();
+    }
+
     try {
       const patch = {
         spec: {
           planTier,
           useCase: useCase.trim(),
+          // null explicitly removes the field in Kubernetes JSON Merge Patch
+          expiresAt: expiryDays === '' ? null : expiresAt,
         },
       };
 
@@ -140,6 +162,45 @@ export const EditAPIKeyDialog = ({
           disabled={saving}
           helperText="Explain your intended use of this API for admin review"
         />
+
+        <FormControl fullWidth margin="normal" disabled={saving}>
+          <InputLabel id="edit-expiry-select-label">Expiration (optional)</InputLabel>
+          <Select
+            labelId="edit-expiry-select-label"
+            value={expiryDays}
+            onChange={(e) => {
+              setExpiryDays(e.target.value as string);
+              setCustomDate("");
+            }}
+          >
+            <MenuItem value="">No expiration</MenuItem>
+            {[7, 30, 60, 90].map(days => {
+              const date = new Date(Date.now() + days * 86400000);
+              return (
+                <MenuItem key={days} value={String(days)}>
+                  {days} days ({date.toLocaleDateString()})
+                </MenuItem>
+              );
+            })}
+            <MenuItem value="custom">Custom</MenuItem>
+          </Select>
+        </FormControl>
+        {expiryDays === "custom" && (
+          <TextField
+            label="Select date"
+            type="date"
+            fullWidth
+            margin="normal"
+            value={customDate}
+            onChange={(e) => setCustomDate(e.target.value)}
+            InputLabelProps={{ shrink: true }}
+            disabled={saving}
+            inputProps={{ min: new Date(Date.now() + 86400000).toISOString().split("T")[0] }}
+            className={classes.datePicker}
+            error={isCustomDateInvalid(expiryDays, customDate)}
+            helperText={isCustomDateInvalid(expiryDays, customDate) ? 'Expiration date must be in the future' : undefined}
+          />
+        )}
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} disabled={saving}>
@@ -149,7 +210,7 @@ export const EditAPIKeyDialog = ({
           onClick={handleSave}
           color="primary"
           variant="contained"
-          disabled={!planTier || saving}
+          disabled={!planTier || saving || isCustomDateInvalid(expiryDays, customDate)}
           startIcon={
             saving ? <CircularProgress size={16} color="inherit" /> : undefined
           }
