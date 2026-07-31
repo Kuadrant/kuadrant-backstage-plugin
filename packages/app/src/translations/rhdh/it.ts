@@ -18,53 +18,30 @@ import { createTranslationMessages } from '@backstage/core-plugin-api/alpha';
 
 import { rhdhTranslationRef } from './ref';
 
-export default createTranslationMessages({
+const rhdhTranslationIt = createTranslationMessages({
   ref: rhdhTranslationRef,
-  full: true, // False means that this is a partial translation
   messages: {
-    // Default main menu items from consts.ts
-    'menuItem.home': 'Home',
-    'menuItem.myGroup': 'Il Mio Gruppo',
+    'menuItem.home': 'Casa',
+    'menuItem.myGroup_one': 'Il mio gruppo',
+    'menuItem.myGroup_other': 'I miei gruppi',
     'menuItem.catalog': 'Catalogo',
     'menuItem.apis': 'API',
-    'menuItem.learningPaths': 'Percorsi di Apprendimento',
-    'menuItem.selfService': 'Self-service',
+    'menuItem.learningPaths': 'Learning Path',
+    'menuItem.selfService': 'Self service',
     'menuItem.userSettings': 'Impostazioni utente',
     'menuItem.administration': 'Amministrazione',
     'menuItem.extensions': 'Estensioni',
-
-    // dynamic-plugins.default.main-menu-items
     'menuItem.clusters': 'Cluster',
     'menuItem.rbac': 'RBAC',
-    'menuItem.bulkImport': 'Importazione in massa',
-    'menuItem.docs': 'Documentazione',
+    'menuItem.bulkImport': 'Importazione in blocco',
+    'menuItem.docs': 'Documenti',
     'menuItem.lighthouse': 'Lighthouse',
-    'menuItem.techRadar': 'Radar tecnologico',
+    'menuItem.techRadar': 'Tech Radar',
     'menuItem.orchestrator': 'Orchestratore',
-    'menuItem.adoptionInsights': 'Insights di adozione',
-
-    'catalog.entityPage.overview.title': 'Panoramica',
-    'catalog.entityPage.topology.title': 'Topologia',
-    'catalog.entityPage.issues.title': 'Problemi',
-    'catalog.entityPage.pullRequests.title': 'Pull/Merge Requests',
-    'catalog.entityPage.ci.title': 'CI',
-    'catalog.entityPage.cd.title': 'CD',
-    'catalog.entityPage.kubernetes.title': 'Kubernetes',
-    'catalog.entityPage.imageRegistry.title': 'Registro Immagini',
-    'catalog.entityPage.monitoring.title': 'Monitoraggio',
-    'catalog.entityPage.lighthouse.title': 'Lighthouse',
-    'catalog.entityPage.api.title': 'API',
-    'catalog.entityPage.dependencies.title': 'Dipendenze',
-    'catalog.entityPage.docs.title': 'Documentazione',
-    'catalog.entityPage.definition.title': 'Definizione',
-    'catalog.entityPage.diagram.title': 'Diagramma del Sistema',
-    'catalog.entityPage.workflows.title': 'Flussi di lavoro',
-
+    'menuItem.adoptionInsights': 'Insights adozione',
     'sidebar.menu': 'Menu',
-    'sidebar.home': 'Home',
-    'sidebar.homeLogo': 'Logo principale',
-
-    // SignIn page translations
+    'sidebar.home': 'Casa',
+    'sidebar.homeLogo': 'Logo casa',
     'signIn.page.title': 'Seleziona un metodo di accesso',
     'signIn.providers.auth0.title': 'Auth0',
     'signIn.providers.auth0.message': 'Accedi con Auth0',
@@ -90,10 +67,23 @@ export default createTranslationMessages({
     'signIn.providers.onelogin.message': 'Accedi con OneLogin',
     'signIn.providers.saml.title': 'SAML',
     'signIn.providers.saml.message': 'Accedi con SAML',
-
-    // App translations
-    'app.scaffolder.title': 'Self-service',
-    'app.search.title': 'Cerca',
+    'catalog.entityPage.overview.title': 'Panoramica',
+    'catalog.entityPage.topology.title': 'Topologia',
+    'catalog.entityPage.issues.title': 'Problemi',
+    'catalog.entityPage.pullRequests.title': 'Pull/Merge Request',
+    'catalog.entityPage.ci.title': 'CI',
+    'catalog.entityPage.cd.title': 'CD',
+    'catalog.entityPage.kubernetes.title': 'Kubernetes',
+    'catalog.entityPage.imageRegistry.title': 'Registro immagine',
+    'catalog.entityPage.monitoring.title': 'Monitoraggio',
+    'catalog.entityPage.lighthouse.title': 'Lighthouse',
+    'catalog.entityPage.api.title': 'API',
+    'catalog.entityPage.dependencies.title': 'Dipendenze',
+    'catalog.entityPage.docs.title': 'Documenti',
+    'catalog.entityPage.definition.title': 'Definizione',
+    'catalog.entityPage.diagram.title': 'Diagramma di sistema',
+    'catalog.entityPage.workflows.title': 'Flussi di lavoro',
+    'app.search.title': 'Ricerca',
     'app.search.resultType': 'Tipo di risultato',
     'app.search.softwareCatalog': 'Catalogo software',
     'app.search.filters.kind': 'Tipo',
@@ -102,20 +92,21 @@ export default createTranslationMessages({
     'app.search.filters.template': 'Modello',
     'app.search.filters.experimental': 'sperimentale',
     'app.search.filters.production': 'produzione',
-    'app.learningPaths.title': 'Percorsi di apprendimento',
-    'app.learningPaths.error.title': 'Impossibile recuperare i dati.',
+    'app.learningPaths.title': 'Learning Path',
+    'app.learningPaths.error.title': 'Impossibile estrarre i dati.',
     'app.learningPaths.error.unknownError': 'Errore sconosciuto',
     'app.userSettings.infoCard.title': 'Metadati RHDH',
     'app.userSettings.infoCard.metadataCopied':
       'Metadati copiati negli appunti',
-    'app.userSettings.infoCard.copyMetadata': 'Copia metadati negli appunti',
+    'app.userSettings.infoCard.copyMetadata': 'Copia i metadati negli appunti',
     'app.userSettings.infoCard.showLess': 'Mostra meno',
-    'app.userSettings.infoCard.showMore': 'Mostra di più',
+    'app.userSettings.infoCard.showMore': 'Mostra altro',
     'app.errors.contactSupport': 'Contatta il supporto',
-    'app.errors.goBack': 'Indietro',
+    'app.errors.goBack': 'Torna indietro',
     'app.errors.notFound.message': 'Non siamo riusciti a trovare quella pagina',
     'app.errors.notFound.additionalInfo':
-      'La pagina che stai cercando potrebbe essere stata rimossa, rinominata o è temporaneamente non disponibile.',
-    'app.table.createdAt': 'Creato il',
+      'La pagina che stai cercando potrebbe essere stata rimossa, aver cambiato nome o essere temporaneamente non disponibile.',
   },
 });
+
+export default rhdhTranslationIt;

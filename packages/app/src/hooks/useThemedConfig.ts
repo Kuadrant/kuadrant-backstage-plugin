@@ -69,3 +69,16 @@ export const useSystemThemedConfig = (
 
   return typeof fullLogo === 'string' ? fullLogo : fullLogo?.[colorScheme];
 };
+
+/**
+ * Gets the sidebar selected background color from the theme palette.
+ * Uses theme.palette.rhdh.general.sidebarItemSelectedBackgroundColor.
+ */
+export const useSidebarSelectedBackgroundColor = () => {
+  const theme = useTheme();
+
+  return (
+    (theme as ThemeConfig)?.palette?.rhdh?.general
+      ?.sidebarItemSelectedBackgroundColor ?? ''
+  );
+};
