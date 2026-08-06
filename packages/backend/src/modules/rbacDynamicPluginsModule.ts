@@ -50,7 +50,7 @@ export const pluginIDProviderService = createServiceFactory({
       })
       .map(p => {
         const removedPrefix = p.manifest.name.replace(
-          /(^@[^\/]*\/plugin-|^[^@/]*-plugin-)/,
+          /(^@[^\/]*\/(?:plugin-|backstage-plugin-)|^[^@/]*-plugin-)/,
           '',
         );
         const removedSuffix = removedPrefix.replace(/-backend-dynamic$/, '');
@@ -69,7 +69,7 @@ export const pluginIDProviderService = createServiceFactory({
 
 export const rbacDynamicPluginsProvider = createBackendModule({
   pluginId: 'permission',
-  moduleId: 'rbac.dynamic-plugin-ids',
+  moduleId: 'rbac-dynamic-plugin-ids',
   register(reg) {
     reg.registerInit({
       deps: {

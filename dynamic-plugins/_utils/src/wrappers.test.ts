@@ -8,25 +8,17 @@ const IGNORE_GLOB = ["**/node_modules/**", "**/dist-dynamic/**"];
 
 const ROOT_DIR = path.join(__dirname, "../../..");
 const DYNAMIC_PLUGINS_DIR = path.join(ROOT_DIR, "dynamic-plugins/wrappers");
-const DYNAMIC_PLUGINS_CONFIG_FILE = path.join(
-  ROOT_DIR,
-  "dynamic-plugins.default.yaml",
-);
 const APP_CONFIG_DYNAMIC_PLUGINS_CONFIG_FILE = path.join(
   ROOT_DIR,
   "app-config.dynamic-plugins.yaml",
 );
-const IBM_VALUES_SHOWCASE_CONFIG_FILE = path.join(
+const CI_VALUES_SHOWCASE_CONFIG_FILE = path.join(
   ROOT_DIR,
-  ".ibm/pipelines/value_files/values_showcase.yaml",
+  ".ci/pipelines/value_files/values_showcase.yaml",
 );
-const IBM_VALUES_SHOWCASE_RBAC_CONFIG_FILE = path.join(
+const CI_VALUES_SHOWCASE_RBAC_CONFIG_FILE = path.join(
   ROOT_DIR,
-  ".ibm/pipelines/value_files/values_showcase-rbac.yaml",
-);
-const IBM_VALUES_SHOWCASE_AUTH_PROVIDERS_CONFIG_FILE = path.join(
-  ROOT_DIR,
-  ".ibm/pipelines/value_files/values_showcase-auth-providers.yaml",
+  ".ci/pipelines/value_files/values_showcase-rbac.yaml",
 );
 const RHDH_OPENSHIFT_SETUP_CONFIG_FILE = path.join(
   ROOT_DIR,
@@ -199,29 +191,6 @@ describe("Dynamic Plugin Wrappers", () => {
     );
   });
 
-  describe("(dynamic-plugins.default.yaml) should have a valid config", () => {
-    const config = parseYamlFile<DynamicPluginsConfig>(
-      DYNAMIC_PLUGINS_CONFIG_FILE,
-    );
-
-    it("should have a corresponding package", () => {
-      validateDynamicPluginsConfig(config, wrapperDirNames);
-    });
-
-    it.each(frontendPackageJsonFiles)(
-      "$scalprum.name should exist in the config",
-      ({ scalprum }) => {
-        expect(
-          config.plugins.some((plugin) =>
-            Object.keys(
-              plugin.pluginConfig?.dynamicPlugins?.frontend ?? {},
-            ).includes(scalprum.name),
-          ),
-        ).toBeTruthy();
-      },
-    );
-  });
-
   describe("(app-config.dynamic-plugins.yaml) should have a valid config", () => {
     const config = parseYamlFile<DynamicPluginAppConfig>(
       APP_CONFIG_DYNAMIC_PLUGINS_CONFIG_FILE,
@@ -239,9 +208,9 @@ describe("Dynamic Plugin Wrappers", () => {
     );
   });
 
-  describe("(ibm: values_showcase.yaml) should have a valid config", () => {
+  describe("(ci: values_showcase.yaml) should have a valid config", () => {
     const config = parseYamlFile<GlobalDynamicPluginsConfig>(
-      IBM_VALUES_SHOWCASE_CONFIG_FILE,
+      CI_VALUES_SHOWCASE_CONFIG_FILE,
     );
 
     const externalDynamicPluginsConfig: DynamicPluginConfig[] = [
@@ -254,15 +223,15 @@ describe("Dynamic Plugin Wrappers", () => {
       },
       {
         package:
-          "@red-hat-developer-hub/backstage-plugin-application-provider-test@0.0.2",
+          "@red-hat-developer-hub/backstage-plugin-application-provider-test@0.6.0",
       },
       {
         package:
-          "@red-hat-developer-hub/backstage-plugin-application-listener-test@0.0.2",
+          "@red-hat-developer-hub/backstage-plugin-application-listener-test@0.6.0",
       },
       {
         package:
-          "@red-hat-developer-hub/backstage-plugin-global-header-test@0.0.2",
+          "@red-hat-developer-hub/backstage-plugin-global-header-test@0.7.0",
       },
       {
         package:
@@ -287,19 +256,9 @@ describe("Dynamic Plugin Wrappers", () => {
     });
   });
 
-  describe("(ibm: values_showcase-rbac.yaml) should have a valid config", () => {
+  describe("(ci: values_showcase-rbac.yaml) should have a valid config", () => {
     const config = parseYamlFile<GlobalDynamicPluginsConfig>(
-      IBM_VALUES_SHOWCASE_RBAC_CONFIG_FILE,
-    );
-
-    it("should have a corresponding package", () => {
-      validateDynamicPluginsConfig(config.global.dynamic, wrapperDirNames);
-    });
-  });
-
-  describe("(ibm: values_showcase_auth-providers.yaml) should have a valid config", () => {
-    const config = parseYamlFile<GlobalDynamicPluginsConfig>(
-      IBM_VALUES_SHOWCASE_AUTH_PROVIDERS_CONFIG_FILE,
+      CI_VALUES_SHOWCASE_RBAC_CONFIG_FILE,
     );
 
     it("should have a corresponding package", () => {

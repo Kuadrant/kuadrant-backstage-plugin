@@ -1,13 +1,14 @@
 import { createTranslationResource } from '@backstage/core-plugin-api/alpha';
-import { userSettingsTranslationRef } from '@backstage/plugin-user-settings/alpha';
+import { userSettingsTranslationRef } from '@backstage/plugin-user-settings';
 
 export const userSettingsTranslations = createTranslationResource({
   ref: userSettingsTranslationRef,
   translations: {
-    en: () => import('./user-settings-en'),
     de: () => import('./user-settings-de'),
-    fr: () => import('./user-settings-fr'),
+    en: () => import('./user-settings-en'),
     es: () => import('./user-settings-es'),
+    fr: () => import('./user-settings-fr'),
     it: () => import('./user-settings-it'),
+    ja: () => import('./ja'),
   },
 });
