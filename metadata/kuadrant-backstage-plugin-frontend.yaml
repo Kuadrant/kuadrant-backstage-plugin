@@ -22,7 +22,7 @@ spec:
   version: 0.0.2-dev
   backstage:
     role: frontend-plugin
-    supportedVersions: 1.52.0
+    supportedVersions: 1.49.4
   author: Kuadrant
   support: community
   lifecycle: active
