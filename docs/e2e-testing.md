@@ -27,9 +27,12 @@ e2e-tests/
 
 ## Running Tests
 
-Prerequisites:
-1. Kind cluster running: `cd kuadrant-dev-setup && make kind-create`
-2. App running: `yarn dev` (in separate terminal)
+CI (`e2e-tests` in `.github/workflows/ci.yml`) uses **oinc**, not kind: `yarn oinc:cluster` then `yarn dev:oinc`, same addons as [kuadrant-console-plugin](https://github.com/Kuadrant/kuadrant-console-plugin) (gateway-api, cert-manager, metallb, istio, kuadrant, mcp-gateway). That job is 60 minutes on `ubuntu-latest` because oinc create is ~6+ min. See [docs/ci.md](ci.md).
+
+Locally, match CI (loop 2) or use kind (loop 1):
+
+1. Cluster: `yarn oinc:cluster` (CI path) **or** `make -C kuadrant-dev-setup kind-create`
+2. App: `yarn dev:oinc` **or** `yarn dev:kind` (in a separate terminal)
 
 ```bash
 cd e2e-tests
@@ -37,6 +40,8 @@ yarn test                              # all kuadrant tests
 yarn test --grep "Happy Path"          # specific test suite
 yarn test --grep "permissions matrix"  # RBAC tests only
 ```
+
+Kind has no MCP Gateway operator. Prefer oinc when exercising MCP. Do not run kind and oinc at the same time (both write `.env`).
 
 ## Key Principles
 

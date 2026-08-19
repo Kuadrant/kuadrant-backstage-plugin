@@ -142,9 +142,9 @@ yarn test --filter=backend      # run tests for specific package
 
 End-to-end tests use Playwright to test the Kuadrant plugin UI and workflows.
 
-Prerequisites:
-1. Kind cluster running with Kuadrant (`cd kuadrant-dev-setup && make kind-create`)
-2. App running (`yarn dev` in separate terminal)
+Prerequisites (CI uses oinc, not kind):
+1. Cluster: `yarn oinc:cluster` **or** `make -C kuadrant-dev-setup kind-create`
+2. App: `yarn dev:oinc` **or** `yarn dev:kind` (separate terminal)
 
 Run tests:
 ```bash

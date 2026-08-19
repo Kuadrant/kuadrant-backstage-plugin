@@ -114,8 +114,15 @@ jobs:
       - name: Run unit tests
         run: yarn test
 
+  # CI e2e cluster is oinc (same addons as `yarn oinc:cluster` / kuadrant-console-plugin),
+  # not kind. Copied from kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
+  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.4.3 from GitHub releases,
+  # Helm, Docker on the hosted runner (no extra DinD/privileged job). oinc create is
+  # nested k8s (~6+ min; Istio + Kuadrant + MCP Gateway). Kind stays local loop 1;
+  # unit tests do not need a cluster.
   e2e-tests:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
 
     steps:
       - name: Checkout code
@@ -128,6 +135,18 @@ jobs:
 
       - name: Enable Corepack
         run: corepack enable
+
+      - name: Install oinc
+        run: |
+          OINC_VERSION="${OINC_VERSION:-v0.4.3}"
+          curl -fL -o oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
+          chmod +x oinc
+          file oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
+          ./oinc version
+          sudo mv oinc /usr/local/bin/
+
+      - name: Install Helm
+        uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # ratchet:azure/setup-helm@v4
 
       - name: Install dependencies
         run: yarn install --immutable
@@ -142,31 +161,36 @@ jobs:
           cd e2e-tests
           yarn playwright install --with-deps chromium
 
-      # TEMPORARY: clone controller until it's published to a registry
-      - name: Clone developer-portal-controller
-        run: git clone https://github.com/Kuadrant/developer-portal-controller.git ../developer-portal-controller
+      - name: Create oinc cluster
+        run: yarn oinc:cluster
 
-      - name: Create kind cluster
-        uses: helm/kind-action@ef37e7f390d99f746eb8b610417061a60e82a6cc # ratchet:helm/kind-action@v1
-        with:
-          cluster_name: kuadrant-test
-          wait: 60s
-
-      - name: Setup RBAC and Kuadrant on kind cluster
+      - name: Verify Kuadrant and MCP Gateway
         run: |
-          cd kuadrant-dev-setup
-          kubectl apply -f rbac/rhdh-rbac.yaml
-          ./scripts/kube-env-setup.sh
-          make kuadrant-install CLUSTER_NAME=kuadrant-test
-          make demo-install
-          cd ..
+          kubectl config current-context
+          test "$(kubectl config current-context)" = oinc
+          kubectl get crd mcpserverregistrations.mcp.kuadrant.io
+          kubectl api-resources --api-group=mcp.kuadrant.io
+          kubectl -n kuadrant-system wait --timeout=180s --for=condition=Available deployment/developer-portal-controller
+          oinc status || true
 
       - name: Start Backstage
         run: |
-          yarn dev:kind &
+          yarn dev:oinc &
           echo $! > backstage.pid
-          # wait for backstage to be ready (webpack dev server)
-          timeout 120 bash -c 'until curl -f http://localhost:3000 > /dev/null 2>&1; do sleep 2; done'
+          DEV_PID=$(cat backstage.pid)
+          for i in $(seq 1 90); do
+            if curl -sf http://localhost:3000 >/dev/null 2>&1; then
+              echo "yarn-dev ready on :3000"
+              exit 0
+            fi
+            if ! kill -0 "$DEV_PID" 2>/dev/null; then
+              echo "yarn-dev process died unexpectedly"
+              exit 1
+            fi
+            sleep 2
+          done
+          echo "yarn-dev not ready after 180s"
+          exit 1
 
       - name: Run e2e tests
         run: |
@@ -189,9 +213,21 @@ jobs:
           path: e2e-tests/test-results/
           retention-days: 7
 
+      - name: Dump cluster diagnostics
+        if: failure()
+        run: |
+          kubectl get pods -A || true
+          kubectl get crd | grep -E 'kuadrant|mcp' || true
+          kubectl -n kuadrant-system get deploy,pods || true
+          kubectl get mcpserverregistrations -A || true
+
       - name: Stop Backstage
         if: always()
         run: |
           if [ -f backstage.pid ]; then
             kill $(cat backstage.pid) || true
           fi
+
+      - name: Teardown oinc
+        if: always()
+        run: yarn oinc:teardown || true

@@ -80,14 +80,28 @@ before publication. Without this step, the frontend would be missing
 
 ## CI Pipeline
 
-`ci.yml` runs four parallel jobs:
+`ci.yml` runs five parallel jobs:
 
 - **build-validate**: Lint, prettier, type-check, build, verify output bundles exist
+- **shellcheck**: Shell scripts under `scripts/`, `oinc/`, and `kuadrant-dev-setup/scripts/`
 - **export-plugins**: Build and verify the frontend and backend dynamic exports
-- **unittests**: Backend and frontend unit tests
-- **e2e-tests**: Spins up a kind cluster with Kuadrant, starts Backstage, runs Playwright tests
+- **unittests**: Backend and frontend unit tests (no Kubernetes cluster)
+- **e2e-tests**: oinc cluster with Kuadrant + MCP Gateway, host `yarn dev:oinc`, Playwright
 
 E2e test artifacts (Playwright report, videos on failure) are uploaded and retained for 7 days.
+
+### E2E cluster (oinc, not kind)
+
+The `e2e-tests` job matches local loop 2 (`yarn oinc:cluster` then `yarn dev:oinc`) and the [kuadrant-console-plugin](https://github.com/Kuadrant/kuadrant-console-plugin) GitHub Actions pattern:
+
+| | CI e2e | Local loop 1 (kind) |
+|---|---|---|
+| Cluster | oinc (`ubuntu-latest`, Docker on the hosted runner) | `make -C kuadrant-dev-setup kind-create` |
+| Addons | gateway-api, cert-manager, metallb, istio, kuadrant@latest, mcp-gateway | Kuadrant via `make kuadrant-install` (no MCP Gateway operator) |
+| Host app | `yarn dev:oinc` (Dex :3000) | `yarn dev:kind` |
+| Job timeout | 60 minutes (oinc create is ~6+ min; Istio + Kuadrant + MCP Gateway) | n/a in CI |
+
+oinc is installed the same way as console-plugin: download `oinc-linux-amd64` from the [oinc v0.4.3](https://github.com/jasonmadigan/oinc/releases/tag/v0.4.3) GitHub release, `file` check, `oinc version`, move to `/usr/local/bin`. Helm is installed with `azure/setup-helm`. There is no extra Docker-in-Docker or privileged job; nested k8s uses the runner’s Docker, as in console-plugin. Kind is **not** used in CI e2e. It remains the lighter local fallback (loop 1). Unit tests do not start a cluster.
 
 ## npm Trusted Publishing
 
