@@ -1,4 +1,4 @@
-import { Page, Locator, expect } from "@playwright/test";
+import { Page, Locator, Browser, expect } from "@playwright/test";
 import { Common } from "./common";
 
 // timeout constants for consistent test behaviour
@@ -15,6 +15,9 @@ export function generateTestId(): string {
 }
 
 export interface TestAPIProduct {
+  // the unique part, shared by name and displayName. use it to find the product
+  // in a table without having to know which of the two that table renders.
+  id: string;
   name: string;
   displayName: string;
   namespace: string;
@@ -24,6 +27,7 @@ export interface TestAPIProduct {
 export function createTestAPIProductData(owner: string): TestAPIProduct {
   const id = generateTestId();
   return {
+    id,
     name: `e2e-test-api-${id}`,
     displayName: `E2E Test API ${id}`,
     namespace: "default",
@@ -160,6 +164,162 @@ export async function waitForApiKeysPageReady(
     const heading = page.locator("h1").filter({ hasText: headingPattern });
     await expect(heading).toBeVisible();
   }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
+}
+
+/**
+ * How many rows the API keys table holds in total, not just on screen.
+ *
+ * Rows for the same API product are indistinguishable in the DOM, and the table
+ * pages at 20 - so counting visible rows proves nothing once the first page is
+ * full: adding one pushes another off, removing one pulls the next up. The
+ * pagination footer carries the real total, so read that where it is rendered
+ * (material-table only pages past 10 rows) and fall back to counting otherwise.
+ *
+ * @param page - The Playwright Page object
+ */
+export async function apiKeyTableTotal(page: Page): Promise<number> {
+  const label = page.getByText(/\d+-\d+ of \d+/);
+  if (await label.count()) {
+    const match = (await label.first().innerText()).match(/of (\d+)/);
+    if (match) return Number(match[1]);
+  }
+  return page.locator("table tbody tr").count();
+}
+
+/**
+ * Open a MUI Select and wait until its options are on screen.
+ *
+ * Two things make a bare `.click()` unreliable here. The select is disabled
+ * while its options load, and a click on a disabled MUI Select is silently
+ * swallowed - no menu opens, and the later wait for an option times out
+ * complaining about the listbox rather than the real cause. Even once enabled,
+ * a re-render as the fetch settles can dismiss a menu that did open. So: wait
+ * for enabled, then retry the open until options are actually showing.
+ *
+ * Use this wherever a test wants to assert on the options itself; use
+ * selectFirstOption when it just needs a value chosen.
+ *
+ * @param page - The Playwright Page object
+ * @param container - The Locator the select lives in (usually the dialog)
+ * @param testId - data-testid of the select, e.g. "api-select"
+ */
+export async function openSelect(
+  page: Page,
+  container: Locator,
+  testId: string,
+): Promise<void> {
+  const select = container.getByTestId(testId);
+  await expect(
+    select,
+    `${testId} should become enabled once its options have loaded`,
+  ).toBeEnabled({ timeout: TIMEOUTS.SLOW });
+
+  await expect(async () => {
+    await select.click();
+    await expect(
+      page.getByRole("listbox").getByRole("option").first(),
+    ).toBeVisible({ timeout: TIMEOUTS.QUICK });
+  }).toPass({ timeout: TIMEOUTS.SLOW, intervals: [250, 500, 1000] });
+}
+
+/**
+ * Open one of the Request Access dialog's selects and choose an option.
+ *
+ * @param page - The Playwright Page object
+ * @param dialog - The dialog Locator the select lives in
+ * @param testId - data-testid of the select, e.g. "api-select"
+ * @param optionName - Exact option to pick; the first option if omitted
+ */
+export async function selectFirstOption(
+  page: Page,
+  dialog: Locator,
+  testId: string,
+  optionName?: string,
+): Promise<void> {
+  await openSelect(page, dialog, testId);
+
+  const listbox = page.getByRole("listbox");
+  const option = optionName
+    ? listbox.getByRole("option", { name: optionName, exact: true })
+    : listbox.getByRole("option").first();
+  await expect(
+    option,
+    `${testId} should offer ${optionName ?? "at least one option"}`,
+  ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
+  await option.click();
+}
+
+/**
+ * Request an API key through the UI, so a test that needs one to exist can
+ * create it rather than skip itself when the environment happens to be empty.
+ *
+ * Picks the first API and the first tier offered. Returns once the dialog has
+ * closed, which the dialog only does on a successful submission.
+ *
+ * @param page - The Playwright Page object
+ * @param useCase - Use-case text, worth making unique per test so the resulting
+ *   row can be identified.
+ */
+export async function requestApiKey(
+  page: Page,
+  useCase: string,
+  apiProductName?: string,
+): Promise<void> {
+  await page.goto("/kuadrant/my-api-keys");
+  await waitForApiKeysPageReady(page);
+
+  await page.getByTestId("request-access-button").click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog, "Request Access dialog should open").toBeVisible({
+    timeout: TIMEOUTS.DEFAULT,
+  });
+
+  await selectFirstOption(page, dialog, "api-select", apiProductName);
+  await selectFirstOption(page, dialog, "tier-select");
+
+  await dialog.getByTestId("usecase-input").fill(useCase);
+  await dialog.getByTestId("submit-button").click();
+
+  await expect(
+    dialog,
+    "Request Access dialog should close once the request is accepted",
+  ).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
+}
+
+/**
+ * Create a pending API key request as a consumer, in a browser context of its
+ * own, so an approver test has something to approve.
+ *
+ * A separate context avoids signing out and back in on the test's own page,
+ * which would throw away the approver session the test is there to exercise.
+ *
+ * The API product is named rather than "whichever is first", because an
+ * approval queue only shows requests for APIs the approver owns - so a test
+ * about owner1's queue has to seed against an API owner1 owns.
+ *
+ * @param browser - The Playwright Browser, from the test's `browser` fixture
+ * @param useCase - Use-case text, recorded on the request
+ * @param apiProductName - Name of the APIProduct to request access to
+ */
+export async function seedPendingApiKeyRequest(
+  browser: Browser,
+  useCase: string,
+  apiProductName: string,
+): Promise<void> {
+  // a manually created context inherits nothing from the config's `use` block,
+  // so mirror the baseURL (dexQuickLogin starts with a relative goto) and the
+  // https override the rest of the suite runs with.
+  const context = await browser.newContext({
+    baseURL: process.env.BASE_URL || "http://localhost:3000",
+    ignoreHTTPSErrors: true,
+  });
+  try {
+    const page = await context.newPage();
+    await new Common(page).dexQuickLogin("consumer1@kuadrant.local");
+    await requestApiKey(page, useCase, apiProductName);
+  } finally {
+    await context.close();
+  }
 }
 
 /**

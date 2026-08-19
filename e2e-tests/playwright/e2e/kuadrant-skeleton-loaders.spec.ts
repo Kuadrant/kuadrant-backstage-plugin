@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
 import { TIMEOUTS } from "../utils/kuadrant-helpers";
 
@@ -14,7 +14,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("admin@kuadrant.local");
   });
 
   test("should show skeleton loaders on My API Keys page while loading", async ({
@@ -109,23 +109,25 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       await expect(catalogHeading.first()).toBeVisible();
     }).toPass({ timeout: TIMEOUTS.SLOW });
 
-    // Try to find and click on an API entity (toystore or any other)
+    // the catalog is seeded with APIProducts by setup-cluster.sh, so an api
+    // entity is expected rather than optional - the old `if (count > 0)` meant
+    // an empty catalog passed this test without ever opening an entity page.
     const apiLink = page.locator('a[href*="/catalog/"][href*="/api/"]').first();
-    const hasApiLink = await apiLink.count();
+    await expect(
+      apiLink,
+      "catalog should list at least one api entity to open",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await apiLink.click();
 
-    if (hasApiLink > 0) {
-      await apiLink.click();
+    // Eventually page should be fully loaded without skeletons
+    await expect(async () => {
+      const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
+      await expect(visibleSkeletons).toHaveCount(0);
+    }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
-      // Eventually page should be fully loaded without skeletons
-      await expect(async () => {
-        const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
-        await expect(visibleSkeletons).toHaveCount(0);
-      }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
-
-      // Verify the page loaded (may or may not have the Kuadrant card depending on the API)
-      const content = page.locator("main");
-      await expect(content).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    }
+    // Verify the page loaded (may or may not have the Kuadrant card depending on the API)
+    const content = page.locator("main");
+    await expect(content).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
   test("should not show old Progress spinners anywhere", async ({ page }) => {
@@ -183,27 +185,26 @@ test.describe("Kuadrant Skeleton Loaders", () => {
       await expect(heading).toBeVisible();
     }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
-    // Try to find a link to an API Product detail page
+    // as above: the demo APIProducts are seeded, so a product link is expected.
     const productLink = page
       .locator('a[href*="/kuadrant/api-products/"]')
       .first();
-    const hasProductLink = await productLink.count();
+    await expect(
+      productLink,
+      "api products list should link to at least one product",
+    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await productLink.click();
 
-    if (hasProductLink > 0) {
-      // Click to navigate to detail page
-      await productLink.click();
+    // Wait for full load
+    await expect(async () => {
+      const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
+      await expect(visibleSkeletons).toHaveCount(0);
+    }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
 
-      // Wait for full load
-      await expect(async () => {
-        const visibleSkeletons = page.locator(".MuiSkeleton-root:visible");
-        await expect(visibleSkeletons).toHaveCount(0);
-      }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
-
-      // Verify page loaded with real content (check for header or main content)
-      await expect(async () => {
-        const pageHeader = page.locator("header, h1").first();
-        await expect(pageHeader).toBeVisible();
-      }).toPass({ timeout: TIMEOUTS.DEFAULT });
-    }
+    // Verify page loaded with real content (check for header or main content)
+    await expect(async () => {
+      const pageHeader = page.locator("header, h1").first();
+      await expect(pageHeader).toBeVisible();
+    }).toPass({ timeout: TIMEOUTS.DEFAULT });
   });
 });

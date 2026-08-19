@@ -265,9 +265,12 @@ describe('createRouter', () => {
 
       mockK8sClient.getCustomResource.mockResolvedValue(mockAPIKey);
 
-      // Mock secret fetch to throw error (not found)
+      // a genuine 404 from the api server: the referenced secret is gone
       mockK8sClient.getSecret.mockRejectedValue(
-        new Error('secret not found in cluster'),
+        Object.assign(
+          new Error('failed to get secret: secrets "missing" not found'),
+          { statusCode: 404 },
+        ),
       );
 
       const response = await request(app)
@@ -276,6 +279,35 @@ describe('createRouter', () => {
 
       expect(response.body).toEqual({
         error: 'secret not found',
+      });
+    });
+
+    it('does not turn a non-404 secret failure into a 404', async () => {
+      // a 403 is the backend's service account missing rbac, not a missing
+      // secret. it must reach the mapper, which logs it and answers generically
+      // rather than passing it off as not-found.
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.DENY },
+      ]);
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.getCustomResource.mockResolvedValue(mockAPIKey);
+
+      mockK8sClient.getSecret.mockRejectedValue(
+        Object.assign(
+          new Error('failed to get secret: secrets is forbidden'),
+          { statusCode: 403 },
+        ),
+      );
+
+      const response = await request(app)
+        .get(`/apikeys/${namespace}/${name}/secret`)
+        .expect(500);
+
+      expect(response.body).toEqual({
+        error: 'failed to read api key secret',
       });
     });
 
@@ -365,6 +397,32 @@ describe('createRouter', () => {
         .post('/secrets')
         .send({ name: 'test-secret', apiKeyValue: 'test-key' })
         .expect(403);
+    });
+
+    it('does not leak the service account rbac detail on a create failure', async () => {
+      // a 403 from the api server is this backend's service account missing an
+      // rbac rule, and its message names the account, namespace and resource.
+      // that belongs in the operator log, not the response body.
+      mockAuthorizeFn.mockResolvedValueOnce([
+        { result: AuthorizeResult.ALLOW },
+      ]);
+
+      mockK8sClient.createSecret.mockRejectedValue(
+        Object.assign(
+          new Error(
+            'failed to create secret: secrets is forbidden: User "system:serviceaccount:rhdh:rhdh" cannot create resource "secrets" in namespace "kuadrant-testuser-c7a65229"',
+          ),
+          { statusCode: 403 },
+        ),
+      );
+
+      const response = await request(app)
+        .post('/secrets')
+        .send({ name: 'test-secret', apiKeyValue: 'test-key-123' })
+        .expect(500);
+
+      expect(response.body.error).toBe('failed to create secret');
+      expect(response.body.error).not.toContain('serviceaccount');
     });
   });
 
@@ -1509,6 +1567,174 @@ describe('createRouter', () => {
         name,
         patchData,
       );
+    });
+  });
+  describe('kubernetes error propagation', () => {
+    // the status the api server returned has to survive the client, but only
+    // the statuses that describe the caller's own request should reach them as
+    // themselves. this backend talks to the api server as one service account
+    // and never impersonates the caller, so anything about that account's own
+    // access is the operator's problem, not the caller's.
+    const k8sError = (
+      statusCode: number,
+      message: string,
+      details?: Record<string, unknown>,
+    ) => Object.assign(new Error(message), { statusCode, details });
+
+    it('leaves a kubernetes 403 as 500 rather than blaming the caller', async () => {
+      // the caller got this far, so backstage's own permission check allowed
+      // them. a forbidden here is the backend's service account missing an rbac
+      // rule; answering 403 makes the ui tell the caller they lack access to
+      // the very thing they were just allowed to do.
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(403, 'failed to list apikeyrequests: apikeyrequests.devportal.kuadrant.io is forbidden'),
+      );
+
+      const response = await request(app).get('/requests').expect(500);
+
+      expect(response.body.error).toBe('failed to fetch api key requests');
+    });
+
+    it('maps a kubernetes 404 for a missing object to 404', async () => {
+      // details.kind means the api server knows the kind and simply has no such
+      // object: a real not-found, and the caller's to see.
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(404, 'failed to list apikeyrequests: apikeyrequests.devportal.kuadrant.io "missing" not found', {
+          group: 'devportal.kuadrant.io',
+          kind: 'apikeyrequests',
+          name: 'missing',
+        }),
+      );
+
+      const response = await request(app).get('/requests').expect(404);
+
+      expect(response.body.error).toBe('not found');
+    });
+
+    it('leaves a kubernetes 404 for a missing resource type as 500', async () => {
+      // the generic "could not find the requested resource" with no details is
+      // what the api server says when nothing serves the kind at all, i.e. the
+      // crds are not installed. answering 404 dresses an absent operator up as
+      // an ordinary empty result.
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(404, 'failed to list apikeyrequests: the server could not find the requested resource'),
+      );
+
+      const response = await request(app).get('/requests').expect(500);
+
+      expect(response.body.error).toBe('failed to fetch api key requests');
+    });
+
+    it('maps a kubernetes 429 to 503 and passes on the retry delay', async () => {
+      // the api server is throttling this backend's service account, not the
+      // caller. transient and worth retrying, but not the caller's fault.
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(429, 'failed to list apikeyrequests: too many requests', {
+          retryAfterSeconds: 7,
+        }),
+      );
+
+      const response = await request(app).get('/requests').expect(503);
+
+      expect(response.body.error).toBe('service temporarily unavailable');
+      expect(response.headers['retry-after']).toBe('7');
+    });
+
+    it('maps a kubernetes 429 with no retry delay to a bare 503', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(429, 'failed to list apikeyrequests: too many requests'),
+      );
+
+      const response = await request(app).get('/requests').expect(503);
+
+      expect(response.body.error).toBe('service temporarily unavailable');
+      expect(response.headers['retry-after']).toBeUndefined();
+    });
+
+    it('surfaces per-field validation causes on a 422', async () => {
+      // what the caller sent is theirs to see, and naming the field is the
+      // whole point of answering rather than a bare "invalid request".
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(422, 'failed to list apikeyrequests: APIKeyRequest is invalid', {
+          causes: [
+            {
+              field: 'spec.planTier',
+              message: 'Unsupported value: "platinum": supported values: "bronze", "silver", "gold"',
+            },
+          ],
+        }),
+      );
+
+      const response = await request(app).get('/requests').expect(422);
+
+      expect(response.body.error).toBe(
+        'spec.planTier: Unsupported value: "platinum": supported values: "bronze", "silver", "gold"',
+      );
+    });
+
+    it('falls back to a generic message when a 400 carries no causes', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(400, 'failed to list apikeyrequests: bad request'),
+      );
+
+      const response = await request(app).get('/requests').expect(400);
+
+      expect(response.body.error).toBe('invalid request');
+    });
+
+    it('maps a kubernetes 503 to a 503 and passes on the retry delay', async () => {
+      // the api server itself is unavailable, not the caller's doing. transient
+      // like a 429, and answered the same way.
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(503, 'failed to list apikeyrequests: the server is currently unable to handle the request', {
+          retryAfterSeconds: 3,
+        }),
+      );
+
+      const response = await request(app).get('/requests').expect(503);
+
+      expect(response.body.error).toBe('service temporarily unavailable');
+      expect(response.headers['retry-after']).toBe('3');
+    });
+
+    it('maps a kubernetes 503 with no retry delay to a bare 503', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(503, 'failed to list apikeyrequests: the server is currently unable to handle the request'),
+      );
+
+      const response = await request(app).get('/requests').expect(503);
+
+      expect(response.body.error).toBe('service temporarily unavailable');
+      expect(response.headers['retry-after']).toBeUndefined();
+    });
+
+    it('leaves an unmapped kubernetes status as 500', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(
+        k8sError(502, 'failed to list apikeyrequests: bad gateway'),
+      );
+
+      const response = await request(app).get('/requests').expect(500);
+
+      expect(response.body.error).toBe('failed to fetch api key requests');
+    });
+
+    it('leaves a failure carrying no status as 500', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValue(new Error('socket hang up'));
+
+      const response = await request(app).get('/requests').expect(500);
+
+      expect(response.body.error).toBe('failed to fetch api key requests');
     });
   });
 });

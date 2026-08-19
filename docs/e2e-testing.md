@@ -38,6 +38,36 @@ yarn test --grep "Happy Path"          # specific test suite
 yarn test --grep "permissions matrix"  # RBAC tests only
 ```
 
+## Running against RHDH (dynamic plugins)
+
+The required CI job above remains the static-plugin path. The separate `E2E (dynamic plugins)` workflow is manually dispatched and runs the same full suite against the current branch's `export-dynamic` output in RHDH on oinc.
+
+The root Makefile is the shared driver for CI and local use. For a one-shot local run:
+
+```bash
+make e2e-dynamic
+```
+
+This builds and exports both plugins, bakes them into an RHDH image, creates the oinc cluster, runs the suite, and tears down on success. A failed run leaves the cluster up for inspection.
+
+For manual UI testing or repeated spec runs:
+
+```bash
+make dynamic-up              # build and leave RHDH running
+make e2e-deps                # needed once before running Playwright locally
+make e2e-specs               # repeat without rebuilding RHDH
+make teardown
+```
+
+`dynamic-up` deliberately does not install Playwright. RHDH is available at `http://rhdh.localhost:9080`; that `.localhost` origin keeps Web Crypto and clipboard APIs available over HTTP. Both RHDH and `yarn dev` authenticate through Dex with the same personas. See [oinc Development Environment](oinc.md) for the cluster, image, authentication, and version details.
+
+The Make targets require oinc v0.3.1, Docker, Helm, kubectl, curl, Python 3, Node, and Yarn. They install project dependencies but do not install those tools. Version and image defaults can be overridden on the command line, for example:
+
+```bash
+make dynamic-up KUADRANT_VERSION=1.5.1 RHDH_IMAGE_TAG=my-test
+make e2e-specs PLAYWRIGHT_ARGS="--grep 'permissions matrix'"
+```
+
 ## Key Principles
 
 ### 1. Tests verify real behaviour
@@ -137,11 +167,27 @@ npx playwright show-trace test-results/.../trace.zip
 
 ## Test Users
 
-Tests use Dex authentication with these users:
+Tests use Dex authentication with these users in both environments:
+
 - `admin@kuadrant.local` - full permissions
 - `owner1@kuadrant.local` - API owner (can manage own APIs)
 - `owner2@kuadrant.local` - API owner (for ownership isolation tests)
 - `consumer1@kuadrant.local` - API consumer (can request access)
+- `consumer2@kuadrant.local` - API consumer (for isolation tests)
+
+Passwords match the username local part. Personas are defined in `kuadrant-dev-setup/dex/config.yaml`; their catalog users and group membership are in `catalog-entities/kuadrant-users.yaml`, with roles mapped in `rbac-policy.csv`.
+
+## Runtime guards
+
+Kuadrant specs import `test` and `expect` from `playwright/fixtures/test.ts`. The fixture fails a test that sees a Kuadrant backend 5xx, an uncaught page exception, or an unexpected console error. This prevents an empty-state assertion from passing over a failed fetch.
+
+Tests that intentionally stub an error response opt out only for that scope:
+
+```typescript
+test.describe("simulated backend failures", () => {
+  test.use({ allowExpectedErrors: true });
+});
+```
 
 ## Adding testids
 

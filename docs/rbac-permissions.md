@@ -461,21 +461,17 @@ See `app-config.local.yaml`:
 permission:
   enabled: true
   rbac:
-    policies-csv-file: ./rbac-policy.csv
+    policies-csv-file: ../../rbac-policy.csv
     policyFileReload: true
 ```
 
 ### Testing Different Roles
 
-Use the included helper scripts:
+`yarn dev` runs a local dex container on `:5556`. Sign in through the dex quick-login picker as one of five personas: `admin@kuadrant.local`, `owner1@`, `owner2@`, `consumer1@`, `consumer2@`. Sign out and back in to switch.
 
-```bash
-yarn user:consumer  # switch to API Consumer role
-yarn user:owner     # switch to API Owner role
-yarn user:default   # restore default permissions
-```
+Dex credentials are defined in `kuadrant-dev-setup/dex/config.yaml`. The matching catalog users and their group membership (`api-admins`, `api-owners`, `api-consumers`) live in `catalog-entities/kuadrant-users.yaml`, and `rbac-policy.csv` maps those groups to roles.
 
-After switching roles, restart with `yarn dev`.
+The Kubernetes permissions used by both kind and oinc are defined once in `kuadrant-dev-setup/rbac/rhdh-cluster-role.yaml`; each environment supplies only its service account and binding.
 
 ## Security Considerations
 

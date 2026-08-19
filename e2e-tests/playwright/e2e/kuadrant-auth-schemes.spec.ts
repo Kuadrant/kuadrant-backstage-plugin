@@ -1,4 +1,4 @@
-import { test, expect } from "@playwright/test";
+import { test, expect } from "../fixtures/test";
 import { Common } from "../utils/common";
 import { TIMEOUTS, isElementVisible } from "../utils/kuadrant-helpers";
 
@@ -23,7 +23,7 @@ test.describe("Auth Scheme UI Behaviour", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("admin@kuadrant.local");
   });
 
   test.describe("OIDC-only API (gamestore-api)", () => {

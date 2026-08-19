@@ -1,0 +1,99 @@
+# The issuer must resolve from both the browser and the RHDH pod. On the host,
+# dex.localhost reaches the oinc ingress. In-cluster, the same name resolves to
+# Service dex in Namespace localhost through the Kubernetes DNS search path.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dex
+  namespace: localhost
+  labels:
+    app: dex
+spec:
+  replicas: 1
+  # Dex uses in-memory storage, so avoid two pods during an update.
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app: dex
+  template:
+    metadata:
+      labels:
+        app: dex
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: dex
+          image: ghcr.io/dexidp/dex:v2.45.1
+          args: ["dex", "serve", "/etc/dex/config.yaml"]
+          ports:
+            - name: http
+              containerPort: 5556
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          volumeMounts:
+            - name: config
+              mountPath: /etc/dex/config.yaml
+              subPath: config.yaml
+              readOnly: true
+            - name: web
+              mountPath: /srv/dex/web/templates/password.html
+              subPath: password.html
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 3
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 20m
+              memory: 64Mi
+            limits:
+              cpu: 500m
+              memory: 256Mi
+      volumes:
+        - name: config
+          configMap:
+            name: dex-config
+        - name: web
+          configMap:
+            name: dex-web
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: dex
+  namespace: localhost
+spec:
+  selector:
+    app: dex
+  ports:
+    - name: http
+      port: 9080
+      targetPort: http
+---
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: dex
+  namespace: localhost
+spec:
+  host: dex.localhost
+  port:
+    targetPort: http
+  to:
+    kind: Service
+    name: dex

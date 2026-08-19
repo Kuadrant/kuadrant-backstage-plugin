@@ -7,7 +7,7 @@ import express from 'express';
 import Router from 'express-promise-router';
 import cors from 'cors';
 import { randomBytes, createHash } from 'crypto';
-import { KuadrantK8sClient } from './k8s-client';
+import { KuadrantK8sClient, K8sStatusDetails } from './k8s-client';
 import { getAPIProductEntityProvider } from './module';
 import {
   kuadrantPermissions,
@@ -57,6 +57,135 @@ function getConsumerNamespace(userEntityRef: string): string {
   // (e.g. "foo_bar" and "foo.bar" both become "foo-bar")
   const hash = createHash('sha256').update(userEntityRef).digest('hex').substring(0, 8);
   return `kuadrant-${sanitized}-${hash}`;
+}
+
+// kubernetes statuses that describe the caller's own request, and so should
+// reach the caller as themselves. anything absent falls through to the
+// handler's own 500.
+//
+// deliberately absent:
+//   401 - this service's own service account token is bad, not anything the
+//         caller did.
+//   403 - the backend talks to the api server as a single service account and
+//         never impersonates the caller, so a forbidden is always that account
+//         missing an rbac rule. answering the caller "permission denied" blames
+//         them for an operator's problem, and the ui turns it into copy telling
+//         them they cannot do the very thing backstage's permission check just
+//         allowed. logged instead, where an operator can act on it.
+//   429 - the api server is throttling this client, not the caller. mapped to
+//         503 below, which keeps the transience without the blame.
+//   503 - the api server is unavailable, not anything the caller did. transient
+//         like a 429, and answered the same way: a 503 with a generic body.
+const K8S_STATUS_RESPONSES: Record<number, string> = {
+  400: 'invalid request',
+  404: 'not found',
+  409: 'conflict',
+  422: 'invalid request',
+};
+
+// read the status structurally rather than by instanceof: k8s-client wraps its
+// failures in K8sApiError, but the underlying client's errors carry the same
+// field and deserve the same mapping.
+function kubernetesStatus(error: unknown): number | undefined {
+  const statusCode = (error as { statusCode?: unknown } | null | undefined)?.statusCode;
+  return typeof statusCode === 'number' ? statusCode : undefined;
+}
+
+function kubernetesDetails(error: unknown): K8sStatusDetails | undefined {
+  const details = (error as { details?: unknown } | null | undefined)?.details;
+  return details && typeof details === 'object' ? (details as K8sStatusDetails) : undefined;
+}
+
+function kubernetesMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+// a 404 carries two very different meanings. "no such object of a kind i know"
+// is an ordinary not-found and the caller's to see; "no such kind" means
+// nothing serves the resource at all, i.e. the crds are missing and the install
+// is broken. the api server fills details.kind for the first and leaves details
+// empty for the second, so read that rather than matching on message text.
+// no details at all is treated as the broken install: answering 404 there would
+// dress an absent operator up as an ordinary empty result.
+function isMissingResourceType(error: unknown): boolean {
+  return !kubernetesDetails(error)?.kind;
+}
+
+// per-field validation feedback describes what the caller sent, so it is theirs
+// to see. the surrounding message is not: it carries the resource path and
+// whatever namespace the operation touched.
+function validationDetail(error: unknown): string | undefined {
+  const causes = kubernetesDetails(error)?.causes;
+  if (!Array.isArray(causes)) {
+    return undefined;
+  }
+
+  const described = causes
+    .filter(cause => typeof cause?.message === 'string' && cause.message !== '')
+    .map(cause => (cause.field ? `${cause.field}: ${cause.message}` : cause.message));
+
+  return described.length > 0 ? described.join('; ') : undefined;
+}
+
+// answers a kubernetes failure with the matching status, or undefined so the
+// caller falls back to its own error handling. the k8s message is logged rather
+// than returned: it names the service account and the resource path, and the
+// status is what the ui acts on. returns the response it sent so handlers that
+// return one can pass it straight back.
+function sendKubernetesError(
+  res: express.Response,
+  error: unknown,
+): express.Response | undefined {
+  const status = kubernetesStatus(error);
+
+  if (status === undefined) {
+    return undefined;
+  }
+
+  // this backend's own service account, never the caller's. the message names
+  // the account and the resource, which is the rbac rule an operator has to add.
+  if (status === 403) {
+    console.error(
+      'kubernetes refused the service account this backend uses; grant it rbac for the resource named here:',
+      kubernetesMessage(error),
+    );
+    return undefined;
+  }
+
+  if (status === 429) {
+    console.error('kubernetes is throttling this backend:', kubernetesMessage(error));
+    const retryAfter = kubernetesDetails(error)?.retryAfterSeconds;
+    if (typeof retryAfter === 'number' && retryAfter > 0) {
+      res.setHeader('Retry-After', String(retryAfter));
+    }
+    return res.status(503).json({ error: 'service temporarily unavailable' });
+  }
+
+  if (status === 503) {
+    console.error('kubernetes is unavailable:', kubernetesMessage(error));
+    const retryAfter = kubernetesDetails(error)?.retryAfterSeconds;
+    if (typeof retryAfter === 'number' && retryAfter > 0) {
+      res.setHeader('Retry-After', String(retryAfter));
+    }
+    return res.status(503).json({ error: 'service temporarily unavailable' });
+  }
+
+  const message = K8S_STATUS_RESPONSES[status];
+  if (message === undefined) {
+    return undefined;
+  }
+
+  if (status === 404 && isMissingResourceType(error)) {
+    console.error(
+      'kubernetes serves no such resource type; check the kuadrant crds are installed:',
+      kubernetesMessage(error),
+    );
+    return undefined;
+  }
+
+  const detail = status === 400 || status === 422 ? validationDetail(error) : undefined;
+
+  return res.status(status).json({ error: detail ?? message });
 }
 
 async function ensureConsumerNamespace(k8sClient: KuadrantK8sClient, namespace: string): Promise<void> {
@@ -241,7 +370,7 @@ export async function createRouter({
       console.error('error fetching apiproducts:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch apiproducts' });
       }
     }
@@ -288,7 +417,7 @@ export async function createRouter({
       console.error('error fetching apiproduct:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch apiproduct' });
       }
     }
@@ -343,15 +472,17 @@ export async function createRouter({
       res.status(201).json(created);
     } catch (error) {
       console.error('error creating apiproduct:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
       } else if (error instanceof InputError) {
         res.status(400).json({ error: error.message });
-      } else {
-        // pass the detailed error message to the frontend
-        res.status(500).json({ error: errorMessage });
+      } else if (!sendKubernetesError(res, error)) {
+        // anything the caller sent has already been answered above, with the
+        // field the api server objected to where it named one. what is left is
+        // a fault; the raw k8s message names the service account and namespace,
+        // so it stays in the log above and the response gets a generic line.
+        res.status(500).json({ error: 'failed to create apiproduct' });
       }
     }
   });
@@ -451,7 +582,7 @@ export async function createRouter({
       console.error('error deleting apiproduct:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to delete apiproduct' });
       }
     }
@@ -478,7 +609,7 @@ export async function createRouter({
       console.error('error fetching httproutes:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch httproutes' });
       }
     }
@@ -507,7 +638,7 @@ export async function createRouter({
       console.error('error fetching httproute:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch httproute' });
       }
     }
@@ -622,15 +753,17 @@ export async function createRouter({
       return res.json(updated);
     } catch (error) {
       console.error('error updating apiproduct:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
 
       if (error instanceof NotAllowedError) {
         return res.status(403).json({ error: error.message });
-      } else if (error instanceof InputError) {
-        return res.status(400).json({ error: error.message });
-      } else {
-        return res.status(500).json({ error: errorMessage });
       }
+      if (error instanceof InputError) {
+        return res.status(400).json({ error: error.message });
+      }
+      return (
+        sendKubernetesError(res, error) ??
+        res.status(500).json({ error: 'failed to update apiproduct' })
+      );
     }
   });
 
@@ -679,7 +812,7 @@ export async function createRouter({
       console.error('error fetching planpolicies:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch planpolicies' });
       }
     }
@@ -705,7 +838,7 @@ export async function createRouter({
       console.error('error fetching planpolicy:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch planpolicy' });
       }
     }
@@ -771,9 +904,8 @@ export async function createRouter({
         res.status(403).json({ error: error.message });
       } else if (error instanceof InputError) {
         res.status(400).json({ error: error.message });
-      } else {
-        const errorMessage = error instanceof Error ? error.message : 'failed to create secret';
-        res.status(500).json({ error: errorMessage });
+      } else if (!sendKubernetesError(res, error)) {
+        res.status(500).json({ error: 'failed to create secret' });
       }
     }
   });
@@ -803,9 +935,8 @@ export async function createRouter({
       console.error('error deleting secret:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
-        const errorMessage = error instanceof Error ? error.message : 'failed to delete secret';
-        res.status(500).json({ error: errorMessage });
+      } else if (!sendKubernetesError(res, error)) {
+        res.status(500).json({ error: 'failed to delete secret' });
       }
     }
   });
@@ -906,11 +1037,12 @@ export async function createRouter({
       console.error('error creating api key request:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
-        // extract meaningful error message from kubernetes API errors
-        // this helps users understand validation failures (e.g., namespace not found, invalid tier)
-        const errorMessage = error instanceof Error ? error.message : 'failed to create api key request';
-        res.status(500).json({ error: errorMessage });
+      } else if (!sendKubernetesError(res, error)) {
+        // validation failures answer above, naming the field the api server
+        // rejected. what is left is a fault; the raw k8s message names the
+        // service account and namespace, so it stays in the log above and the
+        // response gets a generic line.
+        res.status(500).json({ error: 'failed to create api key request' });
       }
     }
   });
@@ -1010,7 +1142,7 @@ export async function createRouter({
       console.error('error fetching api key requests:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch api key requests' });
       }
     }
@@ -1070,7 +1202,7 @@ export async function createRouter({
       console.error('error fetching user api key requests:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch user api key requests' });
       }
     }
@@ -1147,7 +1279,7 @@ export async function createRouter({
       console.error('error approving api key request:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to approve api key request' });
       }
     }
@@ -1220,7 +1352,7 @@ export async function createRouter({
       console.error('error rejecting api key request:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to reject api key request' });
       }
     }
@@ -1314,7 +1446,7 @@ export async function createRouter({
       console.error('error in bulk approve:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to bulk approve api key requests' });
       }
     }
@@ -1400,7 +1532,7 @@ export async function createRouter({
       console.error('error in bulk reject:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to bulk reject api key requests' });
       }
     }
@@ -1448,7 +1580,7 @@ export async function createRouter({
       console.error('error deleting api key request:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to delete api key request' });
       }
     }
@@ -1549,7 +1681,7 @@ export async function createRouter({
         res.status(403).json({ error: error.message });
       } else if (error instanceof InputError) {
         res.status(400).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to update api key request' });
       }
     }
@@ -1604,7 +1736,7 @@ export async function createRouter({
       console.error('failed to get api key:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to get api key' });
       }
     }
@@ -1669,6 +1801,12 @@ export async function createRouter({
       try {
         secret = await k8sClient.getSecret(namespace, secretName);
       } catch (error) {
+        // only a real not-found is the caller's; anything else (a throttle, the
+        // service account missing an rbac rule) is for the mapper below, not
+        // dressed up as a missing secret.
+        if (kubernetesStatus(error) !== 404) {
+          throw error;
+        }
         console.error('error fetching secret:', error);
         res.status(404).json({
           error: 'secret not found',
@@ -1697,7 +1835,7 @@ export async function createRouter({
       console.error('error reading api key secret:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to read api key secret' });
       }
     }
@@ -1743,7 +1881,7 @@ export async function createRouter({
       console.error('error fetching authpolicies:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch authpolicies' });
       }
     }
@@ -1789,7 +1927,7 @@ export async function createRouter({
       console.error('error fetching ratelimitpolicies:', error);
       if (error instanceof NotAllowedError) {
         res.status(403).json({ error: error.message });
-      } else {
+      } else if (!sendKubernetesError(res, error)) {
         res.status(500).json({ error: 'failed to fetch ratelimitpolicies' });
       }
     }

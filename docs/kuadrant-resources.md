@@ -221,6 +221,10 @@ When OIDC is detected, the UI renders an `OidcProviderCard` component that shows
 
 See [`plugins/kuadrant/src/components/OidcProviderCard/OidcProviderCard.tsx`](../plugins/kuadrant/src/components/OidcProviderCard/OidcProviderCard.tsx) for the card implementation.
 
+### API Keys Tab and Card Gating
+
+The entity provider emits `kuadrant.io/auth-apikey: "true"` only when an API-key scheme is discovered. OIDC-only products omit it. This is intentionally presence-based: RHDH dynamic-plugin `hasAnnotation` conditions do not inspect the value, so emitting `"false"` would still show the API Keys tab and overview card. Static mode's `=== "true"` check remains compatible with an absent annotation.
+
 ## PublishStatus for APIProducts
 
 APIProducts have a Draft/Published workflow:

@@ -51,7 +51,8 @@ kuadrant-dev-setup/
 ├── demo/                     # demo resources
 │   └── toystore-demo.yaml    # toystore api with policies
 ├── rbac/                     # rbac configs
-│   └── rhdh-rbac.yaml        # rhdh service account permissions
+│   ├── rhdh-cluster-role.yaml # shared RHDH Kubernetes permissions
+│   └── rhdh-rbac.yaml         # kind service account and binding
 └── scripts/                  # helper scripts
     └── kind-cluster.yaml     # kind cluster configuration
 ```

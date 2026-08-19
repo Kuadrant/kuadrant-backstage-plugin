@@ -356,7 +356,7 @@ export const EditAPIProductDialog = ({ open, onClose, onSuccess, namespace, name
                   placeholder="API description"
                   margin="normal"
                   multiline
-                  rows={2}
+                  minRows={2}
                   required
                   disabled={saving}
                   InputLabelProps={{
