@@ -167,7 +167,7 @@ export async function openMuiSelect(
   page: Page,
   select: Locator,
 ): Promise<Locator> {
-  const trigger = select.getByRole("button").or(select);
+  const trigger = select.getByRole("button");
   await expect(trigger).toBeEnabled({ timeout: TIMEOUTS.SLOW });
 
   await expect(async () => {
