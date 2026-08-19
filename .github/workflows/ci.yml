@@ -158,10 +158,14 @@ jobs:
           cd e2e-tests
           yarn install --immutable
 
+      # Skip --with-deps: it runs apt-get update, which hung ~56m on
+      # azure.archive.ubuntu.com (Ign mirrors) and exhausted the 60m job.
+      # e2e-tests postinstall already fetches Chromium; ubuntu-latest ships
+      # Chrome and the shared libs Playwright needs.
       - name: Install Playwright browsers
         run: |
           cd e2e-tests
-          yarn playwright install --with-deps chromium
+          yarn playwright install chromium
 
       - name: Create oinc cluster
         run: yarn oinc:cluster

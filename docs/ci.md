@@ -88,7 +88,7 @@ before publication. Without this step, the frontend would be missing
 - **unittests**: Backend and frontend unit tests (no Kubernetes cluster)
 - **e2e-tests**: oinc cluster with Kuadrant + MCP Gateway, host `yarn dev:oinc`, Playwright
 
-E2e test artifacts (Playwright report, videos on failure) are uploaded and retained for 7 days.
+E2e test artifacts (Playwright report, videos on failure) are uploaded and retained for 7 days. Playwright browsers are installed without `--with-deps`: that flag runs `apt-get update`, which has hung for nearly an hour on GitHub-hosted Azure Ubuntu mirrors and leaves no time for `yarn oinc:cluster`. Chromium is already fetched by `e2e-tests` postinstall; `ubuntu-latest` provides the system libraries.
 
 ### E2E cluster (oinc, not kind)
 
