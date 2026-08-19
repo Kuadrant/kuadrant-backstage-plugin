@@ -10,10 +10,13 @@ metadata:
   name: rhdh-kuadrant
   namespace: rhdh
 ---
+# Names are distinct from kuadrant-dev-setup/rbac/rhdh-rbac.yaml (the host-side
+# yarn-dev SA). Both can be applied on the same oinc cluster without one
+# ClusterRole or ClusterRoleBinding replacing the other.
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rhdh-kuadrant-reader
+  name: rhdh-kuadrant-reader-oinc
 rules:
   - apiGroups: ["kuadrant.io"]
     resources:
@@ -40,6 +43,15 @@ rules:
       - gateways
       - httproutes
     verbs: ["get", "list", "watch"]
+  # no plugin code references these resources yet (checked plugins/kuadrant
+  # and plugins/kuadrant-backend); read-only until something needs to mutate
+  # them. todo: narrow from clusterrole to a namespaced role once mcp
+  # resources have a fixed namespace to scope to.
+  - apiGroups: ["mcp.kuadrant.io"]
+    resources:
+      - mcpgatewayextensions
+      - mcpserverregistrations
+    verbs: ["get", "list", "watch"]
   - apiGroups: [""]
     resources:
       - namespaces
@@ -52,11 +64,11 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: rhdh-kuadrant-reader
+  name: rhdh-kuadrant-reader-oinc
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rhdh-kuadrant-reader
+  name: rhdh-kuadrant-reader-oinc
 subjects:
   - kind: ServiceAccount
     name: rhdh-kuadrant

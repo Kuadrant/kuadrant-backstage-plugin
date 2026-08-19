@@ -51,6 +51,16 @@ jobs:
       - name: Verify backend plugin bundle
         run: test -f plugins/kuadrant-backend/dist/index.cjs.js
 
+  shellcheck:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # ratchet:actions/checkout@v4
+
+      - name: Run shellcheck
+        run: shellcheck --severity=warning scripts/*.sh oinc/*.sh kuadrant-dev-setup/scripts/*.sh
+
   export-plugins:
     runs-on: ubuntu-latest
 
@@ -153,7 +163,7 @@ jobs:
 
       - name: Start Backstage
         run: |
-          yarn dev &
+          yarn dev:kind &
           echo $! > backstage.pid
           # wait for backstage to be ready (webpack dev server)
           timeout 120 bash -c 'until curl -f http://localhost:3000 > /dev/null 2>&1; do sleep 2; done'

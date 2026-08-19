@@ -2,18 +2,28 @@
 
 development environment for kuadrant plugins in rhdh.
 
+This directory is **loop 1**: kind + host app. The other loops live at the repo root — see the [root README](../README.md#quick-start) and [docs/oinc.md](../docs/oinc.md).
+
+| | Commands | URL | Auth | For |
+|---|---|---|---|---|
+| **1. kind + host app** (this README) | `make kind-create` then `yarn dev:kind` | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. Lighter Kubernetes. |
+| **2. oinc + host app** | `yarn oinc:cluster` then `yarn dev:oinc` | http://localhost:3000 | OIDC (Dex :5556) | Same in-tree app; OpenShift-compatible cluster. Console :9000. |
+| **3. oinc + published dynamic plugins** | `yarn oinc` **or** `yarn oinc:cluster` then `yarn oinc:rhdh` | http://localhost:7007 | Guest | npm-published dynamic plugins in Helm RHDH. No hot reload. |
+
+**:3000 is yarn-dev. :7007 is in-cluster RHDH.** Kind and oinc both write `.env`; use one cluster at a time. Do not port-forward 7007 while the host app is running.
+
 ## quick start
 
 ```bash
 # create kind cluster with kuadrant
 make kind-create
 
-# start rhdh with hot reload
+# host app (hot reload, Dex at :3000)
 cd ..
-yarn dev
+yarn dev:kind
 ```
 
-visit http://localhost:3000/kuadrant
+visit http://localhost:3000/kuadrant — sign in with **OIDC**, not Guest.
 
 ## what gets installed
 
@@ -99,9 +109,9 @@ kubectl get secrets -n toystore
 2. **develop plugins** (with hot reload):
    ```bash
    cd ..
-   yarn dev
+   yarn dev:kind
    ```
-   changes to plugin code automatically rebuild
+   changes to plugin code automatically rebuild. sign in with OIDC at http://localhost:3000, not Guest.
 
 3. **test in browser**:
    - main page: http://localhost:3000/kuadrant
@@ -171,9 +181,9 @@ this setup is simplified for rhdh development:
 
 **what we simplified:**
 - single makefile (no complex includes)
-- no rhdh-local submodule (uses rhdh's yarn dev)
-- no dynamic plugin export (direct imports)
-- no rbac user switching (uses guest auth)
+- no rhdh-local submodule (uses rhdh's yarn-dev)
+- no local dynamic-plugin export into the kind cluster (in-tree imports; for published npm dynamic plugins in RHDH use `yarn oinc:rhdh`)
+- host app uses Dex/OIDC (`yarn dev:kind`), not Guest
 - no separate backstage mode (only hot reload mode)
 
 **result:**

@@ -52,7 +52,7 @@ For specific topics, refer to these focused guides:
 | [docs/api-reference.md](docs/api-reference.md) | Backend REST API endpoints, request/response shapes, auth requirements |
 | [docs/e2e-testing.md](docs/e2e-testing.md) | E2E test setup, Playwright configuration, test structure |
 | [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
-| [docs/oinc.md](docs/oinc.md) | oinc dev environment, cluster setup, RHDH integration testing |
+| [docs/oinc.md](docs/oinc.md) | Three loops: kind + host, oinc + host (`yarn dev:oinc`), oinc + published dynamic plugins (`yarn oinc:rhdh`) |
 
 ## Prerequisites
 
@@ -74,31 +74,25 @@ brew install grep gnu-sed
 ### Development
 ```bash
 yarn install                    # install dependencies
-yarn dev                        # start frontend (webpack, hot reload) + backend
+yarn dev:kind                   # host app vs kind (Dex :3000); fails if context is not kind-*
+yarn dev:oinc                   # host app vs oinc (Dex :3000); fails if context is not oinc
+yarn dev                        # same app, unguarded (current .env)
 yarn start                      # start backend only (serves frontend as static assets)
 yarn build                      # build all packages
 yarn tsc                        # run typescript compilation
 ```
 
 ### Kuadrant Development Setup
-```bash
-cd kuadrant-dev-setup
-make kind-create                # create kind cluster with kuadrant + demo
-cd ..
-yarn dev                        # start rhdh with hot reload
 
-# cleanup
-cd kuadrant-dev-setup
-make kind-delete                # delete cluster
-```
+Three loops. Pick one. Kind has no in-cluster RHDH path.
 
-The kind cluster includes:
-- Kuadrant operator 1.5+ (or RHCL 1.4+)
-- Gateway API CRDs
-- Istio service mesh
-- Custom CRDs (APIProduct, APIKey)
-- Toystore demo (example API with policies)
-- RHDH service account with proper RBAC
+| | Commands | URL | Auth | For |
+|---|---|---|---|---|
+| **1. kind + host app** | `make -C kuadrant-dev-setup kind-create` then `yarn dev:kind` | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. |
+| **2. oinc + host app** | `yarn oinc:cluster` then `yarn dev:oinc` | http://localhost:3000 | OIDC (Dex :5556) | Same app; OpenShift-compatible cluster. Console :9000. |
+| **3. oinc + published dynamic plugins** | `yarn oinc` **or** `yarn oinc:cluster` then `yarn oinc:rhdh` | http://localhost:7007 | Guest | npm packages RHDH loads (`setup-rhdh.sh` / `npm view`). No hot reload. No local `export-dynamic` bake. |
+
+**:3000 is yarn-dev. :7007 is Helm RHDH.** Do not run kind and oinc together (both write `.env`). Do not port-forward 7007 during yarn-dev. Sign in with OIDC (`admin@kuadrant.local` / `admin`); Guest on :7007 is loop 3. Teardown: `yarn oinc:teardown` or `make -C kuadrant-dev-setup kind-delete`.
 
 ### Testing
 
@@ -134,7 +128,8 @@ yarn prettier:fix               # fix formatting
 
 ### Dynamic Plugins
 ```bash
-yarn export-dynamic -- -- --dev # export all dynamic plugins for local dev
+yarn export-dynamic -- -- --dev # RHDH wrapper plugins → dynamic-plugins-root/ (not the Kuadrant in-cluster loop)
+yarn oinc:rhdh                  # loop 3: Helm RHDH loads published Kuadrant npm dynamic plugins
 ```
 
 ### Testing Different Roles

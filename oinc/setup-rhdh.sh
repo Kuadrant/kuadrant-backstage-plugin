@@ -18,12 +18,21 @@ check_command kubectl "Install from https://kubernetes.io/docs/tasks/tools/"
 check_command helm "Install from https://helm.sh/docs/intro/install/"
 check_command npm "Install from https://nodejs.org/"
 
+# never apply to a remote OpenShift cluster; oinc is the only supported context
+if [ "$(kubectl config current-context)" != "oinc" ]; then
+  log "error: kubectl context is '$(kubectl config current-context)', not oinc."
+  log "       switch with: kubectl config use-context oinc"
+  exit 1
+fi
+
 kubectl get crd kuadrants.kuadrant.io &>/dev/null || {
   log "error: kuadrant CRDs not found. Run setup-cluster.sh first."
   exit 1
 }
 
 # --- RHDH SA + RBAC ---
+# in-cluster SA. ClusterRole/Binding names are rhdh-kuadrant-reader-oinc so they
+# do not replace the host-side yarn-dev RBAC applied by setup-cluster.sh.
 
 log "applying RHDH service account and RBAC..."
 kubectl apply -f "${SCRIPT_DIR}/manifests/rhdh-sa.yaml"
@@ -82,6 +91,9 @@ data:
     catalog:
       rules:
         - allow: [Component, API, APIProduct, Location, Template, Domain, User, Group, System, Resource, Plugin, Package]
+      locations:
+        - type: file
+          target: /opt/app-root/src/catalog-entities/kuadrant-users.yaml
 
     permission:
       enabled: true
@@ -99,15 +111,17 @@ data:
           file: /opt/app-root/src/dynamic-plugins-root/dynamic-plugins.yaml
 EOF
 
-# rbac policy from repo root, with guest as api-admin for local dev
-OINC_RBAC=$(mktemp)
-cat "${REPO_DIR}/rbac-policy.csv" > "${OINC_RBAC}"
-echo "g, user:default/guest, role:default/api-admin" >> "${OINC_RBAC}"
+# rbac policy from repo root (already maps user:default/guest to api-admin)
 kubectl create configmap rbac-policy-rhdh \
   --namespace rhdh \
-  --from-file=rbac-policy.csv="${OINC_RBAC}" \
+  --from-file=rbac-policy.csv="${REPO_DIR}/rbac-policy.csv" \
   --dry-run=client -o yaml | kubectl apply -f -
-rm -f "${OINC_RBAC}"
+
+# guest + dex personas for the catalog (needed once catalog is up)
+kubectl create configmap catalog-entities-rhdh \
+  --namespace rhdh \
+  --from-file=kuadrant-users.yaml="${REPO_DIR}/catalog-entities/kuadrant-users.yaml" \
+  --dry-run=client -o yaml | kubectl apply -f -
 
 # k8s credentials secret
 kubectl apply -n rhdh -f - <<EOF
@@ -146,7 +160,11 @@ global:
         pluginConfig:
           dynamicPlugins:
             frontend:
-              kuadrant.kuadrant-backstage-plugin-frontend:
+              # scalprum name of the published 0.4.0 frontend package. the
+              # unpublished source uses kuadrant.kuadrant-backstage-plugin-frontend.
+              internal.plugin-kuadrant:
+                apiFactories:
+                  - importName: kuadrantApiFactory
                 appIcons:
                   - name: kuadrantIcon
                     importName: KuadrantIcon
@@ -202,6 +220,14 @@ global:
 
 upstream:
   backstage:
+    # published kuadrant plugins 0.4.0 are built for RHDH 1.10. the community
+    # chart defaults to rhdh:next (2.x), which cannot load those frontend
+    # remotes (PluginRoot never mounts, /kuadrant/* 404s) and whose
+    # catalog-node 2.2 dropped catalogProcessingExtensionPoint from /alpha.
+    image:
+      registry: quay.io
+      repository: rhdh-community/rhdh
+      tag: next-1.10
     appConfig:
       app:
         baseUrl: http://localhost:7007
@@ -217,6 +243,32 @@ upstream:
           - -c
           - |
             ./install-dynamic-plugins.sh /dynamic-plugins-root
+            # published kuadrant-backend 0.4.0 requires
+            # @backstage/plugin-catalog-node/alpha for catalogProcessingExtensionPoint.
+            # rhdh 2.x moved that onto the main export; the undefined extension
+            # point crashes catalog startup. skip the rewrite on 1.10, where
+            # /alpha still has it. two separate checks so "module missing" and
+            # "export missing" are distinguishable in the logs.
+            if ! node -e "require.resolve('@backstage/plugin-catalog-node/alpha')" 2>/dev/null; then
+              echo "@backstage/plugin-catalog-node/alpha not found (removed upstream); patching to use the main export"
+              needs_patch=1
+            elif ! node -e "process.exit(require('@backstage/plugin-catalog-node/alpha').catalogProcessingExtensionPoint ? 0 : 1)"; then
+              echo "catalogProcessingExtensionPoint moved off /alpha; patching to use the main export"
+              needs_patch=1
+            else
+              needs_patch=0
+            fi
+            if [ "\$needs_patch" = "1" ]; then
+              patched=0
+              while read -r f; do
+                echo "patching catalogProcessingExtensionPoint import in \$f"
+                sed -i "s|require('@backstage/plugin-catalog-node/alpha')|require('@backstage/plugin-catalog-node')|g" "\$f"
+                patched=1
+              done < <(find /dynamic-plugins-root -path '*kuadrant-backstage-plugin-backend-dynamic*/dist/module.cjs.js')
+              if [ "\$patched" = "0" ]; then
+                echo "warning: catalogProcessingExtensionPoint patch needed but no matching module.cjs.js found under /dynamic-plugins-root"
+              fi
+            fi
             # seed the extensions installation file so the UI can manage plugins
             cp /opt/app-root/src/dynamic-plugins.yaml /dynamic-plugins-root/dynamic-plugins.yaml
         env:
@@ -265,6 +317,8 @@ upstream:
         mountPath: /tmp
       - name: rbac-policy
         mountPath: /opt/app-root/src/rbac
+      - name: catalog-entities
+        mountPath: /opt/app-root/src/catalog-entities
     extraVolumes:
       - name: dynamic-plugins-root
         emptyDir: {}
@@ -292,6 +346,9 @@ upstream:
       - name: rbac-policy
         configMap:
           name: rbac-policy-rhdh
+      - name: catalog-entities
+        configMap:
+          name: catalog-entities-rhdh
   postgresql:
     primary:
       persistence:
@@ -301,8 +358,9 @@ upstream:
           ephemeral-storage: 2Gi
 VALS
 
-helm install rhdh rhdh/backstage \
+helm upgrade --install rhdh rhdh/backstage \
   --namespace rhdh \
+  --kube-context oinc \
   --values "${RHDH_VALUES}" \
   --timeout 900s \
   --wait
@@ -326,7 +384,10 @@ echo "============================================"
 echo ""
 echo " RHDH:"
 echo "   kubectl port-forward svc/${RHDH_SVC} 7007:${RHDH_PORT} -n rhdh"
-echo "   http://localhost:7007/kuadrant"
+echo "   http://localhost:7007/kuadrant  (Guest only)"
+echo ""
+echo " Do not port-forward 7007 while yarn-dev is running (both bind 7007)."
+echo " Host hot-reload is yarn dev:oinc → http://localhost:3000 (Dex/OIDC)."
 echo ""
 echo " Verify plugins:"
 echo "   curl -H 'Authorization: Bearer <token>' http://localhost:7007/api/dynamic-plugins-info/loaded-plugins"

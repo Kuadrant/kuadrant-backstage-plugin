@@ -41,7 +41,7 @@ replace_references(){
 
   if [ -d "${DEST_CJS_PATH}" ] &&  [ -d "${SRC_CJS_PATH}" ]; then
     # TODO: Grab ALL cjs file names
-    if [ $(find ${SRC_CJS_PATH} -type f | wc -l) -ne 2 ] || [ $(find ${DEST_CJS_PATH} -type f | wc -l) -ne 2 ]; then
+    if [ "$(find "${SRC_CJS_PATH}" -type f | wc -l)" -ne 2 ] || [ "$(find "${DEST_CJS_PATH}" -type f | wc -l)" -ne 2 ]; then
       echo "This script only supports file renaming for one pair of files in the dist/${MODULE_TYPE} directory" >&2
       echo "It may be necessary to manually rename and update references in ${DEST_CJS_PATH}" >&2
       return 1
@@ -57,8 +57,8 @@ replace_references(){
 
     echo "Renaming files in the ${SRC_CJS_PATH} directory"
     # This makes the assumption that file names do not contains spaces or glob characters
-    filePair=($(find ${SRC_CJS_PATH} -type f -name ${NEWLY_BUILT_FILE_NAME}.*));
-    for file in ${filePair[@]}; do
+    mapfile -t filePair < <(find "${SRC_CJS_PATH}" -type f -name "${NEWLY_BUILT_FILE_NAME}.*")
+    for file in "${filePair[@]}"; do
       mv -vf "${file}" "${SRC_CJS_PATH}/${FILE_NAME}.${file#*.}"
     done;
 
@@ -117,7 +117,7 @@ patch_packages(){
   yarn tsc
 
   echo "Generating Patches for the following plugins/packages: ${targetPcks[*]}"
-  for pck in ${targetPcks[@]}; do
+  for pck in "${targetPcks[@]}"; do
     cd ${SRC_REPO_PATH} || continue
     echo "Changed directory to $(pwd)"
     echo "Generating patches for ${pck}"
