@@ -9,7 +9,7 @@ help:
 	@echo ""
 	@echo "quick start:"
 	@echo "  make kind-create    - create kind cluster with kuadrant"
-	@echo "  cd .. && yarn dev   - start rhdh with hot reload"
+	@echo "  cd .. && yarn dev:kind - start rhdh with hot reload (Dex :3000)"
 	@echo ""
 	@echo "cluster management:"
 	@echo "  make kind-create    - create kind cluster + install kuadrant + demo"
@@ -50,7 +50,7 @@ kind-create: $(KIND) $(HELM)
 	@echo ""
 	@echo "cluster ready! kuadrant and demo resources installed."
 	@echo ""
-	@echo "next: cd .. && yarn dev"
+	@echo "next: cd .. && yarn dev:kind"
 
 kind-delete: $(KIND)
 	@echo "deleting kind cluster: $(CLUSTER_NAME)"
