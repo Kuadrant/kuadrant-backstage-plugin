@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Guarded host-app starter: checks kubectl context (and :7007) then runs `yarn dev`.
 # Usage: scripts/dev-with-cluster.sh oinc|kind
+# package.json `dev` lists concurrently targets by name. Do not switch that
+# to a yarn:dev:* glob: it would also match `yarn dev:kind` and `yarn dev:oinc` and recurse.
 set -euo pipefail
 
 want="${1:-}"

@@ -8,7 +8,7 @@
   "scripts": {
     "prepare": "husky install",
     "start": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
-    "dev": "yarn dev:setup-dex && concurrently \"yarn:dev:dex\" \"yarn:dev:backend\" \"yarn:dev:frontend\" # list is explicit (not yarn:dev:*) so dev:kind/dev:oinc don't recursively re-invoke yarn dev; add new concurrent dev targets here directly",
+    "dev": "yarn dev:setup-dex && concurrently \"yarn:dev:dex\" \"yarn:dev:backend\" \"yarn:dev:frontend\"",
     "dev:setup-dex": "bash scripts/setup-dex.sh",
     "dev:dex": "bash scripts/run-dex.sh",
     "dev:backend": "NODE_OPTIONS=--no-node-snapshot turbo run start --filter=backend",
