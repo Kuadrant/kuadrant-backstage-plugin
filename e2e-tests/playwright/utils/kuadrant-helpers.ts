@@ -162,6 +162,42 @@ export async function waitForApiKeysPageReady(
   }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }
 
+/** Open a MUI Select via its listbox button (testid click misses the menu in CI). */
+export async function openMuiSelect(
+  page: Page,
+  select: Locator,
+): Promise<Locator> {
+  const trigger = select.getByRole("button").or(select);
+  await expect(trigger).toBeEnabled({ timeout: TIMEOUTS.SLOW });
+
+  await expect(async () => {
+    const listbox = page.getByRole("listbox");
+    if (await listbox.isVisible()) {
+      return;
+    }
+    await trigger.click();
+    await expect(listbox).toBeVisible({ timeout: 2000 });
+  }).toPass({ timeout: TIMEOUTS.SLOW, intervals: [300, 500, 1000] });
+
+  return page.getByRole("listbox");
+}
+
+export async function chooseMuiSelectOption(
+  page: Page,
+  select: Locator,
+  option?: string | RegExp,
+): Promise<void> {
+  const listbox = await openMuiSelect(page, select);
+  const opt = option
+    ? listbox.getByRole("option", { name: option }).first()
+    : listbox.getByRole("option").first();
+  await expect(opt, "Select should have at least one option").toBeVisible({
+    timeout: TIMEOUTS.DEFAULT,
+  });
+  await opt.click();
+  await expect(listbox).toBeHidden({ timeout: TIMEOUTS.DEFAULT });
+}
+
 /**
  * Retry an operation with delays for kubernetes propagation.
  */

@@ -1,6 +1,35 @@
-import { test, expect } from "@playwright/test";
+import {
+  test,
+  expect,
+  type Page,
+  type Locator,
+  type Route,
+} from "@playwright/test";
 import { Common } from "../utils/common";
-import { TIMEOUTS, waitForApiKeysPageReady } from "../utils/kuadrant-helpers";
+import {
+  TIMEOUTS,
+  waitForApiKeysPageReady,
+  openMuiSelect,
+  chooseMuiSelectOption,
+} from "../utils/kuadrant-helpers";
+
+async function selectApiAndTier(page: Page, dialog: Locator): Promise<void> {
+  await chooseMuiSelectOption(page, dialog.getByTestId("api-select"));
+  await chooseMuiSelectOption(page, dialog.getByTestId("tier-select"));
+}
+
+async function interceptCreateRequest(
+  page: Page,
+  handler: (route: Route) => Promise<void>,
+): Promise<void> {
+  await page.route("**/api/kuadrant/requests", async (route) => {
+    if (route.request().method() !== "POST") {
+      await route.continue();
+      return;
+    }
+    await handler(route);
+  });
+}
 
 /**
  * E2E tests for SimpleRequestAccessDialog
@@ -73,20 +102,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       timeout: TIMEOUTS.DEFAULT,
     });
 
-    // click to open dropdown
-    await apiSelect.click();
-
-    // verify dropdown shows published APIs (like toystore-api)
-    const listbox = page.getByRole("listbox");
-    await expect(listbox, "API dropdown should open").toBeVisible({
-      timeout: TIMEOUTS.DEFAULT,
-    });
-
-    // should have at least one API option
-    const apiOptions = listbox.getByRole("option");
-    const firstOption = apiOptions.first();
+    const listbox = await openMuiSelect(page, apiSelect);
     await expect(
-      firstOption,
+      listbox.getByRole("option").first(),
       "At least one API should be available",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
@@ -107,17 +125,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
 
     // select an API (toystore-api should have plans)
     const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-
-    const listbox = page.getByRole("listbox");
-    const toystoreOption = listbox
-      .getByRole("option", { name: /toystore/i })
-      .first();
-    await expect(
-      toystoreOption,
-      "Toystore API should be in the list",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-    await toystoreOption.click();
+    await chooseMuiSelectOption(page, apiSelect, /toystore/i);
 
     // verify tiers dropdown becomes enabled and populated
     const tierSelect = dialog.getByTestId("tier-select");
@@ -129,14 +137,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       "Tiers dropdown should be enabled after API selection",
     ).toBeEnabled({ timeout: TIMEOUTS.DEFAULT });
 
-    // click tiers dropdown
-    await tierSelect.click();
-
-    // verify tiers are populated
-    const tierListbox = page.getByRole("listbox");
-    const tierOption = tierListbox.getByRole("option").first();
+    const tierListbox = await openMuiSelect(page, tierSelect);
     await expect(
-      tierOption,
+      tierListbox.getByRole("option").first(),
       "At least one tier should be available",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
@@ -153,21 +156,11 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // select toystore-api
     const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const listbox = page.getByRole("listbox");
-    const toystoreOption = listbox
-      .getByRole("option", { name: /toystore/i })
-      .first();
-    await toystoreOption.click();
+    await chooseMuiSelectOption(page, apiSelect, /toystore/i);
 
-    // open tiers dropdown
     const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-
-    // verify tier options show limits (e.g., "bronze (10 per minute)")
-    const tierListbox = page.getByRole("listbox");
+    const tierListbox = await openMuiSelect(page, tierSelect);
     const tierWithLimits = tierListbox.getByRole("option").first();
     const tierText = tierWithLimits;
 
@@ -200,12 +193,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       "Submit button should be disabled initially",
     ).toBeDisabled({ timeout: TIMEOUTS.DEFAULT });
 
-    // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const apiListbox = page.getByRole("listbox");
-    const apiOption = apiListbox.getByRole("option").first();
-    await apiOption.click();
+    await chooseMuiSelectOption(page, dialog.getByTestId("api-select"));
 
     // submit should still be disabled (no tier selected)
     await expect(
@@ -213,12 +201,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       "Submit button should be disabled without tier",
     ).toBeDisabled({ timeout: TIMEOUTS.DEFAULT });
 
-    // select tier
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    const tierListbox = page.getByRole("listbox");
-    const tierOption = tierListbox.getByRole("option").first();
-    await tierOption.click();
+    await chooseMuiSelectOption(page, dialog.getByTestId("tier-select"));
 
     // submit should now be enabled
     await expect(
@@ -268,19 +251,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    const apiOption = listbox.getByRole("option").first();
-    await apiOption.click();
-
-    // select tier
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    const tierOption = listbox.getByRole("option").first();
-    await tierOption.click();
+    await selectApiAndTier(page, dialog);
 
     // fill use case
     const useCaseField = dialog.getByTestId("usecase-input");
@@ -313,19 +284,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectApiAndTier(page, dialog);
 
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    // intercept the request to slow it down
-    await page.route("**/api/kuadrant/requests", async (route) => {
+    await interceptCreateRequest(page, async (route) => {
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.continue();
     });
@@ -358,11 +319,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // select API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await chooseMuiSelectOption(page, dialog.getByTestId("api-select"));
 
     // fill use case
     const useCaseField = dialog.getByTestId("usecase-input");
@@ -408,11 +365,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
       "API field should have helper text",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // verify Tiers field helper text appears after selecting API
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    const listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await chooseMuiSelectOption(page, dialog.getByTestId("api-select"));
 
     const tierHelperText = dialog.getByText(
       /select an api to view available tiers/i,
@@ -435,8 +388,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // intercept the request to simulate a server error
-    await page.route("**/api/kuadrant/requests", async (route) => {
+    await selectApiAndTier(page, dialog);
+
+    await interceptCreateRequest(page, async (route) => {
       await route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -445,17 +399,6 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
         }),
       });
     });
-
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
 
     // submit
     const submitButton = dialog.getByTestId("submit-button");
@@ -485,8 +428,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // intercept request to simulate email validation error
-    await page.route("**/api/kuadrant/requests", async (route) => {
+    await selectApiAndTier(page, dialog);
+
+    await interceptCreateRequest(page, async (route) => {
       await route.fulfill({
         status: 500,
         contentType: "application/json",
@@ -496,17 +440,6 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
         }),
       });
     });
-
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
 
     // submit
     const submitButton = dialog.getByTestId("submit-button");
@@ -543,16 +476,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
-    // select API and tier
-    const apiSelect = dialog.getByTestId("api-select");
-    await apiSelect.click();
-    let listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
-
-    const tierSelect = dialog.getByTestId("tier-select");
-    await tierSelect.click();
-    listbox = page.getByRole("listbox");
-    await listbox.getByRole("option").first().click();
+    await selectApiAndTier(page, dialog);
 
     // submit
     const submitButton = dialog.getByTestId("submit-button");
