@@ -136,14 +136,16 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      # Download to /tmp: this repo has an oinc/ directory, so curl -o oinc fails
+      # with "Is a directory" (console-plugin does not have that path).
       - name: Install oinc
         run: |
           OINC_VERSION="${OINC_VERSION:-v0.4.3}"
-          curl -fL -o oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
-          chmod +x oinc
-          file oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
-          ./oinc version
-          sudo mv oinc /usr/local/bin/
+          curl -fL -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
+          chmod +x /tmp/oinc
+          file /tmp/oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
+          /tmp/oinc version
+          sudo mv /tmp/oinc /usr/local/bin/oinc
 
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # ratchet:azure/setup-helm@v4

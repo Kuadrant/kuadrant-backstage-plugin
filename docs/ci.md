@@ -101,7 +101,7 @@ The `e2e-tests` job matches local loop 2 (`yarn oinc:cluster` then `yarn dev:oin
 | Host app | `yarn dev:oinc` (Dex :3000) | `yarn dev:kind` |
 | Job timeout | 60 minutes (oinc create is ~6+ min; Istio + Kuadrant + MCP Gateway) | n/a in CI |
 
-oinc is installed the same way as console-plugin: download `oinc-linux-amd64` from the [oinc v0.4.3](https://github.com/jasonmadigan/oinc/releases/tag/v0.4.3) GitHub release, `file` check, `oinc version`, move to `/usr/local/bin`. Helm is installed with `azure/setup-helm`. There is no extra Docker-in-Docker or privileged job; nested k8s uses the runner’s Docker, as in console-plugin. Kind is **not** used in CI e2e. It remains the lighter local fallback (loop 1). Unit tests do not start a cluster.
+oinc is installed like console-plugin, except the binary is downloaded to `/tmp` first: this repo has an `oinc/` directory, so `curl -o oinc` fails with “Is a directory”. Source is `oinc-linux-amd64` from the [oinc v0.4.3](https://github.com/jasonmadigan/oinc/releases/tag/v0.4.3) GitHub release, then `file` check, `oinc version`, and `mv` to `/usr/local/bin`. Helm is installed with `azure/setup-helm`. There is no extra Docker-in-Docker or privileged job; nested k8s uses the runner’s Docker, as in console-plugin. Kind is **not** used in CI e2e. It remains the lighter local fallback (loop 1). Unit tests do not start a cluster.
 
 ## npm Trusted Publishing
 
