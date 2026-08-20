@@ -118,3 +118,12 @@ export const ApiProductDetailPage = kuadrantPlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+export const McpOverviewPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'McpOverviewPage',
+    component: () =>
+      import('./components/McpOverviewPage').then(m => m.McpOverviewPage),
+    mountPoint: rootRouteRef,
+  }),
+);

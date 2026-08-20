@@ -136,6 +136,22 @@ export const kuadrantHttpRouteListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+// mcp permissions (MCP management overview: gateways, extensions, servers)
+export const kuadrantGatewayListPermission = createPermission({
+  name: 'kuadrant.gateway.list',
+  attributes: { action: 'read' },
+});
+
+export const kuadrantMcpGatewayExtensionListPermission = createPermission({
+  name: 'kuadrant.mcpgatewayextension.list',
+  attributes: { action: 'read' },
+});
+
+export const kuadrantMcpServerRegistrationListPermission = createPermission({
+  name: 'kuadrant.mcpserverregistration.list',
+  attributes: { action: 'read' },
+});
+
 /**
  * All Kuadrant permissions as an array for easy iteration
  */
@@ -164,4 +180,7 @@ export const kuadrantPermissions = [
   kuadrantApiKeyDeleteAllPermission,
   kuadrantApiKeyApprovePermission,
   kuadrantHttpRouteListPermission,
+  kuadrantGatewayListPermission,
+  kuadrantMcpGatewayExtensionListPermission,
+  kuadrantMcpServerRegistrationListPermission,
 ];

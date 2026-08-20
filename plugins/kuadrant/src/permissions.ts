@@ -215,6 +215,36 @@ export const kuadrantApiKeyApprovePermission = createPermission({
   attributes: { action: 'update' },
 });
 
+// mcp management permissions
+// control access to the MCP management overview page and its resource tables
+
+/**
+ * permission to list Gateways (gateway.networking.k8s.io)
+ * used by the MCP overview page to derive MCP gateway health counts
+ */
+export const kuadrantGatewayListPermission = createPermission({
+  name: 'kuadrant.gateway.list',
+  attributes: { action: 'read' },
+});
+
+/**
+ * permission to list MCPGatewayExtensions
+ * gates the MCP Gateway Extensions table on the overview page
+ */
+export const kuadrantMcpGatewayExtensionListPermission = createPermission({
+  name: 'kuadrant.mcpgatewayextension.list',
+  attributes: { action: 'read' },
+});
+
+/**
+ * permission to list MCPServerRegistrations
+ * gates the MCP Servers table on the overview page
+ */
+export const kuadrantMcpServerRegistrationListPermission = createPermission({
+  name: 'kuadrant.mcpserverregistration.list',
+  attributes: { action: 'read' },
+});
+
 export const kuadrantPermissions = [
   kuadrantPlanPolicyCreatePermission,
   kuadrantPlanPolicyReadPermission,
@@ -239,4 +269,7 @@ export const kuadrantPermissions = [
   kuadrantApiKeyApprovePermission,
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
+  kuadrantGatewayListPermission,
+  kuadrantMcpGatewayExtensionListPermission,
+  kuadrantMcpServerRegistrationListPermission,
 ];

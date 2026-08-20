@@ -30,6 +30,9 @@ import {
   kuadrantApiKeyDeleteOwnPermission,
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
+  kuadrantGatewayListPermission,
+  kuadrantMcpGatewayExtensionListPermission,
+  kuadrantMcpServerRegistrationListPermission,
 } from './permissions';
 
 const secretKey = 'api_key';
@@ -1791,6 +1794,144 @@ export async function createRouter({
         res.status(403).json({ error: error.message });
       } else {
         res.status(500).json({ error: 'failed to fetch ratelimitpolicies' });
+      }
+    }
+  });
+
+  // mcp management endpoints
+  // the overview page needs gateways plus the two MCP CRDs; each endpoint
+  // projects only the minimal fields the UI renders
+
+  router.get('/gateways', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantGatewayListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const data = await k8sClient.listCustomResources('gateway.networking.k8s.io', 'v1', 'gateways');
+
+      const filtered = {
+        items: (data.items || []).map((gw: any) => ({
+          metadata: {
+            name: gw.metadata?.name,
+            namespace: gw.metadata?.namespace,
+          },
+          spec: {
+            gatewayClassName: gw.spec?.gatewayClassName,
+          },
+          status: {
+            conditions: gw.status?.conditions,
+          },
+        })),
+      };
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('error fetching gateways:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch gateways' });
+      }
+    }
+  });
+
+  router.get('/mcp/gatewayextensions', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantMcpGatewayExtensionListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const data = await k8sClient.listCustomResources('mcp.kuadrant.io', 'v1', 'mcpgatewayextensions');
+
+      const filtered = {
+        items: (data.items || []).map((ext: any) => ({
+          metadata: {
+            name: ext.metadata?.name,
+            namespace: ext.metadata?.namespace,
+          },
+          spec: {
+            targetRef: ext.spec?.targetRef ? {
+              group: ext.spec.targetRef.group,
+              kind: ext.spec.targetRef.kind,
+              name: ext.spec.targetRef.name,
+              namespace: ext.spec.targetRef.namespace,
+            } : undefined,
+          },
+          status: {
+            conditions: ext.status?.conditions,
+          },
+        })),
+      };
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('error fetching mcpgatewayextensions:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch mcpgatewayextensions' });
+      }
+    }
+  });
+
+  router.get('/mcp/serverregistrations', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantMcpServerRegistrationListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const data = await k8sClient.listCustomResources('mcp.kuadrant.io', 'v1', 'mcpserverregistrations');
+
+      const filtered = {
+        items: (data.items || []).map((reg: any) => ({
+          metadata: {
+            name: reg.metadata?.name,
+            namespace: reg.metadata?.namespace,
+          },
+          spec: {
+            targetRef: reg.spec?.targetRef ? {
+              group: reg.spec.targetRef.group,
+              kind: reg.spec.targetRef.kind,
+              name: reg.spec.targetRef.name,
+              namespace: reg.spec.targetRef.namespace,
+            } : undefined,
+            category: reg.spec?.category,
+          },
+          status: {
+            conditions: reg.status?.conditions,
+          },
+        })),
+      };
+
+      res.json(filtered);
+    } catch (error) {
+      console.error('error fetching mcpserverregistrations:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch mcpserverregistrations' });
       }
     }
   });
