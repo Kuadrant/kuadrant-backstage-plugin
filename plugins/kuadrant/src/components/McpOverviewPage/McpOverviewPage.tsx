@@ -350,9 +350,16 @@ type FilterCriterion<T> = {
   key: string;
   label: string;
   accessor: (row: T) => string;
+  // exact criteria match the whole value rather than a substring. needed for
+  // enum-like columns whose values overlap (e.g. "Healthy" is a substring of
+  // "Unhealthy", so a substring match on "Healthy" would also return unhealthy)
+  exact?: boolean;
 };
 
-/** filter rows by a case-insensitive substring match on the selected criterion */
+/**
+ * filter rows against the selected criterion: exact criteria compare the whole
+ * value case-insensitively, others do a case-insensitive substring match.
+ */
 function applyFilter<T>(
   rows: T[],
   criteria: FilterCriterion<T>[],
@@ -362,7 +369,10 @@ function applyFilter<T>(
   const q = query.trim().toLowerCase();
   if (!q) return rows;
   const active = criteria.find((c) => c.key === criterionKey) ?? criteria[0];
-  return rows.filter((row) => active.accessor(row).toLowerCase().includes(q));
+  return rows.filter((row) => {
+    const value = active.accessor(row).toLowerCase();
+    return active.exact ? value === q : value.includes(q);
+  });
 }
 
 /**
@@ -435,6 +445,7 @@ const GATEWAY_CRITERIA: FilterCriterion<GatewayResource>[] = [
     key: "status",
     label: "Status",
     accessor: (r) => (isGatewayHealthy(r) ? "Healthy" : "Unhealthy"),
+    exact: true,
   },
   {
     key: "gatewayClass",
@@ -468,6 +479,7 @@ const SERVER_CRITERIA: FilterCriterion<MCPServerRegistration>[] = [
     key: "status",
     label: "Status",
     accessor: (r) => (isServerOnline(r) ? "Online" : "Offline"),
+    exact: true,
   },
 ];
 
