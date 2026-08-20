@@ -1,0 +1,1 @@
+export { McpGatewayExtensionDetailPage } from "./McpGatewayExtensionDetailPage";

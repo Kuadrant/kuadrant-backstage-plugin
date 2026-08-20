@@ -282,6 +282,14 @@ export interface KuadrantAPI {
   getMcpGatewayExtensions(): Promise<KuadrantList<MCPGatewayExtension>>;
 
   /**
+   * Fetch a single MCPGatewayExtension
+   * @param namespace - Kubernetes namespace
+   * @param name - MCPGatewayExtension name
+   * @returns Promise with the MCP gateway extension
+   */
+  getMcpGatewayExtension(namespace: string, name: string): Promise<MCPGatewayExtension>;
+
+  /**
    * Fetch all MCPServerRegistrations
    * @returns Promise with list of MCP server registrations
    */
@@ -626,6 +634,14 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/mcp/gatewayextensions`,
       "Failed to fetch MCPGatewayExtensions."
+    );
+  }
+
+  async getMcpGatewayExtension(namespace: string, name: string): Promise<MCPGatewayExtension> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/mcp/gatewayextensions/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+      "Failed to fetch MCPGatewayExtension."
     );
   }
 

@@ -7,6 +7,7 @@ export {
   ApiKeyDetailPage,
   ApiProductDetailPage,
   McpOverviewPage,
+  McpGatewayExtensionDetailPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,

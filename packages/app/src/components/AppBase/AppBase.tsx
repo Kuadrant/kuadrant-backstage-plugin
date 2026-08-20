@@ -26,6 +26,7 @@ import {
   ApiKeyDetailPage,
   ApiProductDetailPage,
   ApiProductsPage,
+  McpGatewayExtensionDetailPage,
   McpOverviewPage,
   MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
@@ -154,6 +155,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/mcp-management"
                 element={<McpOverviewPage />}
+              />
+              <Route
+                path="/kuadrant/mcp/gatewayextensions/:namespace/:name"
+                element={<McpGatewayExtensionDetailPage />}
               />
               <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
               <Route

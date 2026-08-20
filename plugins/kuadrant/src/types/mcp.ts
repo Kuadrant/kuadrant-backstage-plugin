@@ -17,6 +17,15 @@ export interface McpCondition {
 export interface McpObjectMeta {
   name: string;
   namespace?: string;
+  labels?: Record<string, string>;
+  annotations?: Record<string, string>;
+  creationTimestamp?: string;
+  ownerReferences?: Array<{
+    kind: string;
+    name: string;
+    uid?: string;
+    apiVersion?: string;
+  }>;
 }
 
 export interface McpTargetRef {

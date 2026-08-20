@@ -27,6 +27,7 @@ import {
   Header,
   Content,
   InfoCard,
+  Link,
   SupportButton,
   ResponseErrorPanel,
   Table,
@@ -652,7 +653,13 @@ const McpContent = () => {
     {
       title: "Extension name",
       field: "metadata.name",
-      render: (row) => <strong>{row.metadata?.name}</strong>,
+      render: (row) => (
+        <Link
+          to={`/kuadrant/mcp/gatewayextensions/${row.metadata?.namespace}/${row.metadata?.name}`}
+        >
+          <strong>{row.metadata?.name}</strong>
+        </Link>
+      ),
     },
     {
       title: "Gateway name",

@@ -1889,6 +1889,45 @@ export async function createRouter({
     }
   });
 
+  router.get('/mcp/gatewayextensions/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantMcpGatewayExtensionListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+
+      if (!namespace || !name) {
+        res.status(400).json({ error: 'namespace and name are required' });
+        return;
+      }
+
+      const data = await k8sClient.getCustomResource(
+        'mcp.kuadrant.io',
+        'v1',
+        namespace,
+        'mcpgatewayextensions',
+        name
+      );
+
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching mcpgatewayextension:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch mcpgatewayextension' });
+      }
+    }
+  });
+
   router.get('/mcp/serverregistrations', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);
