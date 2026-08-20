@@ -2,7 +2,6 @@ import React, { ReactNode, useMemo, useState } from "react";
 import {
   Box,
   Chip,
-  Collapse,
   Divider,
   Grid,
   IconButton,
@@ -22,11 +21,7 @@ import MoreVertIcon from "@material-ui/icons/MoreVert";
 import OpenInNewIcon from "@material-ui/icons/OpenInNew";
 import FilterListIcon from "@material-ui/icons/FilterList";
 import SearchIcon from "@material-ui/icons/Search";
-import ExpandMoreIcon from "@material-ui/icons/ExpandMore";
-import ChevronRightIcon from "@material-ui/icons/ChevronRight";
-import SchoolIcon from "@material-ui/icons/School";
-import WidgetsIcon from "@material-ui/icons/Widgets";
-import InsightsIcon from "@material-ui/icons/TrendingUp";
+import InfoIcon from "@material-ui/icons/Info";
 import {
   Page,
   Header,
@@ -43,11 +38,13 @@ import { kuadrantApiRef } from "../../api";
 import { useKuadrantPermission } from "../../utils/permissions";
 import {
   kuadrantGatewayListPermission,
+  kuadrantHttpRouteListPermission,
   kuadrantMcpGatewayExtensionListPermission,
   kuadrantMcpServerRegistrationListPermission,
 } from "../../permissions";
 import {
   GatewayResource,
+  HTTPRouteResource,
   MCPGatewayExtension,
   MCPServerRegistration,
 } from "../../types/mcp";
@@ -56,16 +53,16 @@ import {
   countOnlineServers,
   countServerTypes,
   deriveMcpGateways,
+  deriveMcpHttpRoutes,
+  getHttpRouteStatus,
   isGatewayHealthy,
+  isHttpRouteEnforced,
   isServerOnline,
 } from "./utils";
 
 const DOCS_LINKS = {
-  documentation: "https://docs.kuadrant.io/latest/",
-  useCases: "https://docs.kuadrant.io/latest/kuadrant-operator/",
-  gatewayApiServiceMesh: "https://gateway-api.sigs.k8s.io/",
-  observability:
-    "https://docs.kuadrant.io/latest/kuadrant-operator/doc/observability/",
+  documentation:
+    "https://docs.kuadrant.io/latest/mcp-gateway/docs/guides/getting-started/",
 };
 
 const GETTING_STARTED_STORAGE_KEY = "hideMCPGettingStarted";
@@ -102,26 +99,25 @@ const useStyles = makeStyles((theme) => ({
   unhealthy: {
     color: theme.palette.warning.main,
   },
-  gsColumnTitle: {
+  gsBanner: {
+    display: "flex",
+    alignItems: "center",
+    gap: theme.spacing(1),
+    // purple outline matching the console plugin's getting-started banner,
+    // with the same rounded-pill radius as the Healthy/Unhealthy status chips
+    border: "1px solid #8476d1",
+    borderRadius: 16,
+    padding: theme.spacing(1, 1, 1, 2),
+  },
+  gsBannerIcon: {
+    color: "#8476d1",
+  },
+  gsBannerLink: {
     display: "inline-flex",
     alignItems: "center",
     gap: theme.spacing(0.5),
-    border: `1px solid ${theme.palette.divider}`,
-    borderRadius: 20,
-    padding: theme.spacing(0.5, 1.5),
-    fontWeight: 600,
-    marginBottom: theme.spacing(1.5),
-  },
-  gsDescription: {
-    color: theme.palette.text.secondary,
-    marginBottom: theme.spacing(2),
-    minHeight: 48,
-  },
-  externalLink: {
-    display: "inline-flex",
-    alignItems: "center",
-    gap: theme.spacing(0.5),
-    marginBottom: theme.spacing(0.5),
+    textDecoration: "underline dashed",
+    textUnderlineOffset: "3px",
   },
   nsBadge: {
     height: 22,
@@ -181,117 +177,54 @@ const StatusPill = ({ ok, label }: { ok: boolean; label: string }) => (
   />
 );
 
-const ExternalLink = ({
-  href,
-  children,
-}: {
-  href: string;
-  children: ReactNode;
-}) => {
+/**
+ * compact single-line "getting started" banner mirroring the kuadrant console
+ * plugin: an info icon, a bold prompt, a documentation link, and a kebab menu
+ * to dismiss it for the session.
+ */
+const GettingStartedBanner = ({ onHide }: { onHide: () => void }) => {
   const classes = useStyles();
-  return (
-    <div>
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className={classes.externalLink}
-      >
-        {children}
-        <OpenInNewIcon fontSize="inherit" />
-      </a>
-    </div>
-  );
-};
-
-const GettingStartedCard = ({ onHide }: { onHide: () => void }) => {
-  const classes = useStyles();
-  const [expanded, setExpanded] = useState(true);
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
 
   return (
-    <InfoCard
-      title={
-        <Box display="flex" alignItems="center">
-          <IconButton
-            size="small"
-            aria-label={expanded ? "Collapse" : "Expand"}
-            onClick={() => setExpanded((prev) => !prev)}
-          >
-            {expanded ? <ExpandMoreIcon /> : <ChevronRightIcon />}
-          </IconButton>
-          <Typography variant="h6">Get started with MCP management</Typography>
-        </Box>
-      }
-      action={
-        <>
-          <IconButton
-            aria-label="Getting started actions"
-            data-testid="mcp-getting-started-menu"
-            onClick={(e) => setMenuAnchor(e.currentTarget)}
-          >
-            <MoreVertIcon />
-          </IconButton>
-          <Menu
-            anchorEl={menuAnchor}
-            open={Boolean(menuAnchor)}
-            onClose={() => setMenuAnchor(null)}
-          >
-            <MenuItem
-              onClick={() => {
-                setMenuAnchor(null);
-                onHide();
-              }}
-            >
-              Don't show again
-            </MenuItem>
-          </Menu>
-        </>
-      }
-    >
-      <Collapse in={expanded}>
-        <Grid container spacing={4}>
-          <Grid item xs={12} md={4}>
-            <span className={classes.gsColumnTitle}>
-              <SchoolIcon fontSize="small" /> Learning resources
-            </span>
-            <Typography className={classes.gsDescription}>
-              Learn how to create, import, and use MCP gateways and servers.
-            </Typography>
-            <ExternalLink href={DOCS_LINKS.documentation}>
-              View documentation
-            </ExternalLink>
-            <ExternalLink href={DOCS_LINKS.useCases}>
-              View use cases
-            </ExternalLink>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <span className={classes.gsColumnTitle}>
-              <WidgetsIcon fontSize="small" /> Feature highlights
-            </span>
-            <Typography className={classes.gsDescription}>
-              Explore how to connect MCP servers and offer a single endpoint for
-              your teams.
-            </Typography>
-            <ExternalLink href={DOCS_LINKS.gatewayApiServiceMesh}>
-              Gateway API for service mesh
-            </ExternalLink>
-          </Grid>
-          <Grid item xs={12} md={4}>
-            <span className={classes.gsColumnTitle}>
-              <InsightsIcon fontSize="small" /> Enhance your work
-            </span>
-            <Typography className={classes.gsDescription}>
-              Leverage powerful observability to monitor traffic flows,
-              streamline resource management for consistent operations.
-            </Typography>
-            <ExternalLink href={DOCS_LINKS.observability}>
-              Observability for Gateway API
-            </ExternalLink>
-          </Grid>
-        </Grid>
-      </Collapse>
-    </InfoCard>
+    <div className={classes.gsBanner}>
+      <InfoIcon fontSize="small" className={classes.gsBannerIcon} />
+      <Typography component="span">
+        <strong>Getting started with MCP Gateway:</strong>{" "}
+        <a
+          href={DOCS_LINKS.documentation}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={classes.gsBannerLink}
+        >
+          View Documentation
+          <OpenInNewIcon fontSize="inherit" />
+        </a>
+      </Typography>
+      <Box flexGrow={1} />
+      <IconButton
+        size="small"
+        aria-label="Getting started actions"
+        data-testid="mcp-getting-started-menu"
+        onClick={(e) => setMenuAnchor(e.currentTarget)}
+      >
+        <MoreVertIcon fontSize="small" />
+      </IconButton>
+      <Menu
+        anchorEl={menuAnchor}
+        open={Boolean(menuAnchor)}
+        onClose={() => setMenuAnchor(null)}
+      >
+        <MenuItem
+          onClick={() => {
+            setMenuAnchor(null);
+            onHide();
+          }}
+        >
+          Don't show again
+        </MenuItem>
+      </Menu>
+    </div>
   );
 };
 
@@ -354,6 +287,9 @@ type FilterCriterion<T> = {
   // enum-like columns whose values overlap (e.g. "Healthy" is a substring of
   // "Unhealthy", so a substring match on "Healthy" would also return unhealthy)
   exact?: boolean;
+  // enum-like criteria render a value dropdown instead of a free-text search
+  // box, so filtering picks an exact value rather than typing it verbatim
+  options?: string[];
 };
 
 /**
@@ -416,20 +352,39 @@ function FilterToolbar<T>({
           </MenuItem>
         ))}
       </TextField>
-      <TextField
-        size="small"
-        variant="outlined"
-        value={query}
-        onChange={(e) => onQueryChange(e.target.value)}
-        placeholder={`Search by ${active.label.toLowerCase()}...`}
-        className={classes.filterSearch}
-        InputProps={{
-          startAdornment: (
-            <SearchIcon fontSize="small" className={classes.filterIcon} />
-          ),
-        }}
-        inputProps={{ "aria-label": "Search" }}
-      />
+      {active.options ? (
+        <TextField
+          select
+          size="small"
+          variant="outlined"
+          value={query}
+          onChange={(e) => onQueryChange(String(e.target.value))}
+          className={classes.filterSearch}
+          inputProps={{ "aria-label": `Filter by ${active.label.toLowerCase()}` }}
+        >
+          <MenuItem value="">All {active.label.toLowerCase()}</MenuItem>
+          {active.options.map((opt) => (
+            <MenuItem key={opt} value={opt}>
+              {opt}
+            </MenuItem>
+          ))}
+        </TextField>
+      ) : (
+        <TextField
+          size="small"
+          variant="outlined"
+          value={query}
+          onChange={(e) => onQueryChange(e.target.value)}
+          placeholder={`Search by ${active.label.toLowerCase()}...`}
+          className={classes.filterSearch}
+          InputProps={{
+            startAdornment: (
+              <SearchIcon fontSize="small" className={classes.filterIcon} />
+            ),
+          }}
+          inputProps={{ "aria-label": "Search" }}
+        />
+      )}
     </div>
   );
 }
@@ -446,6 +401,7 @@ const GATEWAY_CRITERIA: FilterCriterion<GatewayResource>[] = [
     label: "Status",
     accessor: (r) => (isGatewayHealthy(r) ? "Healthy" : "Unhealthy"),
     exact: true,
+    options: ["Healthy", "Unhealthy"],
   },
   {
     key: "gatewayClass",
@@ -480,6 +436,29 @@ const SERVER_CRITERIA: FilterCriterion<MCPServerRegistration>[] = [
     label: "Status",
     accessor: (r) => (isServerOnline(r) ? "Online" : "Offline"),
     exact: true,
+    options: ["Online", "Offline"],
+  },
+];
+
+const HTTPROUTE_CRITERIA: FilterCriterion<HTTPRouteResource>[] = [
+  { key: "name", label: "Name", accessor: (r) => r.metadata?.name ?? "" },
+  {
+    key: "namespace",
+    label: "Namespace",
+    accessor: (r) => r.metadata?.namespace ?? "",
+  },
+  {
+    key: "status",
+    label: "Status",
+    accessor: (r) => getHttpRouteStatus(r),
+    exact: true,
+    options: [
+      "Enforced",
+      "Accepted (Not Enforced)",
+      "Conflicted",
+      "Resolved Refs",
+      "Unknown",
+    ],
   },
 ];
 
@@ -564,8 +543,11 @@ const McpContent = () => {
     useKuadrantPermission(kuadrantMcpServerRegistrationListPermission);
   const { allowed: canListGateways, loading: gwPermLoading } =
     useKuadrantPermission(kuadrantGatewayListPermission);
+  const { allowed: canListHttpRoutes, loading: routePermLoading } =
+    useKuadrantPermission(kuadrantHttpRouteListPermission);
 
-  const permsLoading = extPermLoading || srvPermLoading || gwPermLoading;
+  const permsLoading =
+    extPermLoading || srvPermLoading || gwPermLoading || routePermLoading;
 
   const {
     value: extensions,
@@ -594,12 +576,29 @@ const McpContent = () => {
     return kuadrantApi.getGateways();
   }, [kuadrantApi, canListGateways]);
 
+  const {
+    value: httpRoutes,
+    loading: routeLoading,
+    error: routeError,
+  } = useAsync(async () => {
+    if (!canListHttpRoutes) return { items: [] };
+    return kuadrantApi.getHttpRoutes();
+  }, [kuadrantApi, canListHttpRoutes]);
+
   const extensionItems = useMemo(() => extensions?.items ?? [], [extensions]);
   const serverItems = useMemo(() => servers?.items ?? [], [servers]);
 
   const mcpGateways = useMemo(
     () => deriveMcpGateways(extensionItems, gateways?.items),
     [extensionItems, gateways],
+  );
+  const mcpHttpRoutes = useMemo(
+    () =>
+      deriveMcpHttpRoutes(
+        httpRoutes?.items as HTTPRouteResource[] | undefined,
+        mcpGateways,
+      ),
+    [httpRoutes, mcpGateways],
   );
   const healthyGateways = useMemo(
     () => countHealthyGateways(mcpGateways),
@@ -614,8 +613,9 @@ const McpContent = () => {
     [serverItems],
   );
 
-  const loading = permsLoading || extLoading || srvLoading || gwLoading;
-  const error = extError || srvError || gwError;
+  const loading =
+    permsLoading || extLoading || srvLoading || gwLoading || routeLoading;
+  const error = extError || srvError || gwError || routeError;
 
   const gatewayColumns: TableColumn<GatewayResource>[] = [
     {
@@ -690,6 +690,32 @@ const McpContent = () => {
     },
   ];
 
+  const httpRouteColumns: TableColumn<HTTPRouteResource>[] = [
+    {
+      title: "Name",
+      field: "metadata.name",
+      render: (row) => <strong>{row.metadata?.name}</strong>,
+    },
+    {
+      title: "Namespace",
+      field: "metadata.namespace",
+      render: (row) => <NamespaceCell namespace={row.metadata?.namespace} />,
+    },
+    {
+      title: "Status",
+      field: "status",
+      // field resolves to the raw status object, so sort on the derived label
+      customSort: (a, b) =>
+        getHttpRouteStatus(a).localeCompare(getHttpRouteStatus(b)),
+      render: (row) => (
+        <StatusPill
+          ok={isHttpRouteEnforced(row)}
+          label={getHttpRouteStatus(row)}
+        />
+      ),
+    },
+  ];
+
   if (loading) {
     return (
       <Box p={2}>
@@ -712,7 +738,7 @@ const McpContent = () => {
 
       {!hideGettingStarted && (
         <Box mb={3}>
-          <GettingStartedCard
+          <GettingStartedBanner
             onHide={() => {
               sessionStorage.setItem(GETTING_STARTED_STORAGE_KEY, "true");
               setHideGettingStarted(true);
@@ -817,6 +843,19 @@ const McpContent = () => {
           columns={serverColumns}
           data={serverItems}
           emptyText="No MCP servers found."
+        />
+      </Box>
+
+      {/* httproutes attached to mcp gateways */}
+      <Box mb={3}>
+        <ResourceTableCard<HTTPRouteResource>
+          allowed={canListHttpRoutes}
+          title="HTTPRoutes"
+          resource="HTTPRoutes"
+          criteria={HTTPROUTE_CRITERIA}
+          columns={httpRouteColumns}
+          data={mcpHttpRoutes}
+          emptyText="No HTTPRoutes found for MCP gateways."
         />
       </Box>
     </>

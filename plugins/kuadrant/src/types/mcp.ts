@@ -59,3 +59,24 @@ export interface MCPServerRegistration {
     conditions?: McpCondition[];
   };
 }
+
+/** a Gateway an HTTPRoute attaches to via spec.parentRefs */
+export interface HTTPRouteParentRef {
+  group?: string;
+  kind?: string;
+  name: string;
+  namespace?: string;
+}
+
+/** HTTPRoute (gateway.networking.k8s.io/v1) */
+export interface HTTPRouteResource {
+  metadata: McpObjectMeta;
+  spec?: {
+    parentRefs?: HTTPRouteParentRef[];
+    hostnames?: string[];
+  };
+  status?: {
+    // per-parent status; kuadrant policy conditions surface here
+    parents?: { conditions?: McpCondition[] }[];
+  };
+}

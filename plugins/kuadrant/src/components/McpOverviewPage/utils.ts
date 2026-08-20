@@ -1,5 +1,6 @@
 import {
   GatewayResource,
+  HTTPRouteResource,
   McpCondition,
   MCPGatewayExtension,
   MCPServerRegistration,
@@ -61,6 +62,81 @@ export function countOnlineServers(
   servers: MCPServerRegistration[] | undefined,
 ): number {
   return (servers ?? []).filter(isServerOnline).length;
+}
+
+/**
+ * condition types kuadrant sets on an HTTPRoute's parent status when a policy
+ * targets the route. mirrors the console plugin's POLICIES_MAP for HTTPRoute.
+ */
+const HTTPROUTE_POLICY_CONDITIONS = [
+  "kuadrant.io/AuthPolicyAffected",
+  "kuadrant.io/RateLimitPolicyAffected",
+  "kuadrant.io/TokenRateLimitPolicyAffected",
+];
+
+/** flattens the conditions across all of an HTTPRoute's parents */
+function httpRouteParentConditions(route: HTTPRouteResource): McpCondition[] {
+  return (route.status?.parents ?? []).flatMap((p) => p.conditions ?? []);
+}
+
+/**
+ * derives the HTTPRoute status label the same way the kuadrant console plugin
+ * does: an accepted route with all targeting policies enforced is "Enforced";
+ * otherwise it reflects the accepted/conflicted/resolved-refs/unknown state.
+ */
+export function getHttpRouteStatus(route: HTTPRouteResource): string {
+  const conditions = httpRouteParentConditions(route);
+  const accepted = conditions.some(
+    (c) => c.type === "Accepted" && c.status === "True",
+  );
+  if (accepted) {
+    // only policies actually present on the route count towards "all enforced";
+    // a route with no policy conditions is considered enforced (nothing pending)
+    const relevant = HTTPROUTE_POLICY_CONDITIONS.filter((p) =>
+      conditions.some((c) => c.type === p),
+    );
+    const allEnforced = relevant.every((p) =>
+      conditions.some((c) => c.type === p && c.status === "True"),
+    );
+    const anyError = HTTPROUTE_POLICY_CONDITIONS.some((p) =>
+      conditions.some((c) => c.type === p && c.status === "False"),
+    );
+    return allEnforced && !anyError ? "Enforced" : "Accepted (Not Enforced)";
+  }
+  if (conditions.some((c) => c.type === "Conflicted" && c.status === "True")) {
+    return "Conflicted";
+  }
+  if (conditions.some((c) => c.type === "ResolvedRefs" && c.status === "True")) {
+    return "Resolved Refs";
+  }
+  return "Unknown";
+}
+
+/** an HTTPRoute is considered healthy when its status is "Enforced" */
+export function isHttpRouteEnforced(route: HTTPRouteResource): boolean {
+  return getHttpRouteStatus(route) === "Enforced";
+}
+
+/**
+ * HTTPRoutes relating to MCP gateways: routes whose spec.parentRefs attach to
+ * one of the derived MCP gateways (matched on namespace/name; a parentRef with
+ * no namespace defaults to the route's own namespace, and only Gateway kinds).
+ */
+export function deriveMcpHttpRoutes(
+  routes: HTTPRouteResource[] | undefined,
+  mcpGateways: GatewayResource[],
+): HTTPRouteResource[] {
+  if (!routes || mcpGateways.length === 0) return [];
+  const gatewayKeys = new Set(
+    mcpGateways.map((gw) => `${gw.metadata?.namespace}/${gw.metadata?.name}`),
+  );
+  return routes.filter((route) =>
+    (route.spec?.parentRefs ?? []).some((ref) => {
+      if (ref.kind && ref.kind !== "Gateway") return false;
+      const ns = ref.namespace || route.metadata?.namespace;
+      return gatewayKeys.has(`${ns}/${ref.name}`);
+    }),
+  );
 }
 
 /** number of distinct categories ("types") across all servers */

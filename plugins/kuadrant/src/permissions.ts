@@ -245,6 +245,15 @@ export const kuadrantMcpServerRegistrationListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+/**
+ * permission to list HTTPRoutes (gateway.networking.k8s.io)
+ * gates the HTTPRoutes table on the MCP overview page
+ */
+export const kuadrantHttpRouteListPermission = createPermission({
+  name: 'kuadrant.httproute.list',
+  attributes: { action: 'read' },
+});
+
 export const kuadrantPermissions = [
   kuadrantPlanPolicyCreatePermission,
   kuadrantPlanPolicyReadPermission,
@@ -272,4 +281,5 @@ export const kuadrantPermissions = [
   kuadrantGatewayListPermission,
   kuadrantMcpGatewayExtensionListPermission,
   kuadrantMcpServerRegistrationListPermission,
+  kuadrantHttpRouteListPermission,
 ];
