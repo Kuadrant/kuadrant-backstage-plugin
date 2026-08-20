@@ -275,6 +275,27 @@ Comprehensive view of what each persona can and cannot do:
 - API Owner: list (for reference)
 - API Consumer: none
 
+**MCP Management (Gateways, MCPGatewayExtensions, MCPServerRegistrations):**
+
+MCP resources are **read-only** in the portal: the overview page lists them for
+visibility, and access is gated purely by RBAC (hold the list permission → see the
+table). Create/update/delete are managed on-cluster (via kubectl/GitOps), not from
+the portal.
+
+List permissions: `kuadrant.gateway.list`, `kuadrant.mcpgatewayextension.list`,
+`kuadrant.mcpserverregistration.list` (all `action: read`).
+None use `.own`/`.all` scope — these are cluster infrastructure with no per-user
+ownership model.
+
+- Platform Engineer: manages the underlying resources on-cluster (via kubectl/GitOps)
+- API Admin: list
+- API Owner: list
+- API Consumer: none
+
+The RHDH Kubernetes service account only needs read verbs (`get`, `list`, `watch`)
+on `gateways` (gateway.networking.k8s.io) and
+`mcpgatewayextensions`/`mcpserverregistrations` (mcp.kuadrant.io).
+
 ### Role Hierarchy
 
 The four personas form a clear hierarchy:

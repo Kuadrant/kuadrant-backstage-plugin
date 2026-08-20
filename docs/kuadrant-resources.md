@@ -237,3 +237,26 @@ After successful APIProduct create/delete operations, the router immediately cal
 See:
 - Provider: [`plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts`](../plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts)
 - Router refresh calls: [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/router.ts) - search for `getAPIProductEntityProvider`
+
+## MCP Resources
+
+The **MCP Management** overview page (`/kuadrant/mcp-management`) surfaces Model Context Protocol resources from the `mcp.kuadrant.io/v1` API group:
+
+| Kind | Plural | Purpose |
+|------|--------|---------|
+| `MCPGatewayExtension` | `mcpgatewayextensions` | Extends a Gateway with MCP protocol support; `spec.targetRef` points at a Gateway listener (requires `name` + `sectionName`) |
+| `MCPServerRegistration` | `mcpserverregistrations` | Registers a backend MCP server via an HTTPRoute `spec.targetRef`; `spec.category` drives the "Types" count |
+
+**Health derivation (read-only, no operator required on the page):**
+- A Gateway is **healthy** when both its `Accepted` and `Programmed` conditions are `True`. "MCP gateways" are the Gateways referenced by an `MCPGatewayExtension` `spec.targetRef` (matched by namespace/name).
+- An MCP server is **online** when its `Ready` condition is `True`.
+
+The page shows three tables — **MCP Gateways** (the Gateways derived as MCP gateways), **MCP Gateway Extensions**, and **MCP Servers** — each with a console-style filter toolbar (a criterion dropdown + a search box that filters by the selected criterion) and pagination.
+
+Unlike the API-management resources (which are read-only for infrastructure), MCP actions are gated purely by RBAC — if you hold the permission, you can perform the action. **Delete is fully working**: each row's kebab menu offers a Delete action (enabled when the viewer holds the matching `.delete` permission) that opens a high-severity confirmation dialog (type the resource name to confirm) and calls the RBAC-gated backend to remove the resource from the cluster; the table refreshes on success. **Create and Edit are still disabled** (shown with a tooltip) because they need dedicated forms — deferred to a follow-up ticket.
+
+Backend endpoints are RBAC-gated and list cluster-wide (`GET /kuadrant/gateways`, `/kuadrant/mcp/gatewayextensions`, `/kuadrant/mcp/serverregistrations`); deletes are namespaced (`DELETE /kuadrant/gateways/:namespace/:name`, `/kuadrant/mcp/gatewayextensions/:namespace/:name`, `/kuadrant/mcp/serverregistrations/:namespace/:name`). MCP resources have no ownership model, so each kind has a single `.delete` permission (no `.own`/`.all` split), granted to `api-admin` and `api-owner`. The RHDH service account needs the `delete` verb on `gateways` (gateway.networking.k8s.io) and on `mcpgatewayextensions`/`mcpserverregistrations` (mcp.kuadrant.io).
+
+**Deferred (blocked on observability):** the MCP Gateways table's traffic columns (Total req, Successful req, Error rate, Error codes) and the gateway-traffic charts require mcp-gateway OTel metrics (`mcp_requests_total`, see mcp-gateway PR #1293) and are omitted until a metrics backend exists.
+
+**Dev cluster:** MCP resources are exercised on the [`oinc`](../oinc/) cluster, which installs the real `mcp-gateway` addon — so the `mcp.kuadrant.io` CRDs and server statuses come from the operator rather than hand-vendored copies — and seeds a demo `MCPServerRegistration` via [`oinc/manifests/mcp-demo.yaml`](../oinc/manifests/mcp-demo.yaml). The RHDH service account is granted `get/list/watch/delete` on the MCP group and on `gateways` (gateway.networking.k8s.io) in both [`oinc/manifests/rhdh-sa.yaml`](../oinc/manifests/rhdh-sa.yaml) (the in-cluster RHDH SA) and [`kuadrant-dev-setup/rbac/rhdh-rbac.yaml`](../kuadrant-dev-setup/rbac/rhdh-rbac.yaml) (the host-side SA that `yarn dev` uses). Run `oinc/setup.sh` to create the cluster and deploy RHDH; see [oinc.md](oinc.md).

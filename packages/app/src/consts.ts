@@ -60,6 +60,18 @@ export const DefaultMainMenuItems = {
       parent: 'default.kuadrant',
       priority: 10,
     },
+    'default.mcp': {
+      title: 'MCP Management',
+      icon: 'kuadrant',
+      priority: 54,
+    },
+    'default.mcp.overview': {
+      title: 'MCP Overview',
+      icon: 'api',
+      to: '/kuadrant/mcp-management',
+      parent: 'default.mcp',
+      priority: 30,
+    },
     'default.create': {
       title: 'Self-service',
       titleKey: 'menuItem.selfService',

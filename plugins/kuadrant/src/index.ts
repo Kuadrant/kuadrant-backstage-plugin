@@ -6,6 +6,7 @@ export {
   ApiKeyApprovalPage,
   ApiKeyDetailPage,
   ApiProductDetailPage,
+  McpOverviewPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,
@@ -42,6 +43,9 @@ export {
   kuadrantApiKeyApprovePermission,
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
+  kuadrantGatewayListPermission,
+  kuadrantMcpGatewayExtensionListPermission,
+  kuadrantMcpServerRegistrationListPermission,
   kuadrantPermissions,
 } from './permissions';
 

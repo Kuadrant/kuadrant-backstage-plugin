@@ -26,6 +26,7 @@ import {
   ApiKeyDetailPage,
   ApiProductDetailPage,
   ApiProductsPage,
+  McpOverviewPage,
   MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
@@ -149,6 +150,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/api-products/:namespace/:name"
                 element={<ApiProductDetailPage />}
+              />
+              <Route
+                path="/kuadrant/mcp-management"
+                element={<McpOverviewPage />}
               />
               <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
               <Route

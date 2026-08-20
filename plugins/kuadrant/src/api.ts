@@ -15,6 +15,11 @@ import {
   AuthPolicy,
   RateLimitPolicy,
 } from './types/api-management';
+import {
+  GatewayResource,
+  MCPGatewayExtension,
+  MCPServerRegistration,
+} from './types/mcp';
 
 /**
  * Generic Kuadrant list type for API responses
@@ -261,6 +266,26 @@ export interface KuadrantAPI {
    * @returns Promise with list of all ratelimitpolicies
    */
   getRateLimitPolicies(): Promise<KuadrantList<RateLimitPolicy>>;
+
+  // ===== MCP Management =====
+
+  /**
+   * Fetch all Gateways (gateway.networking.k8s.io)
+   * @returns Promise with list of gateways
+   */
+  getGateways(): Promise<KuadrantList<GatewayResource>>;
+
+  /**
+   * Fetch all MCPGatewayExtensions
+   * @returns Promise with list of MCP gateway extensions
+   */
+  getMcpGatewayExtensions(): Promise<KuadrantList<MCPGatewayExtension>>;
+
+  /**
+   * Fetch all MCPServerRegistrations
+   * @returns Promise with list of MCP server registrations
+   */
+  getMcpServerRegistrations(): Promise<KuadrantList<MCPServerRegistration>>;
 
   /**
    * Create a secret in consumer's own namespace
@@ -583,6 +608,32 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/ratelimitpolicies`,
       "Failed to fetch RateLimitPolicies."
+    );
+  }
+
+  // ===== MCP Management Implementation =====
+
+  async getGateways(): Promise<KuadrantList<GatewayResource>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/gateways`,
+      "Failed to fetch Gateways."
+    );
+  }
+
+  async getMcpGatewayExtensions(): Promise<KuadrantList<MCPGatewayExtension>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/mcp/gatewayextensions`,
+      "Failed to fetch MCPGatewayExtensions."
+    );
+  }
+
+  async getMcpServerRegistrations(): Promise<KuadrantList<MCPServerRegistration>> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/mcp/serverregistrations`,
+      "Failed to fetch MCPServerRegistrations."
     );
   }
 

@@ -41,17 +41,16 @@ rules:
   - apiGroups: ["gateway.networking.k8s.io"]
     resources:
       - gateways
+    verbs: ["get", "list", "watch", "delete"]
+  - apiGroups: ["gateway.networking.k8s.io"]
+    resources:
       - httproutes
     verbs: ["get", "list", "watch"]
-  # no plugin code references these resources yet (checked plugins/kuadrant
-  # and plugins/kuadrant-backend); read-only until something needs to mutate
-  # them. todo: narrow from clusterrole to a namespaced role once mcp
-  # resources have a fixed namespace to scope to.
   - apiGroups: ["mcp.kuadrant.io"]
     resources:
       - mcpgatewayextensions
       - mcpserverregistrations
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "delete"]
   - apiGroups: [""]
     resources:
       - namespaces

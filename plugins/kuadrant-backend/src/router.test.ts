@@ -1511,4 +1511,248 @@ describe('createRouter', () => {
       );
     });
   });
+
+  describe('GET /gateways', () => {
+    // reset the shared authorize queue so leftover one-shot values from earlier
+    // tests in this file don't leak into these (clearAllMocks keeps the queue)
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('lists gateways and projects only the minimal fields', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          {
+            apiVersion: 'gateway.networking.k8s.io/v1',
+            kind: 'Gateway',
+            metadata: { name: 'gw-1', namespace: 'gateway-system', uid: 'drop-me' },
+            spec: { gatewayClassName: 'istio', listeners: ['drop-me'] },
+            status: { conditions: [{ type: 'Accepted', status: 'True' }] },
+          },
+        ],
+      });
+
+      const response = await request(app).get('/gateways').expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'gateway.networking.k8s.io',
+        'v1',
+        'gateways',
+      );
+      // response projects only name/namespace, gatewayClassName and conditions
+      expect(response.body.items).toEqual([
+        {
+          metadata: { name: 'gw-1', namespace: 'gateway-system' },
+          spec: { gatewayClassName: 'istio' },
+          status: { conditions: [{ type: 'Accepted', status: 'True' }] },
+        },
+      ]);
+    });
+
+    it('returns 403 when the gateway list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app).get('/gateways').expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.listCustomResources).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app).get('/gateways').expect(500);
+      expect(response.body.error).toBe('failed to fetch gateways');
+    });
+  });
+
+  describe('GET /mcp/gatewayextensions', () => {
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('lists mcpgatewayextensions and projects only the minimal fields', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          {
+            apiVersion: 'mcp.kuadrant.io/v1',
+            kind: 'MCPGatewayExtension',
+            metadata: { name: 'ext-1', namespace: 'mcp-system', uid: 'drop-me' },
+            spec: {
+              targetRef: {
+                group: 'gateway.networking.k8s.io',
+                kind: 'Gateway',
+                name: 'gw-1',
+                namespace: 'gateway-system',
+              },
+              other: 'drop-me',
+            },
+            status: { conditions: [{ type: 'Ready', status: 'True' }] },
+          },
+        ],
+      });
+
+      const response = await request(app)
+        .get('/mcp/gatewayextensions')
+        .expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'mcp.kuadrant.io',
+        'v1',
+        'mcpgatewayextensions',
+      );
+      expect(response.body.items).toEqual([
+        {
+          metadata: { name: 'ext-1', namespace: 'mcp-system' },
+          spec: {
+            targetRef: {
+              group: 'gateway.networking.k8s.io',
+              kind: 'Gateway',
+              name: 'gw-1',
+              namespace: 'gateway-system',
+            },
+          },
+          status: { conditions: [{ type: 'Ready', status: 'True' }] },
+        },
+      ]);
+    });
+
+    it('returns 403 when the extension list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app)
+        .get('/mcp/gatewayextensions')
+        .expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.listCustomResources).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app)
+        .get('/mcp/gatewayextensions')
+        .expect(500);
+      expect(response.body.error).toBe('failed to fetch mcpgatewayextensions');
+    });
+  });
+
+  describe('GET /mcp/serverregistrations', () => {
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('lists mcpserverregistrations and projects only the minimal fields', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      mockK8sClient.listCustomResources.mockResolvedValueOnce({
+        items: [
+          {
+            apiVersion: 'mcp.kuadrant.io/v1',
+            kind: 'MCPServerRegistration',
+            metadata: { name: 'srv-1', namespace: 'mcp-system', uid: 'drop-me' },
+            spec: {
+              targetRef: { kind: 'Service', name: 'toystore', namespace: 'toystore' },
+              category: ['data', 'search'],
+              other: 'drop-me',
+            },
+            status: { conditions: [{ type: 'Ready', status: 'True' }] },
+          },
+        ],
+      });
+
+      const response = await request(app)
+        .get('/mcp/serverregistrations')
+        .expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'mcp.kuadrant.io',
+        'v1',
+        'mcpserverregistrations',
+      );
+      expect(response.body.items).toEqual([
+        {
+          metadata: { name: 'srv-1', namespace: 'mcp-system' },
+          spec: {
+            targetRef: { group: undefined, kind: 'Service', name: 'toystore', namespace: 'toystore' },
+            category: ['data', 'search'],
+          },
+          status: { conditions: [{ type: 'Ready', status: 'True' }] },
+        },
+      ]);
+    });
+
+    it('returns 403 when the server list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app)
+        .get('/mcp/serverregistrations')
+        .expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.listCustomResources).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app)
+        .get('/mcp/serverregistrations')
+        .expect(500);
+      expect(response.body.error).toBe('failed to fetch mcpserverregistrations');
+    });
+  });
+
+  describe('GET /httproutes', () => {
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('lists httproutes with the correct CRD', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      const routes = {
+        items: [
+          {
+            apiVersion: 'gateway.networking.k8s.io/v1',
+            kind: 'HTTPRoute',
+            metadata: { name: 'route-1', namespace: 'toystore' },
+            spec: { parentRefs: [{ name: 'gw-1', namespace: 'gateway-system' }] },
+          },
+        ],
+      };
+      mockK8sClient.listCustomResources.mockResolvedValueOnce(routes);
+
+      const response = await request(app).get('/httproutes').expect(200);
+
+      expect(mockK8sClient.listCustomResources).toHaveBeenCalledWith(
+        'gateway.networking.k8s.io',
+        'v1',
+        'httproutes',
+      );
+      expect(response.body).toEqual(routes);
+    });
+
+    it('returns 403 when the httproute list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app).get('/httproutes').expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.listCustomResources).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app).get('/httproutes').expect(500);
+      expect(response.body.error).toBe('failed to fetch httproutes');
+    });
+  });
+
 });
