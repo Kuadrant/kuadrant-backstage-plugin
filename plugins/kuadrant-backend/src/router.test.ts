@@ -1525,6 +1525,8 @@ describe('createRouter', () => {
       mockK8sClient.listCustomResources.mockResolvedValueOnce({
         items: [
           {
+            apiVersion: 'gateway.networking.k8s.io/v1',
+            kind: 'Gateway',
             metadata: { name: 'gw-1', namespace: 'gateway-system', uid: 'drop-me' },
             spec: { gatewayClassName: 'istio', listeners: ['drop-me'] },
             status: { conditions: [{ type: 'Accepted', status: 'True' }] },
@@ -1577,6 +1579,8 @@ describe('createRouter', () => {
       mockK8sClient.listCustomResources.mockResolvedValueOnce({
         items: [
           {
+            apiVersion: 'mcp.kuadrant.io/v1',
+            kind: 'MCPGatewayExtension',
             metadata: { name: 'ext-1', namespace: 'mcp-system', uid: 'drop-me' },
             spec: {
               targetRef: {
@@ -1649,6 +1653,8 @@ describe('createRouter', () => {
       mockK8sClient.listCustomResources.mockResolvedValueOnce({
         items: [
           {
+            apiVersion: 'mcp.kuadrant.io/v1',
+            kind: 'MCPServerRegistration',
             metadata: { name: 'srv-1', namespace: 'mcp-system', uid: 'drop-me' },
             spec: {
               targetRef: { kind: 'Service', name: 'toystore', namespace: 'toystore' },
@@ -1713,6 +1719,8 @@ describe('createRouter', () => {
       const routes = {
         items: [
           {
+            apiVersion: 'gateway.networking.k8s.io/v1',
+            kind: 'HTTPRoute',
             metadata: { name: 'route-1', namespace: 'toystore' },
             spec: { parentRefs: [{ name: 'gw-1', namespace: 'gateway-system' }] },
           },
