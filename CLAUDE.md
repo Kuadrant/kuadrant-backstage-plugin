@@ -104,9 +104,9 @@ yarn test --filter=backend      # run tests for specific package
 
 **E2E Tests:**
 
-Prerequisites:
-1. Kind cluster running with Kuadrant (`cd kuadrant-dev-setup && make kind-create`)
-2. App running (`yarn dev` in separate terminal)
+CI uses oinc, not kind. Prerequisites:
+1. oinc cluster with Kuadrant + MCP Gateway (`yarn oinc:cluster`)
+2. App running (`yarn dev:oinc` in a separate terminal)
 
 ```bash
 cd e2e-tests

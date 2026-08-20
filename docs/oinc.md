@@ -140,15 +140,18 @@ Yarn-dev (loops 1–2) imports the plugins in-tree with hot reload. It never loa
 
 ## Running e2e tests against oinc
 
-Loop 3, with RHDH running and port-forwarded:
+CI Playwright (`e2e-tests` in `.github/workflows/ci.yml`) is **loop 2**: oinc cluster + host `yarn dev:oinc` on :3000. Locally:
+
+```bash
+yarn oinc:cluster
+yarn dev:oinc   # separate terminal
+cd e2e-tests && yarn test
+```
+
+Loop 3 (in-cluster RHDH, Guest on :7007) is optional and is **not** what CI runs:
 
 ```bash
 kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh
-```
-
-Run the e2e tests with `BASE_URL` pointed at port 7007 (the default is 3000 for `yarn dev:oinc` / `yarn dev:kind`):
-
-```bash
 cd e2e-tests
 BASE_URL=http://localhost:7007 yarn test
 ```
