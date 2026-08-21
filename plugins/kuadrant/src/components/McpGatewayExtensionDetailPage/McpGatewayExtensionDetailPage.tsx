@@ -229,12 +229,15 @@ export const McpGatewayExtensionDetailPage = () => {
                   </Typography>
                 </Box>
 
-                <Box className={classes.infoItem}>
-                  <Typography variant="caption" className={classes.label}>
-                    Owner
-                  </Typography>
-                  <Typography variant="body2">{owner}</Typography>
-                </Box>
+                {extension.metadata?.ownerReferences &&
+                  extension.metadata.ownerReferences.length > 0 && (
+                    <Box className={classes.infoItem}>
+                      <Typography variant="caption" className={classes.label}>
+                        Owner
+                      </Typography>
+                      <Typography variant="body2">{owner}</Typography>
+                    </Box>
+                  )}
 
                 {extension.spec?.targetRef && (
                   <>
