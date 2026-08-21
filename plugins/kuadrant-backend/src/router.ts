@@ -1975,6 +1975,45 @@ export async function createRouter({
     }
   });
 
+  router.get('/mcp/serverregistrations/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantMcpServerRegistrationListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+
+      if (!namespace || !name) {
+        res.status(400).json({ error: 'namespace and name are required' });
+        return;
+      }
+
+      const data = await k8sClient.getCustomResource(
+        'mcp.kuadrant.io',
+        'v1',
+        namespace,
+        'mcpserverregistrations',
+        name
+      );
+
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching mcpserverregistration:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch mcpserverregistration' });
+      }
+    }
+  });
+
   router.use(createPermissionIntegrationRouter({
     permissions: kuadrantPermissions,
   }));

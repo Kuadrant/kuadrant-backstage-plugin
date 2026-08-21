@@ -63,6 +63,7 @@ export interface MCPServerRegistration {
   spec?: {
     targetRef?: McpTargetRef;
     category?: string[];
+    prefix?: string;
   };
   status?: {
     conditions?: McpCondition[];

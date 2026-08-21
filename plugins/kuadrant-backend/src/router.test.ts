@@ -1780,6 +1780,80 @@ describe('createRouter', () => {
     });
   });
 
+  describe('GET /mcp/serverregistrations/:namespace/:name', () => {
+    const namespace = 'mcp-system';
+    const name = 'srv-1';
+
+    const mockServer = {
+      apiVersion: 'mcp.kuadrant.io/v1',
+      kind: 'MCPServerRegistration',
+      metadata: {
+        name,
+        namespace,
+        uid: 'abc-123',
+        creationTimestamp: '2026-08-01T10:00:00Z',
+        labels: { app: 'mcp' },
+        annotations: { 'kuadrant.io/note': 'demo' },
+        ownerReferences: [{ kind: 'HTTPRoute', name: 'route-1' }],
+      },
+      spec: {
+        prefix: 'toystore_',
+        targetRef: {
+          group: 'gateway.networking.k8s.io',
+          kind: 'HTTPRoute',
+          name: 'route-1',
+          namespace: 'toystore',
+        },
+        category: ['data', 'search'],
+      },
+      status: { conditions: [{ type: 'Ready', status: 'True' }] },
+    };
+
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('returns the full mcpserverregistration when permission is allowed', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(mockServer);
+
+      const response = await request(app)
+        .get(`/mcp/serverregistrations/${namespace}/${name}`)
+        .expect(200);
+
+      // detail endpoint returns the full resource unprojected (labels,
+      // annotations, ownerReferences etc. are all needed by the detail view)
+      expect(response.body).toEqual(mockServer);
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledWith(
+        'mcp.kuadrant.io',
+        'v1',
+        namespace,
+        'mcpserverregistrations',
+        name,
+      );
+    });
+
+    it('returns 403 when the server list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app)
+        .get(`/mcp/serverregistrations/${namespace}/${name}`)
+        .expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.getCustomResource).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.getCustomResource.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app)
+        .get(`/mcp/serverregistrations/${namespace}/${name}`)
+        .expect(500);
+      expect(response.body.error).toBe('failed to fetch mcpserverregistration');
+    });
+  });
+
   describe('GET /httproutes', () => {
     beforeEach(() => {
       mockAuthorizeFn.mockReset();
