@@ -296,6 +296,14 @@ export interface KuadrantAPI {
   getMcpServerRegistrations(): Promise<KuadrantList<MCPServerRegistration>>;
 
   /**
+   * Fetch a single MCPServerRegistration
+   * @param namespace - Kubernetes namespace
+   * @param name - MCPServerRegistration name
+   * @returns Promise with the MCP server registration
+   */
+  getMcpServerRegistration(namespace: string, name: string): Promise<MCPServerRegistration>;
+
+  /**
    * Create a secret in consumer's own namespace
    * Backend determines namespace from authenticated user identity.
    * @param name - Secret name
@@ -650,6 +658,14 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/mcp/serverregistrations`,
       "Failed to fetch MCPServerRegistrations."
+    );
+  }
+
+  async getMcpServerRegistration(namespace: string, name: string): Promise<MCPServerRegistration> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/mcp/serverregistrations/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+      "Failed to fetch MCPServerRegistration."
     );
   }
 

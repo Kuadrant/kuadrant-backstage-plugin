@@ -136,3 +136,12 @@ export const McpGatewayExtensionDetailPage = kuadrantPlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+export const McpServerRegistrationDetailPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'McpServerRegistrationDetailPage',
+    component: () =>
+      import('./components/McpServerRegistrationDetailPage').then(m => m.McpServerRegistrationDetailPage),
+    mountPoint: rootRouteRef,
+  }),
+);
