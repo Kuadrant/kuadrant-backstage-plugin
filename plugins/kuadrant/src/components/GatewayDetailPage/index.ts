@@ -1,0 +1,1 @@
+export { GatewayDetailPage } from './GatewayDetailPage';

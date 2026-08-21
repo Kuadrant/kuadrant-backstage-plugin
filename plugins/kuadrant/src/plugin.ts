@@ -127,3 +127,12 @@ export const McpOverviewPage = kuadrantPlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+export const GatewayDetailPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'GatewayDetailPage',
+    component: () =>
+      import('./components/GatewayDetailPage').then(m => m.GatewayDetailPage),
+    mountPoint: rootRouteRef,
+  }),
+);

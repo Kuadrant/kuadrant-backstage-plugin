@@ -26,6 +26,7 @@ import {
   ApiKeyDetailPage,
   ApiProductDetailPage,
   ApiProductsPage,
+  GatewayDetailPage,
   McpOverviewPage,
   MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
@@ -163,6 +164,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/api-keys/:namespace/:name"
                 element={<ApiKeyDetailPage />}
+              />
+              <Route
+                path="/kuadrant/gateways/:namespace/:name"
+                element={<GatewayDetailPage />}
               />
               <Route path="/rbac" element={<RbacPage />} />
               {dynamicRoutes.map(

@@ -1843,6 +1843,35 @@ export async function createRouter({
     }
   });
 
+  // get a specific gateway by namespace and name
+  // used for the read-only gateway detail view (full unprojected manifest)
+  router.get('/gateways/:namespace/:name', async (req, res) => {
+    try {
+      const credentials = await httpAuth.credentials(req);
+
+      const decision = await permissions.authorize(
+        [{ permission: kuadrantGatewayListPermission }],
+        { credentials }
+      );
+
+      if (decision[0].result !== AuthorizeResult.ALLOW) {
+        throw new NotAllowedError('unauthorised');
+      }
+
+      const { namespace, name } = req.params;
+      const data = await k8sClient.getCustomResource('gateway.networking.k8s.io', 'v1', namespace, 'gateways', name);
+
+      res.json(data);
+    } catch (error) {
+      console.error('error fetching gateway:', error);
+      if (error instanceof NotAllowedError) {
+        res.status(403).json({ error: error.message });
+      } else {
+        res.status(500).json({ error: 'failed to fetch gateway' });
+      }
+    }
+  });
+
   router.get('/mcp/gatewayextensions', async (req, res) => {
     try {
       const credentials = await httpAuth.credentials(req);

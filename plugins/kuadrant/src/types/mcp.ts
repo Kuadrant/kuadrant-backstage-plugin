@@ -37,6 +37,42 @@ export interface GatewayResource {
   };
 }
 
+/**
+ * Full Gateway (gateway.networking.k8s.io/v1) manifest returned by the
+ * `/gateways/:namespace/:name` read endpoint. Unlike {@link GatewayResource}
+ * (the projected list shape) this carries the metadata and spec the read-only
+ * detail view renders.
+ */
+export interface GatewayCondition {
+  type?: string;
+  status?: string;
+  reason?: string;
+  message?: string;
+  lastTransitionTime?: string;
+}
+
+export interface GatewayOwnerReference {
+  kind?: string;
+  name?: string;
+}
+
+export interface GatewayManifest {
+  apiVersion?: string;
+  kind?: string;
+  metadata?: {
+    name?: string;
+    namespace?: string;
+    creationTimestamp?: string;
+    labels?: Record<string, string>;
+    annotations?: Record<string, string>;
+    ownerReferences?: GatewayOwnerReference[];
+  };
+  spec?: Record<string, unknown>;
+  status?: {
+    conditions?: GatewayCondition[];
+  };
+}
+
 /** MCPGatewayExtension (mcp.kuadrant.io/v1) */
 export interface MCPGatewayExtension {
   metadata: McpObjectMeta;
