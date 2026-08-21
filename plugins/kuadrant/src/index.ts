@@ -10,6 +10,7 @@ export {
   McpGatewayExtensionDetailPage,
   McpServerRegistrationDetailPage,
   McpHTTPRouteExtensionDetailPage,
+  GatewayDetailPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,

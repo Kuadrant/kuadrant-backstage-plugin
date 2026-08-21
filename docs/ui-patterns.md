@@ -19,6 +19,25 @@ When using the Backstage `Table` component's `detailPanel` feature with interact
 
 **Example:** See [`plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx`](../plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx) - API key management tab shows expandable rows with code examples in multiple languages (cURL, Node.js, Python, Go). Each row has language tabs that can be switched without collapsing the expansion.
 
+## Read-only Resource Detail View (Details / YAML tabs)
+
+Kubernetes resources that the portal only reads (no create/edit/delete) get a
+read-only detail page reached by clicking a row in the resource's list/table.
+The reference implementation is the Gateway detail view
+([`plugins/kuadrant/src/components/GatewayDetailPage/GatewayDetailPage.tsx`](../plugins/kuadrant/src/components/GatewayDetailPage/GatewayDetailPage.tsx)),
+mounted at `/kuadrant/gateways/:namespace/:name`.
+
+**Key principles:**
+
+1. Keep display logic (age formatting, readiness, owner) in a pure `utils.ts`
+   next to the component so it can be unit tested without rendering
+   (see [`GatewayDetailPage/utils.ts`](../plugins/kuadrant/src/components/GatewayDetailPage/utils.ts)).
+2. Readiness mirrors the list/table health rule (a Gateway is Ready when both
+   `Accepted` and `Programmed` conditions are `True`).
+3. Register the page as a routable extension in `plugin.ts`, export it from
+   `index.ts`, and add the route in `packages/app/src/components/AppBase/AppBase.tsx`.
+
+
 ## Delete Confirmation Patterns
 
 All delete operations should use proper Material-UI dialogs instead of browser `window.confirm()` or `alert()`. The pattern varies based on severity.
