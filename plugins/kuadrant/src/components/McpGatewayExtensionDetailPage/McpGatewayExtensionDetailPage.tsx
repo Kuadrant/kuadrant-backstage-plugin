@@ -31,6 +31,9 @@ import { ResourceYamlCard } from "../ResourceYamlCard";
 import { formatAge, formatOwner, isExtensionReady } from "./utils";
 
 const useStyles = makeStyles((theme) => ({
+  tabs: {
+    marginLeft: theme.spacing(-3),
+  },
   label: {
     fontWeight: 600,
     color: theme.palette.text.secondary,
@@ -171,6 +174,7 @@ export const McpGatewayExtensionDetailPage = () => {
             onChange={(_, newValue) => setSelectedTab(newValue)}
             indicatorColor="primary"
             textColor="primary"
+            className={classes.tabs}
           >
             <Tab label="Details" />
             <Tab label="YAML" />
