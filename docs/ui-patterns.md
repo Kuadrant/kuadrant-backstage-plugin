@@ -19,6 +19,41 @@ When using the Backstage `Table` component's `detailPanel` feature with interact
 
 **Example:** See [`plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx`](../plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.tsx) - API key management tab shows expandable rows with code examples in multiple languages (cURL, Node.js, Python, Go). Each row has language tabs that can be switched without collapsing the expansion.
 
+## Read-only Resource Detail View (Details / YAML tabs)
+
+Kubernetes resources that the portal only reads (no create/edit/delete) get a
+read-only detail page reached by clicking a row in the resource's list/table.
+The reference implementation is the Gateway detail view
+([`plugins/kuadrant/src/components/GatewayDetailPage/GatewayDetailPage.tsx`](../plugins/kuadrant/src/components/GatewayDetailPage/GatewayDetailPage.tsx)),
+mounted at `/kuadrant/gateways/:namespace/:name`.
+
+**Layout:**
+
+- **Breadcrumb** back to the resource's list page.
+- **Details tab** — Name, Namespace, Ready/Status, Age, Labels, Annotations,
+  Created at, Owner, plus a **Conditions** table (Type, Status, Updated, Reason,
+  Message) rendered with the core-components `Table`.
+- **YAML tab** — the raw manifest rendered read-only with `CodeSnippet`
+  (`language="yaml"`, from `@backstage/core-components`). The repo does not
+  bundle the Monaco editor; `CodeSnippet` is the established read-only viewer.
+
+**Key principles:**
+
+1. Keep display logic (age formatting, readiness, owner) in a pure `utils.ts`
+   next to the component so it can be unit tested without rendering
+   (see [`GatewayDetailPage/utils.ts`](../plugins/kuadrant/src/components/GatewayDetailPage/utils.ts)).
+2. Readiness mirrors the list/table health rule (a Gateway is Ready when both
+   `Accepted` and `Programmed` conditions are `True`).
+3. Register the page as a routable extension in `plugin.ts`, export it from
+   `index.ts`, and add the route in `packages/app/src/components/AppBase/AppBase.tsx`.
+
+> Note: the Gateway detail view is reached by clicking a Gateway name in the MCP
+> Gateways table on the MCP overview page
+> ([`plugins/kuadrant/src/components/McpOverviewPage/McpOverviewPage.tsx`](../plugins/kuadrant/src/components/McpOverviewPage/McpOverviewPage.tsx)),
+> whose Name column links to `/kuadrant/gateways/:namespace/:name`. The page
+> fetches the full manifest via `kuadrantApi.getGateway(namespace, name)`, which
+> calls the backend `GET /gateways/:namespace/:name` read endpoint.
+
 ## Delete Confirmation Patterns
 
 All delete operations should use proper Material-UI dialogs instead of browser `window.confirm()` or `alert()`. The pattern varies based on severity.

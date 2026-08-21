@@ -1568,6 +1568,59 @@ describe('createRouter', () => {
     });
   });
 
+  describe('GET /gateways/:namespace/:name', () => {
+    beforeEach(() => {
+      mockAuthorizeFn.mockReset();
+    });
+
+    it('returns the full gateway manifest', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+
+      const manifest = {
+        apiVersion: 'gateway.networking.k8s.io/v1',
+        kind: 'Gateway',
+        metadata: { name: 'gw-1', namespace: 'gateway-system' },
+        spec: { gatewayClassName: 'istio' },
+        status: { conditions: [{ type: 'Accepted', status: 'True' }] },
+      };
+      mockK8sClient.getCustomResource.mockResolvedValueOnce(manifest);
+
+      const response = await request(app)
+        .get('/gateways/gateway-system/gw-1')
+        .expect(200);
+
+      expect(mockK8sClient.getCustomResource).toHaveBeenCalledWith(
+        'gateway.networking.k8s.io',
+        'v1',
+        'gateway-system',
+        'gateways',
+        'gw-1',
+      );
+      // response returns the full unprojected manifest
+      expect(response.body).toEqual(manifest);
+    });
+
+    it('returns 403 when the gateway list permission is denied', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app)
+        .get('/gateways/gateway-system/gw-1')
+        .expect(403);
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.getCustomResource).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when the k8s client fails', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.getCustomResource.mockRejectedValueOnce(new Error('boom'));
+
+      const response = await request(app)
+        .get('/gateways/gateway-system/gw-1')
+        .expect(500);
+      expect(response.body.error).toBe('failed to fetch gateway');
+    });
+  });
+
   describe('GET /mcp/gatewayextensions', () => {
     beforeEach(() => {
       mockAuthorizeFn.mockReset();

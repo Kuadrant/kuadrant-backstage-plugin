@@ -31,6 +31,7 @@ import {
   ResponseErrorPanel,
   Table,
   TableColumn,
+  Link,
 } from "@backstage/core-components";
 import useAsync from "react-use/lib/useAsync";
 import { useApi } from "@backstage/core-plugin-api";
@@ -621,7 +622,16 @@ const McpContent = () => {
     {
       title: "Name",
       field: "metadata.name",
-      render: (row) => <strong>{row.metadata?.name}</strong>,
+      render: (row) =>
+        row.metadata?.name ? (
+          <Link
+            to={`/kuadrant/gateways/${row.metadata?.namespace}/${row.metadata?.name}`}
+          >
+            <strong>{row.metadata?.name}</strong>
+          </Link>
+        ) : (
+          "-"
+        ),
     },
     {
       title: "Namespace",
