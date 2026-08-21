@@ -1,22 +1,6 @@
-import { test, expect, Page } from "@playwright/test";
+import { test, expect } from "@playwright/test";
 import { Common } from "../utils/common";
-import { TIMEOUTS } from "../utils/kuadrant-helpers";
-
-// the shared waitForKuadrantPageReady helper is hardcoded to the API Products
-// page (URL + heading), so the MCP overview needs its own readiness check.
-async function waitForMcpPageReady(page: Page): Promise<void> {
-  await page.waitForURL(/\/kuadrant\/mcp-management/, {
-    timeout: TIMEOUTS.VERY_SLOW,
-  });
-  await page.waitForLoadState("load").catch(() => {});
-
-  await expect(async () => {
-    const spinner = page.locator('[role="progressbar"]:visible');
-    await expect(spinner).toHaveCount(0);
-    const heading = page.locator("h1").filter({ hasText: /mcp management/i });
-    await expect(heading).toBeVisible();
-  }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
-}
+import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
 
 test.describe("Kuadrant MCP Gateway Extension detail", () => {
   let common: Common;
