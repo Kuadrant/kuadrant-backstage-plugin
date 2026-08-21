@@ -162,6 +162,26 @@ export async function waitForApiKeysPageReady(
   }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }
 
+/**
+ * Wait for MCP management pages to be ready (shared across MCP specs).
+ * Default pattern matches /kuadrant/mcp-management (overview) and detail pages.
+ */
+export async function waitForMcpPageReady(
+  page: Page,
+  urlPattern: RegExp = /\/kuadrant\/mcp/,
+  headingPattern: RegExp = /mcp/i,
+): Promise<void> {
+  await page.waitForURL(urlPattern, { timeout: TIMEOUTS.VERY_SLOW });
+  await page.waitForLoadState("load").catch(() => {});
+
+  await expect(async () => {
+    const spinner = page.locator('[role="progressbar"]:visible');
+    await expect(spinner).toHaveCount(0);
+    const heading = page.locator("h1").filter({ hasText: headingPattern });
+    await expect(heading).toBeVisible();
+  }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
+}
+
 /** Open a MUI Select via its listbox button (testid click misses the menu in CI). */
 export async function openMuiSelect(
   page: Page,
