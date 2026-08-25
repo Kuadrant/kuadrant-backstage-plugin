@@ -1,0 +1,1 @@
+export { McpServerRegistrationDetailPage } from "./McpServerRegistrationDetailPage";

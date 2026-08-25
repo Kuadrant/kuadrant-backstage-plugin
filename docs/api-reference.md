@@ -22,14 +22,15 @@ The backend plugin exposes REST API endpoints at `/api/kuadrant/*`. All endpoint
 
 Read-only endpoints backing the MCP Management overview and resource detail views.
 
-| Method | Endpoint                                               | Description                                      | Permission                            |
-| ------ | ------------------------------------------------------ | ------------------------------------------------ | ------------------------------------- |
-| GET    | `/api/kuadrant/gateways`                               | List Gateways (minimal projection)               | `kuadrant.gateway.list`               |
-| GET    | `/api/kuadrant/mcp/gatewayextensions`                  | List MCPGatewayExtensions (minimal projection)   | `kuadrant.mcpgatewayextension.list`   |
-| GET    | `/api/kuadrant/mcp/gatewayextensions/:namespace/:name` | Get a single MCPGatewayExtension (full resource) | `kuadrant.mcpgatewayextension.list`   |
-| GET    | `/api/kuadrant/mcp/serverregistrations`                | List MCPServerRegistrations (minimal projection) | `kuadrant.mcpserverregistration.list` |
+| Method | Endpoint                                                 | Description                                        | Permission                            |
+| ------ | -------------------------------------------------------- | -------------------------------------------------- | ------------------------------------- |
+| GET    | `/api/kuadrant/gateways`                                 | List Gateways (minimal projection)                 | `kuadrant.gateway.list`               |
+| GET    | `/api/kuadrant/mcp/gatewayextensions`                    | List MCPGatewayExtensions (minimal projection)     | `kuadrant.mcpgatewayextension.list`   |
+| GET    | `/api/kuadrant/mcp/gatewayextensions/:namespace/:name`   | Get a single MCPGatewayExtension (full resource)   | `kuadrant.mcpgatewayextension.list`   |
+| GET    | `/api/kuadrant/mcp/serverregistrations`                  | List MCPServerRegistrations (minimal projection)   | `kuadrant.mcpserverregistration.list` |
+| GET    | `/api/kuadrant/mcp/serverregistrations/:namespace/:name` | Get a single MCPServerRegistration (full resource) | `kuadrant.mcpserverregistration.list` |
 
-The list endpoints return only the fields the overview needs (name, namespace, targetRef, conditions). The detail endpoint returns the full resource manifest — including labels, annotations, owner references and creation timestamp — because the read-only detail view renders both a Details tab and a raw YAML tab. It responds `400` if `namespace` or `name` is missing, `403` when the permission is denied, and `500` on a Kubernetes client error.
+The list endpoints return only the fields the overview needs (name, namespace, targetRef, conditions). The detail endpoints return the full resource manifest — including labels, annotations, owner references and creation timestamp — because the read-only detail views render both a Details tab and a raw YAML tab. They respond `403` when the permission is denied and `500` on a Kubernetes client error.
 
 ## PlanPolicy Endpoints
 

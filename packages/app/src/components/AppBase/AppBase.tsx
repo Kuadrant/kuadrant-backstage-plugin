@@ -28,6 +28,7 @@ import {
   ApiProductsPage,
   McpGatewayExtensionDetailPage,
   McpOverviewPage,
+  McpServerRegistrationDetailPage,
   MyApiKeysPage,
 } from '@kuadrant/kuadrant-backstage-plugin-frontend';
 import DynamicRootContext from '@red-hat-developer-hub/plugin-utils';
@@ -159,6 +160,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/mcp/gatewayextensions/:namespace/:name"
                 element={<McpGatewayExtensionDetailPage />}
+              />
+              <Route
+                path="/kuadrant/mcp/serverregistrations/:namespace/:name"
+                element={<McpServerRegistrationDetailPage />}
               />
               <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
               <Route
