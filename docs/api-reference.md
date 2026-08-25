@@ -14,9 +14,10 @@ The backend plugin exposes REST API endpoints at `/api/kuadrant/*`. All endpoint
 
 ## HTTPRoute Endpoints
 
-| Method | Endpoint                   | Description         | Permission                 |
-| ------ | -------------------------- | ------------------- | -------------------------- |
-| GET    | `/api/kuadrant/httproutes` | List all HTTPRoutes | `kuadrant.apiproduct.list` |
+| Method | Endpoint                                  | Description                           | Permission                   |
+| ------ | ----------------------------------------- | ------------------------------------- | ---------------------------- |
+| GET    | `/api/kuadrant/httproutes`                | List all HTTPRoutes                   | `kuadrant.httproute.list`    |
+| GET    | `/api/kuadrant/httproutes/:namespace/:name` | Get a single HTTPRoute (full resource) | `kuadrant.httproute.list`    |
 
 ## MCP Management Endpoints
 

@@ -145,3 +145,12 @@ export const McpServerRegistrationDetailPage = kuadrantPlugin.provide(
     mountPoint: rootRouteRef,
   }),
 );
+
+export const McpHTTPRouteExtensionDetailPage = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'McpHTTPRouteExtensionDetailPage',
+    component: () =>
+      import('./components/McpHTTPRouteExtensionDetailPage').then(m => m.McpHTTPRouteExtensionDetailPage),
+    mountPoint: rootRouteRef,
+  }),
+);
