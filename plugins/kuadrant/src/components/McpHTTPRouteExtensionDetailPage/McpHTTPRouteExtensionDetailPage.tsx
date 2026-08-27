@@ -29,6 +29,8 @@ import ArrowBackIcon from "@material-ui/icons/ArrowBack";
 import { HTTPRouteResource, McpCondition } from "../../types/mcp";
 import { ResourceYamlCard } from "../ResourceYamlCard";
 import { formatAge, formatOwner, isHttpRouteReady, formatParentRefs } from "./utils";
+import { useKuadrantPermission } from "../../utils/permissions";
+import { kuadrantHttpRouteListPermission } from "../../permissions";
 
 const useStyles = makeStyles((theme) => ({
   tabs: {
@@ -68,17 +70,26 @@ export const McpHTTPRouteExtensionDetailPage = () => {
   const [selectedTab, setSelectedTab] = useState(0);
 
   const {
+    allowed: canView,
+    loading: permissionLoading,
+    error: permissionError,
+  } = useKuadrantPermission(kuadrantHttpRouteListPermission);
+
+  const {
     value: httpRoute,
     loading,
     error,
   } = useAsync(async () => {
+    if (!canView) {
+      return undefined;
+    }
     return (await kuadrantApi.getHttpRoute(
       namespace!,
       name!,
     )) as HTTPRouteResource;
-  }, [namespace, name, kuadrantApi]);
+  }, [namespace, name, kuadrantApi, canView]);
 
-  if (loading) {
+  if (permissionLoading || loading) {
     return (
       <Page themeId="tool">
         <Header title="Loading..." />
@@ -92,6 +103,18 @@ export const McpHTTPRouteExtensionDetailPage = () => {
           </Box>
         </Content>
       </Page>
+    );
+  }
+
+  if (permissionError) {
+    return <ResponseErrorPanel error={permissionError} />;
+  }
+
+  if (!canView) {
+    return (
+      <ResponseErrorPanel
+        error={new Error("You do not have permission to view this HTTPRoute")}
+      />
     );
   }
 

@@ -3,11 +3,12 @@ import { hasCondition } from "../McpOverviewPage/utils";
 
 /**
  * An HTTPRoute is considered ready when all parent gateways have accepted it.
- * We check for "Accepted" condition with "True" status in the first parent's conditions.
+ * Returns false if there are no parents or if any parent lacks Accepted=True.
  */
 export function isHttpRouteReady(route: HTTPRouteResource): boolean {
-  const firstParent = route.status?.parents?.[0];
-  return hasCondition(firstParent?.conditions, "Accepted");
+  const parents = route.status?.parents || [];
+  if (parents.length === 0) return false;
+  return parents.every(parent => hasCondition(parent.conditions, "Accepted"));
 }
 
 /**

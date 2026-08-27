@@ -41,6 +41,48 @@ describe("McpHTTPRouteExtensionDetailPage utils", () => {
       };
       expect(isHttpRouteReady(route)).toBe(false);
     });
+
+    it("returns true when all parents have Accepted=True", () => {
+      const route: HTTPRouteResource = {
+        metadata: { name: "test-route", namespace: "default" },
+        status: {
+          parents: [
+            {
+              conditions: [
+                { type: "Accepted", status: "True" },
+              ],
+            },
+            {
+              conditions: [
+                { type: "Accepted", status: "True" },
+              ],
+            },
+          ],
+        },
+      };
+      expect(isHttpRouteReady(route)).toBe(true);
+    });
+
+    it("returns false when some parents are rejected", () => {
+      const route: HTTPRouteResource = {
+        metadata: { name: "test-route", namespace: "default" },
+        status: {
+          parents: [
+            {
+              conditions: [
+                { type: "Accepted", status: "True" },
+              ],
+            },
+            {
+              conditions: [
+                { type: "Accepted", status: "False" },
+              ],
+            },
+          ],
+        },
+      };
+      expect(isHttpRouteReady(route)).toBe(false);
+    });
   });
 
   describe("formatAge", () => {
