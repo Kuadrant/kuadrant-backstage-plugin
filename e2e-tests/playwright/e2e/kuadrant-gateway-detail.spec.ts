@@ -55,18 +55,16 @@ test.describe("Kuadrant Gateway detail view", () => {
     await waitForMcpPageReady(page);
 
     // the Gateways table Name column links to the read-only detail view
-    const gatewayLink = page
-      .locator('a[href^="/kuadrant/gateways/"]')
-      .first();
+    const gatewayLink = page.locator('a[href^="/kuadrant/gateways/"]').first();
     await expect(gatewayLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
     const gatewayName = (await gatewayLink.textContent())?.trim() || "";
 
     await gatewayLink.click();
     await waitForGatewayDetailReady(page);
 
-    // breadcrumb back to the gateways list
+    // breadcrumb back to the MCP overview
     await expect(
-      page.locator("nav[aria-label='breadcrumb']").getByText("Gateways"),
+      page.locator("nav[aria-label='breadcrumb']").getByText("MCP Overview"),
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
 
     // Details tab is the default and shows the gateway name
