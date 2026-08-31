@@ -1,0 +1,374 @@
+import React, { useState } from "react";
+import { useParams } from "react-router-dom";
+import { useApi } from "@backstage/core-plugin-api";
+import { kuadrantApiRef } from "../../api";
+import { useAsync } from "react-use";
+import {
+  Header,
+  Page,
+  Content,
+  ResponseErrorPanel,
+  InfoCard,
+  Link,
+  Breadcrumbs,
+  Table,
+  TableColumn,
+} from "@backstage/core-components";
+import {
+  Box,
+  Typography,
+  Button,
+  Tabs,
+  Tab,
+  Chip,
+  makeStyles,
+  Grid,
+} from "@material-ui/core";
+import { Skeleton } from "@material-ui/lab";
+import ArrowBackIcon from "@material-ui/icons/ArrowBack";
+import { HTTPRouteResource, McpCondition } from "../../types/mcp";
+import { ResourceYamlCard } from "../ResourceYamlCard";
+import { formatAge, formatOwner, isHttpRouteReady, formatParentRefs } from "./utils";
+import { useKuadrantPermission } from "../../utils/permissions";
+import { kuadrantHttpRouteListPermission } from "../../permissions";
+
+const useStyles = makeStyles((theme) => ({
+  tabs: {
+    marginLeft: theme.spacing(-3),
+  },
+  label: {
+    fontWeight: 600,
+    color: theme.palette.text.secondary,
+    marginBottom: theme.spacing(0.5),
+    fontSize: "0.75rem",
+    textTransform: "uppercase",
+  },
+  infoGrid: {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(200px, 1fr))",
+    gap: theme.spacing(3),
+    marginBottom: theme.spacing(3),
+  },
+  infoItem: {
+    minWidth: 0,
+  },
+  statusChipReady: {
+    backgroundColor: theme.palette.success.main,
+    color: theme.palette.common.white,
+  },
+  statusChipNotReady: {
+    backgroundColor: theme.palette.error.main,
+    color: theme.palette.common.white,
+  },
+}));
+
+export const McpHTTPRouteExtensionDetailPage = () => {
+  const classes = useStyles();
+  const { namespace, name } = useParams<{ namespace: string; name: string }>();
+  const kuadrantApi = useApi(kuadrantApiRef);
+
+  const [selectedTab, setSelectedTab] = useState(0);
+
+  const {
+    allowed: canView,
+    loading: permissionLoading,
+    error: permissionError,
+  } = useKuadrantPermission(kuadrantHttpRouteListPermission);
+
+  const {
+    value: httpRoute,
+    loading,
+    error,
+  } = useAsync(async () => {
+    if (!canView) {
+      return undefined;
+    }
+    return (await kuadrantApi.getHttpRoute(
+      namespace!,
+      name!,
+    )) as HTTPRouteResource;
+  }, [namespace, name, kuadrantApi, canView]);
+
+  if (permissionLoading || loading) {
+    return (
+      <Page themeId="tool">
+        <Header title="Loading..." />
+        <Content>
+          <Box p={2}>
+            {[...Array(5)].map((_, i) => (
+              <Box key={i} p={2}>
+                <Skeleton variant="text" width="100%" />
+              </Box>
+            ))}
+          </Box>
+        </Content>
+      </Page>
+    );
+  }
+
+  if (permissionError) {
+    return <ResponseErrorPanel error={permissionError} />;
+  }
+
+  if (!canView) {
+    return (
+      <ResponseErrorPanel
+        error={new Error("You do not have permission to view this HTTPRoute")}
+      />
+    );
+  }
+
+  if (error || !httpRoute) {
+    return (
+      <ResponseErrorPanel
+        error={error || new Error("HTTPRoute not found")}
+      />
+    );
+  }
+
+  // Flatten all conditions from all parents
+  const allConditions: McpCondition[] =
+    httpRoute.status?.parents?.flatMap(parent => parent.conditions || []) || [];
+
+  const ready = isHttpRouteReady(httpRoute);
+  const labels = httpRoute.metadata?.labels || {};
+  const annotations = httpRoute.metadata?.annotations || {};
+  const createdAt = httpRoute.metadata?.creationTimestamp;
+  const owner = formatOwner(httpRoute);
+  const parentRefs = formatParentRefs(httpRoute);
+  const hostnames = httpRoute.spec?.hostnames || [];
+
+  const conditionsColumns: TableColumn<McpCondition>[] = [
+    {
+      title: "Type",
+      field: "type",
+      render: (row) => <strong>{row.type}</strong>,
+    },
+    {
+      title: "Status",
+      field: "status",
+      render: (row) => (
+        <Chip
+          label={row.status}
+          size="small"
+          style={{
+            backgroundColor:
+              row.status === "True" ? "var(--rh-green, #3e8635)" : undefined,
+            color: row.status === "True" ? "white" : undefined,
+          }}
+        />
+      ),
+    },
+    {
+      title: "Updated",
+      field: "lastTransitionTime",
+      render: (row) => formatAge(row.lastTransitionTime),
+    },
+    {
+      title: "Reason",
+      field: "reason",
+      render: (row) => row.reason || "-",
+    },
+    {
+      title: "Message",
+      field: "message",
+      render: (row) => row.message || "-",
+    },
+  ];
+
+  return (
+    <Page themeId="tool">
+      <Header
+        title={httpRoute.metadata?.name || "HTTPRoute"}
+        subtitle={`Namespace: ${httpRoute.metadata?.namespace || "-"}`}
+      >
+        <Link to="/kuadrant/mcp-management">
+          <Button startIcon={<ArrowBackIcon />}>Back to MCP Overview</Button>
+        </Link>
+      </Header>
+      <Content>
+        <Box mb={2}>
+          <Breadcrumbs aria-label="breadcrumb">
+            <Link to="/kuadrant/mcp-management">MCP Overview</Link>
+            <Typography>
+              {httpRoute.metadata?.name || "HTTPRoute"}
+            </Typography>
+          </Breadcrumbs>
+        </Box>
+
+        <Box mb={2}>
+          <Tabs
+            value={selectedTab}
+            onChange={(_, newValue) => setSelectedTab(newValue)}
+            indicatorColor="primary"
+            textColor="primary"
+            className={classes.tabs}
+          >
+            <Tab label="Details" />
+            <Tab label="YAML" />
+          </Tabs>
+        </Box>
+
+        {selectedTab === 0 && (
+          <>
+            <InfoCard title="Resource Details">
+              <Box className={classes.infoGrid}>
+                <Box className={classes.infoItem}>
+                  <Typography variant="caption" className={classes.label}>
+                    Name
+                  </Typography>
+                  <Typography variant="body2">
+                    {httpRoute.metadata?.name || "-"}
+                  </Typography>
+                </Box>
+
+                <Box className={classes.infoItem}>
+                  <Typography variant="caption" className={classes.label}>
+                    Namespace
+                  </Typography>
+                  <Typography variant="body2">
+                    {httpRoute.metadata?.namespace || "-"}
+                  </Typography>
+                </Box>
+
+                <Box className={classes.infoItem}>
+                  <Typography variant="caption" className={classes.label}>
+                    Status
+                  </Typography>
+                  <Box>
+                    <Chip
+                      label={ready ? "Accepted" : "Not Accepted"}
+                      size="small"
+                      className={
+                        ready
+                          ? classes.statusChipReady
+                          : classes.statusChipNotReady
+                      }
+                    />
+                  </Box>
+                </Box>
+
+                <Box className={classes.infoItem}>
+                  <Typography variant="caption" className={classes.label}>
+                    Created At
+                  </Typography>
+                  <Typography variant="body2">
+                    {createdAt ? new Date(createdAt).toLocaleString() : "-"}
+                  </Typography>
+                </Box>
+
+                {httpRoute.metadata?.ownerReferences &&
+                  httpRoute.metadata.ownerReferences.length > 0 && (
+                    <Box className={classes.infoItem}>
+                      <Typography variant="caption" className={classes.label}>
+                        Owner
+                      </Typography>
+                      <Typography variant="body2">{owner}</Typography>
+                    </Box>
+                  )}
+              </Box>
+
+              {parentRefs.length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="caption" className={classes.label}>
+                    Parent Gateways
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {parentRefs.map((parentRef, idx) => (
+                      <Grid item key={idx}>
+                        <Chip
+                          label={parentRef}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {hostnames.length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="caption" className={classes.label}>
+                    Hostnames
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {hostnames.map((hostname, idx) => (
+                      <Grid item key={idx}>
+                        <Chip
+                          label={hostname}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {Object.keys(labels).length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="caption" className={classes.label}>
+                    Labels
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {Object.entries(labels).map(([key, value]) => (
+                      <Grid item key={key}>
+                        <Chip
+                          label={`${key}: ${value}`}
+                          size="small"
+                          variant="outlined"
+                        />
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+
+              {Object.keys(annotations).length > 0 && (
+                <Box mb={3}>
+                  <Typography variant="caption" className={classes.label}>
+                    Annotations
+                  </Typography>
+                  <Grid container spacing={1}>
+                    {Object.entries(annotations).map(([key, value]) => (
+                      <Grid item key={key} xs={12}>
+                        <Typography
+                          variant="body2"
+                          style={{
+                            fontFamily: "monospace",
+                            fontSize: "0.75rem",
+                          }}
+                        >
+                          <strong>{key}:</strong> {String(value)}
+                        </Typography>
+                      </Grid>
+                    ))}
+                  </Grid>
+                </Box>
+              )}
+            </InfoCard>
+
+            {allConditions.length > 0 && (
+              <Box mt={3}>
+                <InfoCard title="Conditions">
+                  <Table<McpCondition>
+                    options={{
+                      paging: false,
+                      search: false,
+                      toolbar: false,
+                    }}
+                    columns={conditionsColumns}
+                    data={allConditions}
+                  />
+                </InfoCard>
+              </Box>
+            )}
+          </>
+        )}
+
+        {selectedTab === 1 && <ResourceYamlCard resource={httpRoute} />}
+      </Content>
+    </Page>
+  );
+};

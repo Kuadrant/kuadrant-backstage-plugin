@@ -1,0 +1,1 @@
+export { McpHTTPRouteExtensionDetailPage } from "./McpHTTPRouteExtensionDetailPage";

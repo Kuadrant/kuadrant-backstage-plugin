@@ -9,6 +9,7 @@ export {
   McpOverviewPage,
   McpGatewayExtensionDetailPage,
   McpServerRegistrationDetailPage,
+  McpHTTPRouteExtensionDetailPage,
   EntityKuadrantApiAccessCard,
   EntityKuadrantApiKeyManagementTab,
   EntityKuadrantApiKeysContent,

@@ -707,7 +707,13 @@ const McpContent = () => {
     {
       title: "Name",
       field: "metadata.name",
-      render: (row) => <strong>{row.metadata?.name}</strong>,
+      render: (row) => (
+        <Link
+          to={`/kuadrant/mcp/httproutes/${row.metadata?.namespace}/${row.metadata?.name}`}
+        >
+          <strong>{row.metadata?.name}</strong>
+        </Link>
+      ),
     },
     {
       title: "Namespace",

@@ -27,6 +27,7 @@ import {
   ApiProductDetailPage,
   ApiProductsPage,
   McpGatewayExtensionDetailPage,
+  McpHTTPRouteExtensionDetailPage,
   McpOverviewPage,
   McpServerRegistrationDetailPage,
   MyApiKeysPage,
@@ -164,6 +165,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/mcp/serverregistrations/:namespace/:name"
                 element={<McpServerRegistrationDetailPage />}
+              />
+              <Route
+                path="/kuadrant/mcp/httproutes/:namespace/:name"
+                element={<McpHTTPRouteExtensionDetailPage />}
               />
               <Route path="/kuadrant/my-api-keys" element={<MyApiKeysPage />} />
               <Route
