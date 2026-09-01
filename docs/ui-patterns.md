@@ -37,7 +37,6 @@ mounted at `/kuadrant/gateways/:namespace/:name`.
 3. Register the page as a routable extension in `plugin.ts`, export it from
    `index.ts`, and add the route in `packages/app/src/components/AppBase/AppBase.tsx`.
 
-
 ## Delete Confirmation Patterns
 
 All delete operations should use proper Material-UI dialogs instead of browser `window.confirm()` or `alert()`. The pattern varies based on severity.

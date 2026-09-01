@@ -28,7 +28,7 @@ import { kuadrantApiRef } from '../../api';
 import { GatewayManifest, GatewayCondition } from '../../types/mcp';
 import { ResourceYamlCard } from '../ResourceYamlCard';
 import { hasCondition } from '../McpOverviewPage/utils';
-import { formatAge, getGatewayOwner } from './utils';
+import { getGatewayOwner } from './utils';
 
 const useStyles = makeStyles((theme) => ({
   tabs: {
@@ -227,20 +227,15 @@ export const GatewayDetailPage = () => {
                     {createdAt ? new Date(createdAt).toLocaleString() : '-'}
                   </Typography>
                 </Box>
-                <Box className={classes.infoItem}>
-                  <Typography variant='caption' className={classes.label}>
-                    Age
-                  </Typography>
-                  <Typography variant='body2'>
-                    {formatAge(createdAt)}
-                  </Typography>
-                </Box>
-                <Box className={classes.infoItem}>
-                  <Typography variant='caption' className={classes.label}>
-                    Owner
-                  </Typography>
-                  <Typography variant='body2'>{owner}</Typography>
-                </Box>
+                {gateway.metadata?.ownerReferences &&
+                  gateway.metadata.ownerReferences.length > 0 && (
+                    <Box className={classes.infoItem}>
+                      <Typography variant='caption' className={classes.label}>
+                        Owner
+                      </Typography>
+                      <Typography variant='body2'>{owner}</Typography>
+                    </Box>
+                  )}
                 <Box className={classes.infoItem}>
                   <Typography variant='caption' className={classes.label}>
                     Gateway Class
