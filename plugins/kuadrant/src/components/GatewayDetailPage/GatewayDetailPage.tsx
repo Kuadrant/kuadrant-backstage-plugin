@@ -29,6 +29,8 @@ import { GatewayManifest, GatewayCondition } from '../../types/mcp';
 import { ResourceYamlCard } from '../ResourceYamlCard';
 import { hasCondition } from '../McpOverviewPage/utils';
 import { getGatewayOwner } from './utils';
+import { useKuadrantPermission } from '../../utils/permissions';
+import { kuadrantGatewayListPermission } from '../../permissions';
 
 const useStyles = makeStyles((theme) => ({
   tabs: {
@@ -110,17 +112,26 @@ export const GatewayDetailPage = () => {
   const [selectedTab, setSelectedTab] = useState(0);
 
   const {
+    allowed: canView,
+    loading: permissionLoading,
+    error: permissionError,
+  } = useKuadrantPermission(kuadrantGatewayListPermission);
+
+  const {
     value: gateway,
     loading,
     error,
   } = useAsync(async () => {
+    if (!canView) {
+      return undefined;
+    }
     if (!namespace || !name) {
       throw new Error('Gateway namespace and name are required');
     }
     return (await kuadrantApi.getGateway(namespace!, name!)) as GatewayManifest;
-  }, [namespace, name, kuadrantApi]);
+  }, [namespace, name, kuadrantApi, canView]);
 
-  if (loading) {
+  if (permissionLoading || loading) {
     return (
       <Page themeId='tool'>
         <Header title='Loading...' />
@@ -134,6 +145,18 @@ export const GatewayDetailPage = () => {
           </Box>
         </Content>
       </Page>
+    );
+  }
+
+  if (permissionError) {
+    return <ResponseErrorPanel error={permissionError} />;
+  }
+
+  if (!canView) {
+    return (
+      <ResponseErrorPanel
+        error={new Error('You do not have permission to view this Gateway')}
+      />
     );
   }
 
@@ -288,15 +311,17 @@ export const GatewayDetailPage = () => {
               </Box>
             </InfoCard>
 
-            <Box mt={3}>
-              <InfoCard title='Conditions'>
-                <Table<GatewayCondition>
-                  options={{ paging: false, search: false, toolbar: false }}
-                  columns={conditionColumns}
-                  data={conditions}
-                />
-              </InfoCard>
-            </Box>
+            {conditions.length > 0 && (
+              <Box mt={3}>
+                <InfoCard title='Conditions'>
+                  <Table<GatewayCondition>
+                    options={{ paging: false, search: false, toolbar: false }}
+                    columns={conditionColumns}
+                    data={conditions}
+                  />
+                </InfoCard>
+              </Box>
+            )}
           </>
         )}
 
