@@ -5,8 +5,8 @@ import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
 // the oinc demo fixture (oinc/manifests/mcp-demo.yaml) always registers this
 // MCPServerRegistration in CI, so tests assert against it directly instead of
 // skipping when the servers table happens to be empty.
-const FIXTURE_NAMESPACE = "toystore";
-const FIXTURE_NAME = "toystore-mcp-server";
+const fixtureNamespace = "toystore";
+const fixtureName = "toystore-mcp-server";
 
 test.describe("Kuadrant MCP Server Registration detail", () => {
   let common: Common;
@@ -28,7 +28,7 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
   test("opens the detail page from the servers table", async ({ page }) => {
     // the server name is a link into the read-only detail view
     const serverLink = page.locator(
-      `a[href="/kuadrant/mcp/serverregistrations/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}"]`,
+      `a[href="/kuadrant/mcp/serverregistrations/${fixtureNamespace}/${fixtureName}"]`,
     );
 
     await expect(serverLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -36,7 +36,7 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
     await serverLink.click();
 
     await page.waitForURL(
-      `**/kuadrant/mcp/serverregistrations/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}`,
+      `**/kuadrant/mcp/serverregistrations/${fixtureNamespace}/${fixtureName}`,
       { timeout: TIMEOUTS.VERY_SLOW },
     );
 
@@ -50,8 +50,8 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
     await expect(page.getByText("Resource Details").first()).toBeVisible({
       timeout: TIMEOUTS.SLOW,
     });
-    await expect(page.getByText(FIXTURE_NAME).first()).toBeVisible();
-    await expect(page.getByText(FIXTURE_NAMESPACE).first()).toBeVisible();
+    await expect(page.getByText(fixtureName).first()).toBeVisible();
+    await expect(page.getByText(fixtureNamespace).first()).toBeVisible();
 
     // breadcrumb links back to the overview
     const breadcrumb = page.locator('a[href="/kuadrant/mcp-management"]', {
@@ -62,14 +62,14 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
 
   test("shows the read-only YAML manifest", async ({ page }) => {
     const serverLink = page.locator(
-      `a[href="/kuadrant/mcp/serverregistrations/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}"]`,
+      `a[href="/kuadrant/mcp/serverregistrations/${fixtureNamespace}/${fixtureName}"]`,
     );
 
     await expect(serverLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     await serverLink.click();
     await page.waitForURL(
-      `**/kuadrant/mcp/serverregistrations/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}`,
+      `**/kuadrant/mcp/serverregistrations/${fixtureNamespace}/${fixtureName}`,
       { timeout: TIMEOUTS.VERY_SLOW },
     );
 
@@ -83,10 +83,10 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
       page.getByText(/apiVersion:\s*mcp\.kuadrant\.io/).first(),
     ).toBeVisible();
     await expect(
-      page.getByText(new RegExp(`name:\\s*${FIXTURE_NAME}`)).first(),
+      page.getByText(new RegExp(`name:\\s*${fixtureName}`)).first(),
     ).toBeVisible();
     await expect(
-      page.getByText(new RegExp(`namespace:\\s*${FIXTURE_NAMESPACE}`)).first(),
+      page.getByText(new RegExp(`namespace:\\s*${fixtureNamespace}`)).first(),
     ).toBeVisible();
   });
 });

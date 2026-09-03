@@ -17,6 +17,7 @@ import {
 } from './types/api-management';
 import {
   GatewayResource,
+  GatewayManifest,
   MCPGatewayExtension,
   MCPServerRegistration,
 } from './types/mcp';
@@ -274,6 +275,14 @@ export interface KuadrantAPI {
    * @returns Promise with list of gateways
    */
   getGateways(): Promise<KuadrantList<GatewayResource>>;
+
+  /**
+   * Fetch a specific Gateway (gateway.networking.k8s.io) as a full manifest
+   * @param namespace - Kubernetes namespace
+   * @param name - Gateway name
+   * @returns Promise with the Gateway manifest
+   */
+  getGateway(namespace: string, name: string): Promise<GatewayManifest>;
 
   /**
    * Fetch all MCPGatewayExtensions
@@ -634,6 +643,14 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/gateways`,
       "Failed to fetch Gateways."
+    );
+  }
+
+  async getGateway(namespace: string, name: string): Promise<GatewayManifest> {
+    const baseUrl = await this.getBaseUrl();
+    return this.fetchWithRetry(
+      `${baseUrl}kuadrant/gateways/${namespace}/${name}`,
+      `Failed to fetch Gateway ${namespace}/${name}.`
     );
   }
 

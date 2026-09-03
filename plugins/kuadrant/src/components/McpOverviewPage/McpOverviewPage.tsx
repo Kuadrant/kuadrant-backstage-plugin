@@ -361,7 +361,9 @@ function FilterToolbar<T>({
           value={query}
           onChange={(e) => onQueryChange(String(e.target.value))}
           className={classes.filterSearch}
-          inputProps={{ "aria-label": `Filter by ${active.label.toLowerCase()}` }}
+          inputProps={{
+            "aria-label": `Filter by ${active.label.toLowerCase()}`,
+          }}
         >
           <MenuItem value="">All {active.label.toLowerCase()}</MenuItem>
           {active.options.map((opt) => (
@@ -622,7 +624,16 @@ const McpContent = () => {
     {
       title: "Name",
       field: "metadata.name",
-      render: (row) => <strong>{row.metadata?.name}</strong>,
+      render: (row) =>
+        row.metadata?.name ? (
+          <Link
+            to={`/kuadrant/gateways/${row.metadata?.namespace}/${row.metadata?.name}`}
+          >
+            <strong>{row.metadata?.name}</strong>
+          </Link>
+        ) : (
+          "-"
+        ),
     },
     {
       title: "Namespace",
