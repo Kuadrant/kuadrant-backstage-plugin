@@ -28,9 +28,5 @@ spec:
   lifecycle: active
   partOf:
     - kuadrant
-  appConfigExamples:
-    - title: Default configuration
-      content:
-        dynamicPlugins:
-          backend:
-            kuadrant.kuadrant-backstage-plugin-backend: {}
+  appConfigNotRequired: true
+  appConfigExamples: []

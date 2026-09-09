@@ -86,7 +86,7 @@ spec:
                   title: API Product Info
               mountPoints:
                 - mountPoint: entity.page.api-keys/cards
-                  importName: EntityKuadrantApiKeyManagementTab
+                  importName: EntityKuadrantApiKeysContent
                   config:
                     layout:
                       gridColumn: "1 / -1"
