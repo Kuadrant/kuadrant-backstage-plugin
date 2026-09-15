@@ -1,9 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# create an oinc cluster with the same Kuadrant/GWAPI stack as
-# kuadrant-console-plugin/scripts/cluster-setup.sh (console-plugin CI pins
-# oinc v0.4.3). then add this repo's demos and host-side SA for yarn-dev.
+# Create an oinc v0.5.3+ cluster, then add demos and the host-side SA.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -13,8 +11,6 @@ source "${SCRIPT_DIR}/lib.sh"
 
 check_command oinc "Install from https://github.com/jasonmadigan/oinc"
 check_command kubectl "Install from https://kubernetes.io/docs/tasks/tools/"
-
-RUNTIME=$(detect_runtime)
 
 # default matches kuadrant-console-plugin (mcp-gateway is exercised there on 4.22).
 OCP_VERSION="${OCP_VERSION:-4.22}"
@@ -26,20 +22,9 @@ KUADRANT_VERSION="${KUADRANT_VERSION:-latest}"
 # cert-manager, metallb, and istio; listing them keeps the stack explicit.
 ADDONS="gateway-api,cert-manager,metallb,istio,kuadrant@${KUADRANT_VERSION},mcp-gateway"
 
-# console-plugin: oinc create --addons ... --metallb-address-pool auto
-# then kubectl-patch developerPortal and apply a class-less Gateway.
-# do not pass --gateway-api-gateway: that stamps loadBalancerClass
-# oinc.io/metallb, which unscoped metallb (pool mode) ignores, so the
-# Gateway never gets an IP. do not pass --kuadrant-devportal: console-plugin
-# enables the portal with the same merge-patch after create.
-create_args=(create --version "${OCP_VERSION}" --addons "${ADDONS}")
-use_oinc_metallb=0
-if oinc create --help 2>&1 | grep -q -- --metallb-address-pool; then
-  create_args+=(--metallb-address-pool auto)
-  use_oinc_metallb=1
-else
-  log "warning: oinc CLI missing --metallb-address-pool (need >= v0.4.2; kuadrant-console-plugin CI pins v0.4.3). falling back to kubectl MetalLB pool."
-fi
+# oinc configures the default Gateway for its scoped MetalLB controller.
+create_args=(create --version "${OCP_VERSION}" --addons "${ADDONS}"
+  --metallb-address-pool auto --gateway-api-gateway)
 
 dump_kuadrant_diagnostics() {
   log "oinc create failed - dumping kuadrant addon diagnostics..."
@@ -68,68 +53,16 @@ if [[ "${ctx}" != "oinc" ]]; then
   exit 1
 fi
 
-# --- MetalLB IP pool (only if this oinc CLI cannot --metallb-address-pool) ---
-# console-plugin dropped the hand-rolled .200-.220 pool once oinc grew the
-# flag; oinc names the pool oinc-pool / L2Advertisement oinc-l2.
-
-if [[ "${use_oinc_metallb}" -eq 0 ]]; then
-  log "configuring MetalLB IP pool..."
-  DOCKER_SUBNET=$(${RUNTIME} network inspect bridge -f '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || echo "172.18.0.0/16")
-  POOL_START=$(echo "${DOCKER_SUBNET}" | sed 's|\.[0-9]*/.*|.200|')
-  POOL_END=$(echo "${DOCKER_SUBNET}" | sed 's|\.[0-9]*/.*|.220|')
-
-  log "MetalLB pool: ${POOL_START}-${POOL_END}"
-  kubectl apply -f - <<EOF
-apiVersion: metallb.io/v1beta1
-kind: IPAddressPool
-metadata:
-  name: dev-pool
-  namespace: metallb-system
-spec:
-  addresses:
-  - ${POOL_START}-${POOL_END}
----
-apiVersion: metallb.io/v1beta1
-kind: L2Advertisement
-metadata:
-  name: dev-l2
-  namespace: metallb-system
-EOF
-fi
-
 # --- developer portal (same merge-patch as console-plugin) ---
 
 log "patch kuadrant to enable developer portal controller..."
 kubectl patch kuadrant kuadrant -n kuadrant-system --type merge --patch '{"spec": {"components": {"developerPortal": {"enabled": true}}}}'
 
-# --- Gateway (same class-less spec as console-plugin) ---
-# a class-less Gateway lets unscoped metallb assign an IP from oinc-pool.
-
-log "creating gateway..."
-kubectl create namespace gateway-system 2>/dev/null || true
-kubectl apply -f - <<EOF
-apiVersion: gateway.networking.k8s.io/v1
-kind: Gateway
-metadata:
-  name: kuadrant-ingressgateway
-  namespace: gateway-system
-spec:
-  gatewayClassName: istio
-  listeners:
-  - name: http
-    port: 80
-    protocol: HTTP
-    allowedRoutes:
-      namespaces:
-        from: All
-EOF
-
 # --- demo resources ---
 
 log "applying demo resources..."
-for f in toystore-demo.yaml gamestore-demo.yaml additional-demos.yaml; do
-  kubectl apply -f "${REPO_DIR}/kuadrant-dev-setup/demo/${f}" || log "warning: failed to apply ${f}"
-done
+# The overlay adds the Service class before Istio creates demo Gateway Services.
+kubectl kustomize --load-restrictor=LoadRestrictionsNone "${SCRIPT_DIR}/manifests/demos" | kubectl apply -f -
 
 log "applying MCP demo resources..."
 kubectl create namespace toystore 2>/dev/null || true

@@ -14,9 +14,9 @@ Same three loops as the [root README](../README.md#quick-start):
 
 ## Prerequisites
 
-- [oinc](https://github.com/jasonmadigan/oinc) v0.4.3 or later (same pin as [kuadrant-console-plugin](https://github.com/Kuadrant/kuadrant-console-plugin) CI; `--metallb-address-pool auto` is the MetalLB path)
+- [oinc](https://github.com/jasonmadigan/oinc) v0.5.3 or later
 - kubectl
-- helm
+- Helm (CI uses 4.3.0)
 - npm
 - Docker or Podman
 
@@ -44,16 +44,18 @@ yarn oinc:teardown
 
 Creates an oinc cluster with the full Kuadrant infrastructure stack. That is enough for local `yarn dev:oinc`, and it is also the **starting point** of loop 3 / the [installation guide](installation.md) if you later install RHDH in-cluster.
 
-Cluster create matches [kuadrant-console-plugin](https://github.com/Kuadrant/kuadrant-console-plugin) `scripts/cluster-setup.sh` (minus `--console-plugin`, which is that repo's OpenShift Console wiring):
+Cluster creation uses oinc’s managed MCP Gateway support and scoped MetalLB setup:
 
 ```bash
 oinc create --version 4.22 \
   --addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway \
-  --metallb-address-pool auto
-# then kubectl patch developerPortal; apply a class-less Gateway
+  --metallb-address-pool auto --gateway-api-gateway
+# then kubectl patch developerPortal and apply the demo overlay
 ```
 
-That covers Gateway API CRDs, cert-manager, MetalLB (`oinc-pool` + `oinc-l2`), Istio (Sail Operator), Kuadrant Operator, MCP Gateway operator, OLM, and the OpenShift Console. Override with `OCP_VERSION` / `KUADRANT_VERSION`. Do not pass `--gateway-api-gateway`: it stamps `loadBalancerClass: oinc.io/metallb`, which unscoped MetalLB ignores, so the Gateway never gets an IP. Developer portal is the same merge-patch as console-plugin, not `--kuadrant-devportal`. Older oinc CLIs without `--metallb-address-pool` fall back to a kubectl pool in `setup-cluster.sh`.
+That covers Gateway API CRDs, cert-manager, MetalLB (`oinc-pool` + `oinc-l2`), Istio (Sail Operator), Kuadrant Operator, its managed MCP Gateway controller, OLM, and the OpenShift Console. Override with `OCP_VERSION` / `KUADRANT_VERSION`. oinc configures its default and MCP Gateways for `oinc.io/metallb`; the demo overlay adds the same Service class to the demo Gateways before creation. Developer portal is enabled with a merge-patch.
+
+When upgrading an existing disposable cluster from oinc v0.4.3, recreate it after saving anything you need. Gateway Service classes cannot be changed in place. See [oinc’s migration instructions](https://github.com/jasonmadigan/oinc/blob/v0.5.3/docs/addons.md#migration-from-v043) to retain an existing cluster.
 
 Our setup script then adds:
 - Demo resources from `kuadrant-dev-setup/demo/`
@@ -97,7 +99,7 @@ This port-forward occupies the same backend port as `yarn dev` / `yarn dev:oinc`
 
 ## What oinc provides vs what we add
 
-oinc gives you MicroShift in a container with OLM, OpenShift Console (port 9000), and a ConsolePlugin CRD out of the box. `--addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway` is the same Kuadrant/GWAPI list as kuadrant-console-plugin (kuadrant already pulls those deps; listing them keeps the stack explicit), plus MCP Gateway. `--metallb-address-pool auto` creates `oinc-pool` / `oinc-l2`; a class-less `kuadrant-ingressgateway` then gets an IP from that pool. Developer portal is enabled with the same kubectl merge-patch as console-plugin.
+oinc gives you MicroShift in a container with OLM, OpenShift Console (port 9000), and a ConsolePlugin CRD out of the box. `--addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway` is the same Kuadrant/GWAPI list as kuadrant-console-plugin (kuadrant already pulls those deps; listing them keeps the stack explicit), plus MCP Gateway. `--metallb-address-pool auto` creates `oinc-pool` / `oinc-l2`; the default and demo Gateway Service overlays select that pool through `oinc.io/metallb`. Developer portal is enabled with the same kubectl merge-patch as console-plugin.
 
 Our setup scripts add:
 
