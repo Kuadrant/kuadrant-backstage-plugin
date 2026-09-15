@@ -16,7 +16,7 @@ Same three loops as the [root README](../README.md#quick-start):
 
 - [oinc](https://github.com/jasonmadigan/oinc) v0.4.3 or later (same pin as [kuadrant-console-plugin](https://github.com/Kuadrant/kuadrant-console-plugin) CI; `--metallb-address-pool auto` is the MetalLB path)
 - kubectl
-- helm
+- Helm 3 (CI uses 3.22.0; Helm 4 conflicts with Kuadrant-managed MCP Gateway CRDs)
 - npm
 - Docker or Podman
 

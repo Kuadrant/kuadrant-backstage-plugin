@@ -149,6 +149,9 @@ jobs:
 
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # ratchet:azure/setup-helm@v4
+        with:
+          # Helm 4 tries to apply MCP Gateway CRDs already owned by Kuadrant.
+          version: v3.22.0
 
       - name: Install dependencies
         run: yarn install --immutable
