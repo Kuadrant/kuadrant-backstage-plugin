@@ -2,7 +2,7 @@
 
 This guide covers installing the Kuadrant plugins into an existing Red Hat Developer Hub (RHDH) or Backstage instance.
 
-**For plugin development**, see the [main README](../README.md).
+**For plugin development**, see the [main README](https://github.com/Kuadrant/kuadrant-backstage-plugin/blob/main/README.md).
 
 ## Packages
 
