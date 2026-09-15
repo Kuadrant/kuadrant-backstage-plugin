@@ -116,7 +116,7 @@ jobs:
 
   # CI e2e cluster is oinc (same addons as `yarn oinc:cluster` / kuadrant-console-plugin),
   # not kind. Copied from kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
-  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.4.3 from GitHub releases,
+  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.5.3 from GitHub releases,
   # Helm, Docker on the hosted runner (no extra DinD/privileged job). oinc create is
   # nested k8s (~6+ min; Istio + Kuadrant + MCP Gateway). Kind stays local loop 1;
   # unit tests do not need a cluster.
@@ -140,7 +140,7 @@ jobs:
       # with "Is a directory" (console-plugin does not have that path).
       - name: Install oinc
         run: |
-          OINC_VERSION="${OINC_VERSION:-v0.4.3}"
+          OINC_VERSION="${OINC_VERSION:-v0.5.3}"
           curl -fL -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
           chmod +x /tmp/oinc
           file /tmp/oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
@@ -150,8 +150,8 @@ jobs:
       - name: Install Helm
         uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # ratchet:azure/setup-helm@v4
         with:
-          # Helm 4 tries to apply MCP Gateway CRDs already owned by Kuadrant.
-          version: v3.22.0
+          # Keep Helm explicit; oinc reuses the operator-managed MCP Gateway.
+          version: v4.3.0
 
       - name: Install dependencies
         run: yarn install --immutable

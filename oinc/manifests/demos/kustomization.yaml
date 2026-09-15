@@ -1,0 +1,20 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../../../kuadrant-dev-setup/demo/toystore-demo.yaml
+  - ../../../kuadrant-dev-setup/demo/gamestore-demo.yaml
+  - ../../../kuadrant-dev-setup/demo/additional-demos.yaml
+  - gateway-parameters.yaml
+patches:
+  - target:
+      group: gateway.networking.k8s.io
+      version: v1
+      kind: Gateway
+    patch: |-
+      - op: add
+        path: /spec/infrastructure
+        value:
+          parametersRef:
+            group: ""
+            kind: ConfigMap
+            name: gateway-parameters
