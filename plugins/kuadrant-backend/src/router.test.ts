@@ -1379,11 +1379,23 @@ describe('createRouter', () => {
     it('returns empty array when consumer namespace does not exist', async () => {
       mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
 
-      const error404 = new Error('404 not found');
+      const error404 = Object.assign(new Error('namespace not found'), {
+        statusCode: 404,
+      });
       mockK8sClient.listCustomResources.mockRejectedValueOnce(error404);
 
       const response = await request(app).get('/requests/my').expect(200);
       expect(response.body.items).toEqual([]);
+    });
+
+    it('does not hide failures whose message happens to contain 404', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.listCustomResources.mockRejectedValueOnce(
+        new Error('connection failed after 404 milliseconds'),
+      );
+
+      const response = await request(app).get('/requests/my').expect(500);
+      expect(response.body.error).toBe('failed to fetch user api key requests');
     });
 
     it('returns 403 when user has no read permissions', async () => {

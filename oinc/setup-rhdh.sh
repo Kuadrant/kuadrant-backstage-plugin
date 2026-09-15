@@ -30,9 +30,8 @@ BACKEND_PKG="@kuadrant/kuadrant-backstage-plugin-backend-dynamic"
 PLUGIN_SOURCE="${PLUGIN_SOURCE:-npm}"
 RHDH_IMAGE_REPOSITORY="${RHDH_IMAGE_REPOSITORY:-localhost/kuadrant-rhdh-e2e}"
 RHDH_IMAGE_TAG="${RHDH_IMAGE_TAG:-ci}"
-# rhdh addon chart pin (rhdh@<version>). empty = addon default (6.2.2, paired
-# with the rhdh:1.10 image line). the chart carries no appVersion, so this
-# tracks the base image by release; bump both together.
+# Keep the addon chart and RHDH image on the 1.10 release line.
+# Override both together when testing a different RHDH release.
 RHDH_CHART_VERSION="${RHDH_CHART_VERSION:-6.2.2}"
 RHDH_BASE_IMAGE="${RHDH_BASE_IMAGE:-quay.io/rhdh-community/rhdh:next-1.10}"
 # the addon exposes rhdh via an openshift route on the http port oinc maps
@@ -106,6 +105,10 @@ if [ "${PLUGIN_SOURCE}" = "npm" ]; then
   log "fetching plugin integrity hashes..."
   FRONTEND_HASH=$(npm view "${FRONTEND_PKG}" dist.integrity)
   BACKEND_HASH=$(npm view "${BACKEND_PKG}" dist.integrity)
+  if [ -z "${FRONTEND_HASH}" ] || [ -z "${BACKEND_HASH}" ]; then
+    log "error: failed to resolve npm package integrity hashes"
+    exit 1
+  fi
   log "frontend: ${FRONTEND_HASH}"
   log "backend:  ${BACKEND_HASH}"
 fi
@@ -114,6 +117,33 @@ fi
 FRONTEND_SCALPRUM_NAME="kuadrant.kuadrant-backstage-plugin-frontend"
 if [ "${PLUGIN_SOURCE}" = "npm" ]; then
   FRONTEND_SCALPRUM_NAME="internal.plugin-kuadrant"
+fi
+
+# These pages were added after the published 0.4.0 plugins.
+LOCAL_ROUTES=""
+LOCAL_MENU_ITEMS=""
+if [ "${PLUGIN_SOURCE}" = "baked" ]; then
+  LOCAL_ROUTES=$(cat <<'EOF'
+                  - path: /kuadrant/mcp-management
+                    importName: McpOverviewPage
+                    menuItem:
+                      icon: kuadrantIcon
+                      text: MCP Management
+                  - path: /kuadrant/mcp/gatewayextensions/:namespace/:name
+                    importName: McpGatewayExtensionDetailPage
+                  - path: /kuadrant/mcp/serverregistrations/:namespace/:name
+                    importName: McpServerRegistrationDetailPage
+                  - path: /kuadrant/mcp/httproutes/:namespace/:name
+                    importName: McpHTTPRouteExtensionDetailPage
+                  - path: /kuadrant/gateways/:namespace/:name
+                    importName: GatewayDetailPage
+EOF
+  )
+  LOCAL_MENU_ITEMS=$(cat <<'EOF'
+                  kuadrant.mcp-management:
+                    parent: kuadrant
+EOF
+  )
 fi
 
 # --- helm values overlay ---
@@ -153,6 +183,7 @@ FRONTEND_PLUGIN_CONFIG=$(
                     importName: ApiProductDetailPage
                   - path: /kuadrant/api-keys/:namespace/:name
                     importName: ApiKeyDetailPage
+${LOCAL_ROUTES}
                 menuItems:
                   kuadrant:
                     icon: kuadrantIcon
@@ -163,6 +194,7 @@ FRONTEND_PLUGIN_CONFIG=$(
                     parent: kuadrant
                   kuadrant.api-key-approval:
                     parent: kuadrant
+${LOCAL_MENU_ITEMS}
                 entityTabs:
                   - mountPoint: entity.page.api-keys
                     path: /api-keys

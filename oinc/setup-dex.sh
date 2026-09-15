@@ -22,7 +22,8 @@ done
 
 rendered_config=$(mktemp)
 trap 'rm -f "${rendered_config}"' EXIT
-sed -E "s|^issuer:[[:space:]].*|issuer: ${DEX_URL}|" \
+sed_cmd=$(command -v gsed || command -v sed)
+"${sed_cmd}" -E "s|^issuer:[[:space:]].*|issuer: ${DEX_URL}|" \
   "${DEX_CONFIG}" >"${rendered_config}"
 
 kubectl apply -f - <<'EOF'

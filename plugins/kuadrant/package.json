@@ -39,7 +39,12 @@
       "ApiIcon": "./src/components/icons",
       "KeyIcon": "./src/components/icons",
       "ApprovalIcon": "./src/components/icons",
-      "kuadrantApiFactory": "./src/apis"
+      "kuadrantApiFactory": "./src/apis",
+      "McpOverviewPage": "./src/plugin.ts",
+      "McpGatewayExtensionDetailPage": "./src/plugin.ts",
+      "McpServerRegistrationDetailPage": "./src/plugin.ts",
+      "McpHTTPRouteExtensionDetailPage": "./src/plugin.ts",
+      "GatewayDetailPage": "./src/plugin.ts"
     }
   },
   "sideEffects": false,

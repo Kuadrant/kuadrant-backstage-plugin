@@ -35,7 +35,8 @@ preflight:
 		command -v $$tool >/dev/null 2>&1 || { echo "error: '$$tool' not found on PATH"; exit 1; }; \
 	done
 	@docker info >/dev/null 2>&1 || { echo "error: docker is not running"; exit 1; }
-	@version=$$(oinc version 2>/dev/null | grep -o 'v[0-9][^[:space:]]*' | head -1); \
+	@grep_cmd=$$(command -v ggrep || command -v grep); \
+	version=$$(oinc version 2>/dev/null | $$grep_cmd -o 'v[0-9][^[:space:]]*' | head -1); \
 	case "$$version" in \
 		$(OINC_VERSION)|$(OINC_VERSION)-*) ;; \
 		*) echo "error: oinc $(OINC_VERSION) required, found $${version:-unknown}"; exit 1 ;; \

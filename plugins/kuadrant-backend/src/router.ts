@@ -155,17 +155,13 @@ function sendKubernetesError(
     return undefined;
   }
 
-  if (status === 429) {
-    console.error('kubernetes is throttling this backend:', kubernetesMessage(error));
-    const retryAfter = kubernetesDetails(error)?.retryAfterSeconds;
-    if (typeof retryAfter === 'number' && retryAfter > 0) {
-      res.setHeader('Retry-After', String(retryAfter));
-    }
-    return res.status(503).json({ error: 'service temporarily unavailable' });
-  }
-
-  if (status === 503) {
-    console.error('kubernetes is unavailable:', kubernetesMessage(error));
+  if (status === 429 || status === 503) {
+    console.error(
+      status === 429
+        ? 'kubernetes is throttling this backend:'
+        : 'kubernetes is unavailable:',
+      kubernetesMessage(error),
+    );
     const retryAfter = kubernetesDetails(error)?.retryAfterSeconds;
     if (typeof retryAfter === 'number' && retryAfter > 0) {
       res.setHeader('Retry-After', String(retryAfter));
@@ -1177,7 +1173,7 @@ export async function createRouter({
         data = await k8sClient.listCustomResources('devportal.kuadrant.io', 'v1alpha1', 'apikeys', consumerNs);
       } catch (error: any) {
         // consumer namespace doesn't exist yet — user has never requested a key
-        if (error.message?.includes('404') || error.statusCode === 404) {
+        if (kubernetesStatus(error) === 404) {
           res.json({ items: [] });
           return;
         }

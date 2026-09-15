@@ -66,7 +66,7 @@ make teardown
 
 `dynamic-up` deliberately does not install Playwright. RHDH is available at `http://rhdh.localhost:9080`; that `.localhost` origin keeps Web Crypto and clipboard APIs available over HTTP. Both RHDH and `yarn dev` authenticate through Dex with the same personas. See [oinc Development Environment](oinc.md) for the cluster, image, authentication, and version details.
 
-The Make targets require oinc v0.4.3, Docker, Helm, kubectl, curl, Python 3, Node, and Yarn. They install project dependencies but do not install those tools. Version and image defaults can be overridden on the command line, for example:
+The Make targets require oinc v0.5.3, Docker, Helm, kubectl, curl, Python 3, Node, and Yarn. They install project dependencies but do not install those tools. Version and image defaults can be overridden on the command line, for example:
 
 ```bash
 make dynamic-up KUADRANT_VERSION=1.5.1 RHDH_IMAGE_TAG=my-test

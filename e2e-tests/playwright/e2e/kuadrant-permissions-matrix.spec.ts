@@ -15,13 +15,13 @@ const owner1Api = "owner1-inventory-api";
 const owner2Api = "owner2-shipping-api";
 
 /**
- * Filter the API Products table down to one product.
+ * Filter the current table when it renders a search box.
  *
  * The table pages at 20 rows, and the environment grows products over time, so
  * a named row is not reliably on the first page. Searching is a no-op when the
  * table is small enough not to render a search box.
  */
-async function narrowProductsTable(page: Page, text: string): Promise<void> {
+async function narrowTable(page: Page, text: string): Promise<void> {
   const search = page.getByRole("textbox", { name: "Search" });
   if (await search.count()) {
     await search.fill(text);
@@ -188,7 +188,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       // find Gamestore API row specifically (owned by owner2, not owner1).
       // it is seeded by setup-cluster.sh, so its absence is a broken
       // environment, not a reason to skip the assertion this test exists for.
-      await narrowProductsTable(page, "Gamestore API");
+      await narrowTable(page, "Gamestore API");
       const gamestoreRow = page
         .locator("tr")
         .filter({ hasText: "Gamestore API" })
@@ -361,7 +361,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
       // the queue pages at 20 rows, so narrow to the seeded api first -
       // otherwise a fresh request can sit off the visible page.
-      await page.getByRole("textbox", { name: "Search" }).fill(owner2Api);
+      await narrowTable(page, owner2Api);
 
       await expect(
         page.locator("tbody tr").filter({ hasText: owner2Api }).first(),
@@ -396,7 +396,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
       // the queue pages at 20 rows, so narrow to the seeded api first -
       // otherwise a fresh request can sit off the visible page.
-      await page.getByRole("textbox", { name: "Search" }).fill(owner1Api);
+      await narrowTable(page, owner1Api);
 
       await expect(
         page.locator("tbody tr").filter({ hasText: owner1Api }).first(),
@@ -480,7 +480,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       // Toystore API must exist for this test (owned by owner1). the products
       // table pages at 20, so narrow to it first rather than hoping it landed
       // on the visible page.
-      await narrowProductsTable(page, "Toystore API");
+      await narrowTable(page, "Toystore API");
       const toystoreRow = page
         .locator("tr")
         .filter({ hasText: "Toystore API" })
@@ -511,7 +511,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       // Toystore API must exist for this test (owned by owner1). the products
       // table pages at 20, so narrow to it first rather than hoping it landed
       // on the visible page.
-      await narrowProductsTable(page, "Toystore API");
+      await narrowTable(page, "Toystore API");
       const toystoreRow = page
         .locator("tr")
         .filter({ hasText: "Toystore API" })
@@ -541,7 +541,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
       // Toystore API must exist for this test. narrowed first: the products
       // table pages at 20 and the environment grows products over time.
-      await narrowProductsTable(page, "Toystore API");
+      await narrowTable(page, "Toystore API");
       const toystoreRow = page
         .locator("tr")
         .filter({ hasText: "Toystore API" })
@@ -583,8 +583,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       // freshly seeded one can land off the visible page. narrow with the
       // table's own search first, then identify by count rather than by a
       // single row: approving one should remove exactly one from the queue.
-      const search = page.getByRole("textbox", { name: "Search" });
-      await search.fill(owner2Api);
+      await narrowTable(page, owner2Api);
 
       const pendingRows = page
         .locator("tbody tr")
@@ -626,7 +625,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
       await expect
         .poll(
           async () => {
-            await search.fill(owner2Api);
+            await narrowTable(page, owner2Api);
             return pendingRows.count();
           },
           {

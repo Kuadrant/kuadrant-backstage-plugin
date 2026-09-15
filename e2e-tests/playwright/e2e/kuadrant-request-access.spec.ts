@@ -312,10 +312,10 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
 
     // intercept the request to slow it down
     await page.route("**/api/kuadrant/requests", async (route) => {
-        if (route.request().method() !== "POST") {
-          await route.continue();
-          return;
-        }
+      if (route.request().method() !== "POST") {
+        await route.continue();
+        return;
+      }
       await new Promise((resolve) => setTimeout(resolve, 1000));
       await route.continue();
     });
@@ -407,7 +407,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
-  // these two stub a 500 to check the ui surfaces it, so the guards in
+  // These tests stub backend failures, so the guards in
   // fixtures/test.ts would otherwise fail them on their own fixture.
   test.describe("simulated backend failures", () => {
     test.use({ allowExpectedErrors: true });
@@ -483,11 +483,11 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
           return;
         }
         await route.fulfill({
-          status: 500,
+          status: 422,
           contentType: "application/json",
           body: JSON.stringify({
             error:
-              'failed to create apikeys: APIKey.devportal.kuadrant.io "test-key" is invalid: spec.requestedBy.email: Invalid value: "admin": spec.requestedBy.email in body should match \'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$\'',
+              "spec.requestedBy.email: Invalid value: \"admin\": spec.requestedBy.email in body should match '^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$'",
           }),
         });
       });
