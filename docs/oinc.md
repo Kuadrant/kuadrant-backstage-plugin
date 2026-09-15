@@ -99,7 +99,7 @@ This port-forward occupies the same backend port as `yarn dev` / `yarn dev:oinc`
 
 ## What oinc provides vs what we add
 
-oinc gives you MicroShift in a container with OLM, OpenShift Console (port 9000), and a ConsolePlugin CRD out of the box. `--addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway` is the same Kuadrant/GWAPI list as kuadrant-console-plugin (kuadrant already pulls those deps; listing them keeps the stack explicit), plus MCP Gateway. `--metallb-address-pool auto` creates `oinc-pool` / `oinc-l2`; a class-less `kuadrant-ingressgateway` then gets an IP from that pool. Developer portal is enabled with the same kubectl merge-patch as console-plugin.
+oinc gives you MicroShift in a container with OLM, OpenShift Console (port 9000), and a ConsolePlugin CRD out of the box. `--addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway` is the same Kuadrant/GWAPI list as kuadrant-console-plugin (kuadrant already pulls those deps; listing them keeps the stack explicit), plus MCP Gateway. `--metallb-address-pool auto` creates `oinc-pool` / `oinc-l2`; the default and demo Gateway Service overlays select that pool through `oinc.io/metallb`. Developer portal is enabled with the same kubectl merge-patch as console-plugin.
 
 Our setup scripts add:
 

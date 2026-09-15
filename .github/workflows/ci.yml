@@ -115,7 +115,7 @@ jobs:
         run: yarn test
 
   # CI e2e cluster is oinc (same addons as `yarn oinc:cluster` / kuadrant-console-plugin),
-  # not kind. Copied from kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
+  # not kind. Based on kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
   # ubuntu-latest (no larger runner), 60m timeout, oinc v0.5.3 from GitHub releases,
   # Helm, Docker on the hosted runner (no extra DinD/privileged job). oinc create is
   # nested k8s (~6+ min; Istio + Kuadrant + MCP Gateway). Kind stays local loop 1;
