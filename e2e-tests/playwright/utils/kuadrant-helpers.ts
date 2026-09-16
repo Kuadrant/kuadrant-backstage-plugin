@@ -295,6 +295,9 @@ export async function selectFirstOption(
     `${testId} should offer ${optionName ?? "at least one option"}`,
   ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   await option.click();
+  // MUI keeps the old listbox visible during its exit transition. The next
+  // select must not mistake that closing menu for its own options.
+  await expect(listbox).toBeHidden({ timeout: TIMEOUTS.DEFAULT });
 }
 
 /**
