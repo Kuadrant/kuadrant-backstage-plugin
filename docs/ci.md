@@ -2,13 +2,14 @@
 
 ## Workflows
 
-Three GitHub Actions workflows live in `.github/workflows/`:
+GitHub Actions workflows live in `.github/workflows/`:
 
-| Workflow                     | Trigger                                     | Purpose                                        |
-| ---------------------------- | ------------------------------------------- | ---------------------------------------------- |
-| `ci.yml`                     | PRs, merge queue, pushes to main, or manual | Build, lint, type-check, unit tests, e2e tests |
-| `publish.yml`                | GitHub Release published, or manual         | Publish packages to npm                        |
-| `contributor-governance.yml` | Issues and PRs                              | Run the shared contributor-governance checks   |
+| Workflow                     | Trigger                                     | Purpose                                                      |
+| ---------------------------- | ------------------------------------------- | ------------------------------------------------------------ |
+| `ci.yml`                     | PRs, merge queue, pushes to main, or manual | Build, lint, type-check, unit tests, static-plugin e2e tests |
+| `e2e-dynamic.yml`            | Manual (`workflow_dispatch`)                | Full e2e suite against dynamic plugins in RHDH               |
+| `publish.yml`                | GitHub Release published, or manual         | Publish packages to npm                                      |
+| `contributor-governance.yml` | Issues and PRs                              | Run the shared contributor-governance checks                 |
 
 ## Release Flow
 
@@ -102,6 +103,8 @@ The `e2e-tests` job matches local loop 2 (`yarn oinc:cluster` then `yarn dev:oin
 | Job timeout | 60 minutes (oinc create is ~6+ min; Istio + Kuadrant + MCP Gateway) | n/a in CI |
 
 oinc is installed like console-plugin, except the binary is downloaded to `/tmp` first: this repo has an `oinc/` directory, so `curl -o oinc` fails with “Is a directory”. Source is `oinc-linux-amd64` from the [oinc v0.5.3](https://github.com/jasonmadigan/oinc/releases/tag/v0.5.3) GitHub release, then `file` check, `oinc version`, and `mv` to `/usr/local/bin`. Helm is pinned to `v4.3.0` with `azure/setup-helm`. oinc v0.5.3 reuses the MCP Gateway controller and CRDs managed by Kuadrant Operator, avoiding a conflicting standalone Helm install. There is no extra Docker-in-Docker or privileged job; nested k8s uses the runner’s Docker, as in console-plugin. Kind is **not** used in CI e2e. It remains the lighter local fallback (loop 1). Unit tests do not start a cluster.
+
+The static path remains the default required PR check. The dynamic-plugin workflow is manual-only because it also builds an RHDH image and boots an oinc cluster. It runs the same full Playwright suite against the current branch's exported dynamic plugins. Its build and cluster commands are shared with the local Make targets; see [E2E Testing](e2e-testing.md#running-against-rhdh-dynamic-plugins).
 
 ## npm Trusted Publishing
 

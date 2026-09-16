@@ -1,4 +1,3 @@
----
 apiVersion: v1
 kind: Namespace
 metadata:
@@ -10,56 +9,6 @@ metadata:
   name: rhdh-kuadrant
   namespace: rhdh
 ---
-# Names are distinct from kuadrant-dev-setup/rbac/rhdh-rbac.yaml (the host-side
-# yarn-dev SA). Both can be applied on the same oinc cluster without one
-# ClusterRole or ClusterRoleBinding replacing the other.
-apiVersion: rbac.authorization.k8s.io/v1
-kind: ClusterRole
-metadata:
-  name: rhdh-kuadrant-reader-oinc
-rules:
-  - apiGroups: ["kuadrant.io"]
-    resources:
-      - authpolicies
-      - ratelimitpolicies
-      - dnspolicies
-      - tlspolicies
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["extensions.kuadrant.io"]
-    resources:
-      - planpolicies
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["devportal.kuadrant.io"]
-    resources:
-      - apiproducts
-      - apikeys
-    verbs: ["get", "list", "watch", "create", "delete", "patch", "update"]
-  - apiGroups: ["devportal.kuadrant.io"]
-    resources:
-      - apikeys/status
-    verbs: ["get", "patch", "update"]
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources:
-      - gateways
-    verbs: ["get", "list", "watch", "delete"]
-  - apiGroups: ["gateway.networking.k8s.io"]
-    resources:
-      - httproutes
-    verbs: ["get", "list", "watch"]
-  - apiGroups: ["mcp.kuadrant.io"]
-    resources:
-      - mcpgatewayextensions
-      - mcpserverregistrations
-    verbs: ["get", "list", "watch", "delete"]
-  - apiGroups: [""]
-    resources:
-      - namespaces
-    verbs: ["get", "list", "watch"]
-  - apiGroups: [""]
-    resources:
-      - secrets
-    verbs: ["get", "list", "watch", "create", "delete"]
----
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
@@ -67,7 +16,7 @@ metadata:
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rhdh-kuadrant-reader-oinc
+  name: rhdh-kuadrant-reader
 subjects:
   - kind: ServiceAccount
     name: rhdh-kuadrant

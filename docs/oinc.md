@@ -1,16 +1,9 @@
 # oinc Development Environment
 
-[oinc](https://github.com/jasonmadigan/oinc) (OpenShift in a Container) provides a lightweight OpenShift-compatible cluster for the Kuadrant plugins. Local yarn-dev has no OpenShift cluster of its own; oinc fills that gap.
-
-Same three loops as the [root README](../README.md#quick-start):
-
-| | Commands | URL | Auth | For |
-|---|---|---|---|---|
-| **1. kind + host app** | `make -C kuadrant-dev-setup kind-create` then `yarn dev:kind` | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. Lighter Kubernetes. |
-| **2. oinc + host app** | `yarn oinc:cluster` then `yarn dev:oinc` | http://localhost:3000 | OIDC (Dex :5556) | Same in-tree app and Dex; OpenShift-compatible cluster. Console: http://localhost:9000 |
-| **3. oinc + published dynamic plugins** | `yarn oinc` **or** `yarn oinc:cluster` then `yarn oinc:rhdh` | http://localhost:7007 | Guest | npm-published Scalprum / dynamic-plugin artifacts RHDH loads. No hot reload. |
-
-**:3000 is yarn-dev. :7007 is in-cluster Helm RHDH.** Do not port-forward 7007 while the host app is running — both bind 7007. `yarn dev:oinc` refuses to start if it sees that port-forward. `yarn dev` is unguarded. Do not run kind and oinc at the same time; both write `K8S_URL` / `K8S_CLUSTER_TOKEN` in `.env`.
+[oinc](https://github.com/jasonmadigan/oinc) provides a lightweight
+OpenShift-compatible cluster for testing the Kuadrant plugins in Red Hat Developer Hub
+(RHDH). For hot reload, run `yarn dev:oinc` against an oinc cluster or
+`yarn dev:kind` against kind. For dynamic-plugin loading, use in-cluster RHDH.
 
 ## Prerequisites
 
@@ -18,165 +11,127 @@ Same three loops as the [root README](../README.md#quick-start):
 - kubectl
 - Helm (CI uses 4.3.0)
 - npm
-- Docker or Podman
+- Docker or Podman (`make dynamic-up` specifically uses Docker)
 
-Recommended 8GB+ RAM. The cluster stack (Istio, Kuadrant) is heavy; in-cluster RHDH adds PostgreSQL on top.
+Allow at least 8 GB of RAM for MicroShift, Istio, Kuadrant, RHDH, and PostgreSQL.
 
 ## Usage
 
 ```bash
-# loop 2 — OpenShift-compatible cluster + demos + .env, then host app (Dex :3000)
-yarn oinc:cluster
-yarn dev:oinc
-
-# loop 3 — cluster + in-cluster RHDH with published npm dynamic plugins (Guest :7007)
-yarn oinc
-
-# loop 3 — in-cluster RHDH on an existing oinc cluster
-yarn oinc:rhdh
-
+yarn oinc           # cluster, Dex, and RHDH with published plugins
+yarn oinc:cluster   # cluster, demos, and host-app credentials in .env
+yarn dev:oinc       # host app with hot reload on :3000
+yarn oinc:rhdh      # Dex and RHDH on an existing oinc cluster
 yarn oinc:teardown
 ```
 
-## Modes
+RHDH is exposed at `http://rhdh.localhost:9080/kuadrant`; the OpenShift Console is
+available at `http://localhost:9000`.
 
-### Cluster only (`yarn oinc:cluster`) — loop 2
+## Cluster setup
 
-Creates an oinc cluster with the full Kuadrant infrastructure stack. That is enough for local `yarn dev:oinc`, and it is also the **starting point** of loop 3 / the [installation guide](installation.md) if you later install RHDH in-cluster.
-
-Cluster creation uses oinc’s managed MCP Gateway support and scoped MetalLB setup:
+`oinc/setup-cluster.sh` runs:
 
 ```bash
 oinc create --version 4.22 \
   --addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway \
   --metallb-address-pool auto --gateway-api-gateway
-# then kubectl patch developerPortal and apply the demo overlay
 ```
 
-That covers Gateway API CRDs, cert-manager, MetalLB (`oinc-pool` + `oinc-l2`), Istio (Sail Operator), Kuadrant Operator, its managed MCP Gateway controller, OLM, and the OpenShift Console. Override with `OCP_VERSION` / `KUADRANT_VERSION`. oinc configures its default and MCP Gateways for `oinc.io/metallb`; the demo overlay adds the same Service class to the demo Gateways before creation. Developer portal is enabled with a merge-patch.
+oinc configures its default and MCP Gateways for the scoped `oinc.io/metallb`
+controller and reuses Kuadrant's managed MCP Gateway controller. The script then
+enables the developer portal, applies the API demo overlay with the same Service
+class and the MCP demo, and configures the host service account and `.env`.
+Both the host-app and dynamic-plugin CI paths use this cluster setup.
+Use `OCP_VERSION` and `KUADRANT_VERSION` to override the defaults.
 
-When upgrading an existing disposable cluster from oinc v0.4.3, recreate it after saving anything you need. Gateway Service classes cannot be changed in place. See [oinc’s migration instructions](https://github.com/jasonmadigan/oinc/blob/v0.5.3/docs/addons.md#migration-from-v043) to retain an existing cluster.
+When upgrading an existing disposable cluster from oinc v0.4.3, recreate it after
+saving anything you need. Gateway Service classes cannot be changed in place. See
+[oinc's migration instructions](https://github.com/jasonmadigan/oinc/blob/v0.5.3/docs/addons.md#migration-from-v043)
+to retain an existing cluster.
 
-Our setup script then adds:
-- Demo resources from `kuadrant-dev-setup/demo/`
-- MCP demo (`oinc/manifests/mcp-demo.yaml`): test server + `MCPServerRegistration` in `toystore`
-- The host-side `rhdh` ServiceAccount (same manifest as kind: `kuadrant-dev-setup/rbac/rhdh-rbac.yaml`)
-- `K8S_URL` and `K8S_CLUSTER_TOKEN` in `.env`, so the host app can talk to the cluster
+Do not run kind and oinc together: both write host credentials to `.env`.
+The host app uses Dex on :5556; in-cluster RHDH uses Dex on :9080.
 
-After setup:
-- OpenShift Console: http://localhost:9000
-- Host app: `yarn dev:oinc` → http://localhost:3000/kuadrant
-- Sign in with **OIDC** (Dex on http://localhost:5556), not Guest. Same personas as kind + `yarn dev:kind`; password is the email local-part (`admin` / `owner1` / `consumer1` / …).
+## RHDH setup
 
-Do not port-forward in-cluster RHDH to `localhost:7007` while the host app is running. Both bind 7007. `yarn dev:oinc` will refuse to start if it sees that port-forward. Guest-only sign-in on :7007 is loop 3 (Helm RHDH), not hot-reload Backstage.
+`oinc/setup-rhdh.sh` installs Dex first, then installs RHDH through the oinc `rhdh`
+addon. Its values overlay configures:
 
-`OCP_VERSION` overrides the pinned OpenShift version (default 4.22). `KUADRANT_VERSION` pins the Kuadrant operator (default `latest`):
+- the Kuadrant frontend and backend dynamic plugins;
+- frontend routes, menu items, entity tabs, and cards;
+- the Kubernetes service-account connection;
+- the catalog users and RBAC policy;
+- Dex OIDC sign-in; and
+- the extensions installation UI.
+
+The default `PLUGIN_SOURCE=npm` loads the published Kuadrant packages and resolves their
+integrity hashes. The dynamic test path uses `PLUGIN_SOURCE=baked`; it builds the current
+branch's exported plugins into a derived RHDH image and sideloads that image with
+`oinc load-image`.
+
+The RHDH chart defaults to 6.2.2 and the image line to
+`quay.io/rhdh-community/rhdh:next-1.10`. `RHDH_BASE_IMAGE`, `RHDH_CHART_VERSION`, `RHDH_IMAGE_REPOSITORY`, and
+`RHDH_IMAGE_TAG` are overridable.
+
+## Authentication
+
+Both `yarn dev` and the oinc RHDH path use Dex v2.45.1 and the same five personas:
+
+| User                       | Role           |
+| -------------------------- | -------------- |
+| `admin@kuadrant.local`     | `api-admin`    |
+| `owner1@kuadrant.local`    | `api-owner`    |
+| `owner2@kuadrant.local`    | `api-owner`    |
+| `consumer1@kuadrant.local` | `api-consumer` |
+| `consumer2@kuadrant.local` | `api-consumer` |
+
+Passwords match the username local part. Dex users and clients live in
+`kuadrant-dev-setup/dex/config.yaml`; Backstage users and group membership live in
+`catalog-entities/kuadrant-users.yaml`; `rbac-policy.csv` maps those groups to roles.
+
+The oinc issuer is `http://dex.localhost:9080`. On the host, `.localhost` reaches the
+oinc ingress. In a pod, Kubernetes expands `dex.localhost` to the `dex` Service in the
+`localhost` Namespace. Using one resolvable name matters because the token issuer cannot
+differ between browser and backend.
+
+On Linux hosts that do not synthesize `.localhost`, add explicit IPv4 entries:
 
 ```bash
-OCP_VERSION=4.21 KUADRANT_VERSION=1.4.4 yarn oinc:cluster
+echo "127.0.0.1 rhdh.localhost" | sudo tee -a /etc/hosts
+echo "127.0.0.1 dex.localhost" | sudo tee -a /etc/hosts
 ```
 
-### Published dynamic plugins in RHDH (`yarn oinc:rhdh`)
+## Kubernetes RBAC
 
-Installs stock RHDH (Helm) on an existing cluster from `oinc:cluster`. This is **loop 3**: the [dynamic plugins](ci.md) RHDH actually loads at runtime, not in-tree yarn-dev source.
+The canonical ClusterRole is
+`kuadrant-dev-setup/rbac/rhdh-cluster-role.yaml`. The kind and oinc manifests contain
+only their environment-specific service accounts and bindings, so permission changes
+cannot drift between the two paths.
 
-`oinc/setup-rhdh.sh` does **not** run `yarn export-dynamic` or bake local `dist-scalprum` / `dist-dynamic` into the cluster. It Helm-installs the RHDH image and lists the **published npm packages**, with integrity hashes from `npm view` (latest on the registry; comments in the script assume published **0.4.0**):
+## Testing the current branch dynamically
 
-- `@kuadrant/kuadrant-backstage-plugin-frontend` (includes `dist-scalprum` for [Scalprum](https://github.com/scalprum/scaffolding))
-- `@kuadrant/kuadrant-backstage-plugin-backend-dynamic`
-
-The init container (`install-dynamic-plugins`) downloads those packages. Helm `pluginConfig` keys (routes, mount points, Scalprum name) must match the published package — yarn-dev never exercises that. Plugin source still has `export-dynamic` scripts; CI / `publish.yml` use them to produce the npm artifacts. There is no `make dynamic-up` on this branch.
-
-Also configures: RHDH service account, RBAC policies, RBAC management UI, guest auth, extensions installation UI. End state matches the [installation guide](installation.md).
-
-After setup:
-```bash
-kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh
-# http://localhost:7007/kuadrant  (Guest auth; stop this before yarn dev:oinc)
-```
-
-This port-forward occupies the same backend port as `yarn dev` / `yarn dev:oinc`. Use it only for loop 3, not the hot-reload loop.
-
-## What oinc provides vs what we add
-
-oinc gives you MicroShift in a container with OLM, OpenShift Console (port 9000), and a ConsolePlugin CRD out of the box. `--addons gateway-api,cert-manager,metallb,istio,kuadrant@latest,mcp-gateway` is the same Kuadrant/GWAPI list as kuadrant-console-plugin (kuadrant already pulls those deps; listing them keeps the stack explicit), plus MCP Gateway. `--metallb-address-pool auto` creates `oinc-pool` / `oinc-l2`; the default and demo Gateway Service overlays select that pool through `oinc.io/metallb`. Developer portal is enabled with the same kubectl merge-patch as console-plugin.
-
-Our setup scripts add:
-
-**`setup-cluster.sh` adds:**
-
-| Component | Notes |
-|-|-|
-| Demo resources | APIProducts, PlanPolicies from `kuadrant-dev-setup/demo/` |
-| MCP demo | `oinc/manifests/mcp-demo.yaml` (test server + MCPServerRegistration in toystore) |
-| Host-side RHDH SA | `kuadrant-dev-setup/rbac/rhdh-rbac.yaml` (`rhdh` in `default`) plus `.env` |
-
-**`setup-rhdh.sh` adds:**
-
-| Component | Source | Notes |
-|-|-|-|
-| RHDH (Helm chart) | `rhdh/backstage` | Stock RHDH image with dynamic plugins |
-| Kuadrant plugins | npm packages | Frontend + backend, integrity hashes fetched at setup time |
-| RBAC management UI | Bundled in RHDH image | `backstage-community-plugin-rbac`, just enabled |
-| RHDH service account | `oinc/manifests/rhdh-sa.yaml` | In-cluster SA `rhdh-kuadrant` in `rhdh`; ClusterRole/Binding names are `rhdh-kuadrant-reader-oinc` so they do not replace the host-side yarn-dev RBAC |
-| Guest auth + RBAC | ConfigMaps | Guest user gets `api-admin` role for local dev |
-| Extensions UI | app-config + seed file | Enables the plugin management UI in RHDH |
-
-## File structure
-
-```
-oinc/
-  setup.sh              # entry point, dispatches to modes
-  setup-cluster.sh      # oinc create (Kuadrant/GWAPI stack + mcp-gateway) + demos, host SA + .env
-  setup-rhdh.sh         # in-cluster RHDH installation
-  teardown.sh           # deletes the oinc cluster
-  lib.sh                # shared helpers
-  manifests/
-    rhdh-sa.yaml        # in-cluster RHDH SA + rhdh-kuadrant-reader-oinc RBAC
-    mcp-demo.yaml       # toystore MCP test server + MCPServerRegistration
-```
-
-## Why loop 3 exists
-
-Yarn-dev (loops 1–2) imports the plugins in-tree with hot reload. It never loads the Scalprum remotes, Helm `pluginConfig`, or the RHDH image. Loop 3 is how you check the **published** dynamic-plugin packages against real RHDH.
-
-## Running e2e tests against oinc
-
-CI Playwright (`e2e-tests` in `.github/workflows/ci.yml`) is **loop 2**: oinc cluster + host `yarn dev:oinc` on :3000. Locally:
+Use the root Make targets rather than the published-package `yarn oinc` path:
 
 ```bash
-yarn oinc:cluster
-yarn dev:oinc   # separate terminal
-cd e2e-tests && yarn test
+make dynamic-up
+make e2e-deps
+make e2e-specs
+make teardown
 ```
 
-Loop 3 (in-cluster RHDH, Guest on :7007) is optional and is **not** what CI runs:
-
-```bash
-kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh
-cd e2e-tests
-BASE_URL=http://localhost:7007 yarn test
-```
+`make e2e-dynamic` performs the same phases as a one-shot run. See
+[E2E Testing](e2e-testing.md#running-against-rhdh-dynamic-plugins).
 
 ## Troubleshooting
 
-**Signed in as Guest / no Dex:** you are on loop 3 (`localhost:7007`), not the host app. Stop `kubectl port-forward … 7007:7007`, run `yarn dev:oinc` from the repo root, and open http://localhost:3000. Choose **OIDC** and sign in as `admin@kuadrant.local` / `admin` (or the other Dex personas). Dex itself is http://localhost:5556.
-
-Check pod status:
 ```bash
+oinc status --watch
 kubectl -n rhdh get pods
 kubectl -n rhdh logs deployment/rhdh-developer-hub
-```
-
-Init container logs (plugin installation):
-```bash
 kubectl -n rhdh logs deployment/rhdh-developer-hub -c install-dynamic-plugins
+kubectl -n localhost logs deployment/dex
 ```
 
-If RHDH is stuck in init, it's usually downloading plugins. The init container fetches all default RHDH plugins plus the Kuadrant ones from npm.
-
-Cluster status:
-```bash
-oinc status          # endpoints and addon status
-oinc status --watch  # live dashboard
-```
+The RHDH init container downloads or copies dynamic plugins before the backend starts,
+so a fresh install can remain in init for several minutes.

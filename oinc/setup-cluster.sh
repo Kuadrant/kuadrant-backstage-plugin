@@ -74,7 +74,8 @@ kubectl apply -f "${SCRIPT_DIR}/manifests/mcp-demo.yaml"
 # RHDH SA in oinc/manifests/rhdh-sa.yaml, which setup-rhdh.sh applies later.
 
 log "creating host-side rhdh service account and rbac..."
-kubectl apply -f "${REPO_DIR}/kuadrant-dev-setup/rbac/rhdh-rbac.yaml"
+kubectl apply -f "${REPO_DIR}/kuadrant-dev-setup/rbac/rhdh-cluster-role.yaml" \
+  -f "${REPO_DIR}/kuadrant-dev-setup/rbac/rhdh-rbac.yaml"
 
 log "writing K8S_URL and K8S_CLUSTER_TOKEN to .env for yarn dev..."
 "${REPO_DIR}/kuadrant-dev-setup/scripts/kube-env-setup.sh"

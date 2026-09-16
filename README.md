@@ -35,13 +35,13 @@ Three developer loops. Pick one. Do not run kind and oinc together (both write `
 |---|---|---|---|---|
 | **1. kind + host app** | `make -C kuadrant-dev-setup kind-create` then `yarn dev:kind` (or `yarn dev`) | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. Lighter Kubernetes. |
 | **2. oinc + host app** | `yarn oinc:cluster` then `yarn dev:oinc` | http://localhost:3000 | OIDC (Dex :5556) | Same in-tree app and Dex; OpenShift-compatible cluster. Console: http://localhost:9000 |
-| **3. oinc + published dynamic plugins** | `yarn oinc` **or** `yarn oinc:cluster` then `yarn oinc:rhdh` | http://localhost:7007 | Guest | The **npm-published** frontend + backend [dynamic plugins](docs/ci.md) RHDH loads (Scalprum / `pluginConfig`). No hot reload. |
+| **3. oinc + dynamic plugins** | `yarn oinc:rhdh` for published packages; `make dynamic-up` for local builds | http://rhdh.localhost:9080 | OIDC (Dex :9080) | RHDH dynamic loading; rebuild to pick up local changes. |
 
 Loops 1–2: sign in with **OIDC** (`admin@kuadrant.local` / `admin`; password is the email local-part). Not Guest.
 
-Loop 3: `kubectl port-forward svc/rhdh-developer-hub 7007:7007 -n rhdh` → http://localhost:7007 (Guest only). Helm-installs stock RHDH and pulls `@kuadrant/kuadrant-backstage-plugin-frontend` + `@kuadrant/kuadrant-backstage-plugin-backend-dynamic` from npm (`npm view` in `oinc/setup-rhdh.sh`; comments on this branch assume published **0.4.0**). There is no local `yarn export-dynamic` bake into the cluster. Yarn-dev never exercises Scalprum packaging, `pluginConfig` keys, or the RHDH image — that is what this loop is for.
+Loop 3: `yarn oinc:cluster` then `yarn oinc:rhdh` installs RHDH with published npm plugins. `make dynamic-up` builds and exports local plugins, loads the derived image into oinc, and starts RHDH. Both use Dex OIDC at http://rhdh.localhost:9080.
 
-**:3000 is yarn-dev. :7007 is in-cluster RHDH.** Do not port-forward 7007 while the host app is running — both bind 7007. `yarn dev:kind` / `yarn dev:oinc` refuse to start if :7007 is a kubectl port-forward. `yarn dev` is unguarded (whatever `.env` is current).
+**:3000 is the host app; rhdh.localhost:9080 is in-cluster RHDH.** Sign in with OIDC (`admin@kuadrant.local` / `admin`). Use one cluster at a time: kind and oinc both write `.env`. Teardown: `yarn oinc:teardown` or `make -C kuadrant-dev-setup kind-delete`.
 
 Visit (host app, loops 1–2):
 - http://localhost:3000/kuadrant - Main plugin page
@@ -91,7 +91,7 @@ yarn dev:kind                     # loop 1, or yarn dev:oinc for loop 2
 
 Needs a cluster first (see the matrix above). Sign in with OIDC, not Guest. `yarn dev` skips the context / :7007 guards.
 
-To test the **published** dynamic-plugin artifacts (loop 3, no hot reload): `yarn oinc:rhdh`, port-forward :7007, Guest.
+To test the **published** dynamic-plugin artifacts (loop 3, no hot reload): `yarn oinc:rhdh`, then open http://rhdh.localhost:9080 and sign in with OIDC. For local builds, use `make dynamic-up`.
 
 ### Kubernetes Access
 
@@ -114,7 +114,7 @@ make -C kuadrant-dev-setup kind-delete
 yarn oinc:cluster
 yarn oinc:teardown
 
-# loop 3 — in-cluster Helm RHDH + published npm dynamic plugins (Guest :7007)
+# loop 3 — in-cluster RHDH + published npm dynamic plugins (OIDC :9080)
 yarn oinc              # cluster + RHDH
 yarn oinc:rhdh         # RHDH on an existing oinc cluster
 ```

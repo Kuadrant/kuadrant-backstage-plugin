@@ -23,6 +23,72 @@ export interface K8sList {
   items: K8sResource[];
 }
 
+// one field:message pair from a validation failure, e.g.
+// { field: 'spec.planTier', message: 'Unsupported value: "platinum"' }
+export interface K8sStatusCause {
+  field?: string;
+  message?: string;
+}
+
+// the api server's Status.details. kind is what tells "no such object of a kind
+// i know" apart from "no such kind", causes carry per-field validation
+// feedback, and retryAfterSeconds comes back with a throttled request.
+export interface K8sStatusDetails {
+  kind?: string;
+  name?: string;
+  group?: string;
+  causes?: K8sStatusCause[];
+  retryAfterSeconds?: number;
+}
+
+/**
+ * a kubernetes api failure, carrying the status the api server returned.
+ *
+ * the status is what tells a permission problem apart from a real fault, so it
+ * has to survive the client: without it the router can only answer 500, and a
+ * missing rbac rule reads as "server error" in the ui.
+ *
+ * reason and details survive alongside it because the status alone is
+ * ambiguous: a 404 is either a missing object or a missing crd, and only
+ * details tells them apart.
+ */
+export class K8sApiError extends Error {
+  readonly statusCode?: number;
+  readonly reason?: string;
+  readonly details?: K8sStatusDetails;
+
+  constructor(
+    message: string,
+    statusCode?: number,
+    reason?: string,
+    details?: K8sStatusDetails,
+  ) {
+    super(message);
+    this.name = 'K8sApiError';
+    this.statusCode = statusCode;
+    this.reason = reason;
+    this.details = details;
+  }
+}
+
+// @kubernetes/client-node puts the status on error.response, older shapes carry
+// it on the error itself, and the body holds the api server's own message.
+function k8sApiError(operation: string, error: any): K8sApiError {
+  const statusCode =
+    error?.response?.statusCode ?? error?.statusCode ?? error?.body?.code;
+  const body = error?.response?.body ?? error?.body;
+  const message = body?.message ?? error?.message;
+  const reason = body?.reason;
+  const details = body?.details;
+
+  return new K8sApiError(
+    `failed to ${operation}: ${message}${reason ? ` (${reason})` : ''}`,
+    typeof statusCode === 'number' ? statusCode : undefined,
+    typeof reason === 'string' ? reason : undefined,
+    details && typeof details === 'object' ? (details as K8sStatusDetails) : undefined,
+  );
+}
+
 export class KuadrantK8sClient {
   private kc: k8s.KubeConfig;
   private customApi: k8s.CustomObjectsApi;
@@ -137,7 +203,7 @@ export class KuadrantK8sClient {
 
       return response.body as K8sList;
     } catch (error: any) {
-      throw new Error(`failed to list ${plural}: ${error.message}`);
+      throw k8sApiError(`list ${plural}`, error);
     }
   }
 
@@ -158,7 +224,7 @@ export class KuadrantK8sClient {
       );
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to get ${plural}/${name}: ${error.message}`);
+      throw k8sApiError(`get ${plural}/${name}`, error);
     }
   }
 
@@ -167,7 +233,7 @@ export class KuadrantK8sClient {
       const response = await this.coreApi.createNamespacedSecret(namespace, secret as k8s.V1Secret);
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to create secret: ${error.message}`);
+      throw k8sApiError('create secret', error);
     }
   }
 
@@ -176,7 +242,7 @@ export class KuadrantK8sClient {
       const response = await this.coreApi.readNamespacedSecret(name, namespace);
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to get secret: ${error.message}`);
+      throw k8sApiError('get secret', error);
     }
   }
 
@@ -184,7 +250,7 @@ export class KuadrantK8sClient {
     try {
       await this.coreApi.deleteNamespacedSecret(name, namespace);
     } catch (error: any) {
-      throw new Error(`failed to delete secret: ${error.message}`);
+      throw k8sApiError('delete secret', error);
     }
   }
 
@@ -219,7 +285,7 @@ export class KuadrantK8sClient {
         details: JSON.stringify(details),
       });
 
-      throw new Error(`failed to create ${plural}: ${message}${reason ? ` (${reason})` : ''}`);
+      throw k8sApiError(`create ${plural}`, error);
     }
   }
 
@@ -239,7 +305,7 @@ export class KuadrantK8sClient {
         name,
       );
     } catch (error: any) {
-      throw new Error(`failed to delete ${plural}/${name}: ${error.message}`);
+      throw k8sApiError(`delete ${plural}/${name}`, error);
     }
   }
 
@@ -270,7 +336,7 @@ export class KuadrantK8sClient {
       );
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to patch ${plural}/${name}: ${error.message}`);
+      throw k8sApiError(`patch ${plural}/${name}`, error);
     }
   }
 
@@ -279,7 +345,7 @@ export class KuadrantK8sClient {
       const response = await this.coreApi.readNamespace(name);
       return response.body as K8sResource;
     } catch (error: any) {
-      throw error;
+      throw k8sApiError(`get namespace/${name}`, error);
     }
   }
 
@@ -288,8 +354,7 @@ export class KuadrantK8sClient {
       const response = await this.coreApi.createNamespace(namespace as k8s.V1Namespace);
       return response.body as K8sResource;
     } catch (error: any) {
-      throw new Error(`failed to create namespace: ${error.message}`);
+      throw k8sApiError('create namespace', error);
     }
   }
 }
-

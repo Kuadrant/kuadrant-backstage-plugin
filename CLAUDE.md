@@ -52,7 +52,7 @@ For specific topics, refer to these focused guides:
 | [docs/api-reference.md](docs/api-reference.md) | Backend REST API endpoints, request/response shapes, auth requirements |
 | [docs/e2e-testing.md](docs/e2e-testing.md) | E2E test setup, Playwright configuration, test structure |
 | [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
-| [docs/oinc.md](docs/oinc.md) | Three loops: kind + host, oinc + host (`yarn dev:oinc`), oinc + published dynamic plugins (`yarn oinc:rhdh`) |
+| [docs/oinc.md](docs/oinc.md) | Development loops: kind or oinc host app, and RHDH with published or locally built dynamic plugins |
 
 ## Prerequisites
 
@@ -90,9 +90,9 @@ Three loops. Pick one. Kind has no in-cluster RHDH path.
 |---|---|---|---|---|
 | **1. kind + host app** | `make -C kuadrant-dev-setup kind-create` then `yarn dev:kind` | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. |
 | **2. oinc + host app** | `yarn oinc:cluster` then `yarn dev:oinc` | http://localhost:3000 | OIDC (Dex :5556) | Same app; OpenShift-compatible cluster. Console :9000. |
-| **3. oinc + published dynamic plugins** | `yarn oinc` **or** `yarn oinc:cluster` then `yarn oinc:rhdh` | http://localhost:7007 | Guest | npm packages RHDH loads (`setup-rhdh.sh` / `npm view`). No hot reload. No local `export-dynamic` bake. |
+| **3. oinc + dynamic plugins** | `yarn oinc:rhdh` for published packages; `make dynamic-up` for local builds | http://rhdh.localhost:9080 | OIDC (Dex :9080) | RHDH dynamic loading; rebuild to pick up local changes. |
 
-**:3000 is yarn-dev. :7007 is Helm RHDH.** Do not run kind and oinc together (both write `.env`). Do not port-forward 7007 during yarn-dev. Sign in with OIDC (`admin@kuadrant.local` / `admin`); Guest on :7007 is loop 3. Teardown: `yarn oinc:teardown` or `make -C kuadrant-dev-setup kind-delete`.
+**:3000 is the host app; rhdh.localhost:9080 is in-cluster RHDH.** Sign in with OIDC (`admin@kuadrant.local` / `admin`). Use one cluster at a time: kind and oinc both write `.env`. Teardown: `yarn oinc:teardown` or `make -C kuadrant-dev-setup kind-delete`.
 
 ### Testing
 
@@ -114,9 +114,27 @@ yarn test                       # run kuadrant e2e tests
 yarn test:smoke                 # run smoke tests only
 ```
 
-Tests available:
-- `kuadrant-plugin.spec.ts` - basic navigation and rendering tests
-- `kuadrant-rbac.spec.ts` - comprehensive RBAC permission tests covering all personas
+**Dynamic-plugin E2E (manually dispatched in CI):**
+```bash
+make e2e-dynamic                # build, bake, boot oinc, run the specs, tear down
+make preflight                  # check required tooling, change nothing
+```
+Needs oinc (pinned version), docker, helm, kubectl, curl, python3 and node/yarn, and
+installs none of them; it does run `yarn install` and `playwright install chromium`, as
+CI does. Cluster is left up on failure for inspection.
+
+For manual testing, run the same phases without the one-shot teardown:
+```bash
+make dynamic-up                 # build and leave the RHDH environment running
+make e2e-deps                   # install Playwright locally (once)
+make e2e-specs                  # run the specs against it (repeatable, no rebuild)
+make teardown                   # delete the cluster (no-op if there is none)
+```
+`dynamic-up` leaves RHDH at `http://rhdh.localhost:9080` and always rebuilds the image.
+It signs in through dex with the same five personas as `yarn dev`, so the whole spec set
+runs there. It deliberately skips Playwright installation for browser-only manual
+testing. After `e2e-deps`, `e2e-specs` forwards `PLAYWRIGHT_ARGS` and needs no rebuild.
+See [docs/e2e-testing.md](docs/e2e-testing.md) and [docs/oinc.md](docs/oinc.md).
 
 ### Linting and Formatting
 ```bash
@@ -133,12 +151,16 @@ yarn oinc:rhdh                  # loop 3: Helm RHDH loads published Kuadrant npm
 ```
 
 ### Testing Different Roles
-```bash
-yarn user:consumer              # switch to API Consumer
-yarn user:owner                 # switch to API Owner
-yarn user:default               # restore default permissions
-```
-After switching roles, restart with `yarn dev`.
+
+`yarn dev` starts a local dex container on `:5556`; `make dynamic-up` deploys dex on the
+oinc cluster from the same files. Either way, sign in through the dex quick-login picker
+as one of five personas: `admin@kuadrant.local`, `owner1@`, `owner2@`, `consumer1@`,
+`consumer2@` (passwords match usernames). Sign out and back in to switch.
+
+Personas live in [`kuadrant-dev-setup/dex/config.yaml`](kuadrant-dev-setup/dex/config.yaml)
+and [`catalog-entities/kuadrant-users.yaml`](catalog-entities/kuadrant-users.yaml); their
+group membership maps to roles in [`rbac-policy.csv`](rbac-policy.csv). Adding a persona
+is a one-file edit that both environments pick up.
 
 ## Testing Infrastructure
 
