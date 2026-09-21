@@ -4,6 +4,9 @@
 ---
 apiVersion: apps/v1
 kind: Deployment
+# This manifest is for the local oinc demo cluster only. Do not apply it to a
+# production cluster: the image is intentionally unpinned and the bearer-token
+# Secret below is a known test credential.
 metadata:
   name: mcp-test-server
   namespace: toystore
@@ -66,6 +69,7 @@ spec:
   parentRefs:
     - name: mcp-gateway
       namespace: gateway-system
+      sectionName: mcp
   hostnames:
     - "mcp-test-server.mcp.local"
   rules:
@@ -90,3 +94,127 @@ spec:
     group: gateway.networking.k8s.io
     kind: HTTPRoute
     name: mcp-test-server-route
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-stateless-test-server
+  namespace: toystore
+  labels:
+    app: mcp-stateless-test-server
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mcp-stateless-test-server
+  template:
+    metadata:
+      labels:
+        app: mcp-stateless-test-server
+    spec:
+      containers:
+        - name: mcp-stateless-test-server
+          image: ghcr.io/kuadrant/mcp-gateway/test-stateless-server:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9090
+              name: http
+          env:
+            - name: MCP_TRANSPORT
+              value: "http"
+            - name: PORT
+              value: "9090"
+          resources:
+            limits:
+              memory: "128Mi"
+              cpu: "100m"
+            requests:
+              memory: "64Mi"
+              cpu: "50m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-stateless-test-server
+  namespace: toystore
+  labels:
+    app: mcp-stateless-test-server
+spec:
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+  selector:
+    app: mcp-stateless-test-server
+  type: ClusterIP
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: HTTPRoute
+metadata:
+  name: mcp-stateless-test-server-route
+  namespace: toystore
+  labels:
+    mcp-server: "true"
+spec:
+  parentRefs:
+    - name: mcp-gateway
+      namespace: gateway-system
+      sectionName: mcp
+  hostnames:
+    - "stateless-server.mcp.local"
+  rules:
+    - matches:
+        - path:
+            type: PathPrefix
+            value: /mcp
+      backendRefs:
+        - name: mcp-stateless-test-server
+          port: 9090
+---
+apiVersion: mcp.kuadrant.io/v1
+kind: MCPServerRegistration
+metadata:
+  name: stateless-mcp-server
+  namespace: toystore
+  labels:
+    mcp.kuadrant.io/managed: "true"
+spec:
+  prefix: stateless_
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: HTTPRoute
+    name: mcp-stateless-test-server-route
+---
+apiVersion: kuadrant.io/v1
+kind: AuthPolicy
+metadata:
+  name: mcp-inspector-bearer
+  namespace: gateway-system
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: mcp-gateway
+    sectionName: mcp
+  rules:
+    authentication:
+      bearer-token:
+        apiKey:
+          selector:
+            matchLabels:
+              app: mcp-inspector
+          allNamespaces: true
+        credentials:
+          authorizationHeader:
+            prefix: Bearer
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mcp-inspector-bearer
+  namespace: gateway-system
+  labels:
+    app: mcp-inspector
+type: Opaque
+stringData:
+  api_key: mcp-inspector-token

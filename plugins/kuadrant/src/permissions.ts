@@ -246,6 +246,14 @@ export const kuadrantMcpServerRegistrationListPermission = createPermission({
 });
 
 /**
+ * permission to connect the MCP Inspector and execute tools
+ */
+export const kuadrantMcpInspectorUsePermission = createPermission({
+  name: 'kuadrant.mcp.inspector.use',
+  attributes: { action: 'update' },
+});
+
+/**
  * permission to list HTTPRoutes (gateway.networking.k8s.io)
  * gates the HTTPRoutes table on the MCP overview page
  */
@@ -281,5 +289,6 @@ export const kuadrantPermissions = [
   kuadrantGatewayListPermission,
   kuadrantMcpGatewayExtensionListPermission,
   kuadrantMcpServerRegistrationListPermission,
+  kuadrantMcpInspectorUsePermission,
   kuadrantHttpRouteListPermission,
 ];

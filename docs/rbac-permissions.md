@@ -277,6 +277,10 @@ Comprehensive view of what each persona can and cannot do:
 
 **MCP Management (Gateways, MCPGatewayExtensions, MCPServerRegistrations):**
 
+The interactive Tools view additionally requires
+`kuadrant.mcp.inspector.use`. Its backend service account needs `get` access to
+MCPGatewayExtensions and Gateways. See [MCP Inspector](mcp-inspector.md).
+
 MCP resources are **read-only** in the portal: the overview page lists them for
 visibility, and access is gated purely by RBAC (hold the list permission → see the
 table). Create/update/delete are managed on-cluster (via kubectl/GitOps), not from

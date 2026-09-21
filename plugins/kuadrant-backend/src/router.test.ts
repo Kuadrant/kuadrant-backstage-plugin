@@ -2,6 +2,7 @@ import { mockServices } from '@backstage/backend-test-utils';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import express from 'express';
 import request from 'supertest';
+import { Readable } from 'stream';
 import { createRouter } from './router';
 import { KuadrantK8sClient } from './k8s-client';
 
@@ -27,6 +28,7 @@ describe('createRouter', () => {
       deleteCustomResource: jest.fn(),
       createSecret: jest.fn(),
       deleteSecret: jest.fn(),
+      proxyMCPRequest: jest.fn(),
       getNamespace: jest.fn().mockResolvedValue({ metadata: { name: 'kuadrant-testuser-c7a65229' } }),
       createNamespace: jest.fn(),
     } as any;
@@ -65,6 +67,99 @@ describe('createRouter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+  });
+
+  describe('POST /mcp/inspector/:namespace/:name', () => {
+    const rpcRequest = {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+      params: {},
+    };
+
+    it('authorizes and relays the MCP exchange with session headers', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.proxyMCPRequest.mockResolvedValueOnce({
+        statusCode: 200,
+        headers: {
+          'content-type': 'application/json',
+          'mcp-session-id': 'session-123',
+          'mcp-protocol-version': '2025-11-25',
+          'x-not-forwarded': 'drop-me',
+        },
+        body: Readable.from([
+          JSON.stringify({ jsonrpc: '2.0', id: 1, result: { tools: [] } }),
+        ]),
+      } as any);
+
+      const response = await request(app)
+        .post('/mcp/inspector/mcp-system/extension-1')
+        .set('Content-Type', 'application/json')
+        .set('Accept', 'application/json, text/event-stream')
+        .set('MCP-Protocol-Version', '2025-11-25')
+        .set('Mcp-Session-Id', 'session-123')
+        .set('X-Kuadrant-MCP-Authorization', 'Bearer gateway-token')
+        .send(JSON.stringify(rpcRequest))
+        .expect(200);
+
+      expect(mockK8sClient.proxyMCPRequest).toHaveBeenCalledWith(
+        'mcp-system',
+        'extension-1',
+        Buffer.from(JSON.stringify(rpcRequest)),
+        expect.objectContaining({
+          'mcp-protocol-version': '2025-11-25',
+          'mcp-session-id': 'session-123',
+          'x-kuadrant-mcp-authorization': 'Bearer gateway-token',
+        }),
+      );
+      expect(response.body).toEqual({ jsonrpc: '2.0', id: 1, result: { tools: [] } });
+      expect(response.headers['mcp-session-id']).toBe('session-123');
+      expect(response.headers['mcp-protocol-version']).toBe('2025-11-25');
+      expect(response.headers['x-not-forwarded']).toBeUndefined();
+    });
+
+    it('returns 403 without inspector use permission', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.DENY }]);
+
+      const response = await request(app)
+        .post('/mcp/inspector/mcp-system/extension-1')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify(rpcRequest))
+        .expect(403);
+
+      expect(response.body.error).toBe('unauthorised');
+      expect(mockK8sClient.proxyMCPRequest).not.toHaveBeenCalled();
+    });
+
+    it('relays an authentication response from the MCP gateway', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.proxyMCPRequest.mockResolvedValueOnce({
+        statusCode: 401,
+        headers: { 'content-type': 'application/json' },
+        body: Readable.from([JSON.stringify({ error: 'authentication required' })]),
+      } as any);
+
+      const response = await request(app)
+        .post('/mcp/inspector/mcp-system/extension-1')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify(rpcRequest))
+        .expect(401);
+
+      expect(response.body).toEqual({ error: 'authentication required' });
+    });
+
+    it('returns 502 when the MCP gateway cannot be reached', async () => {
+      mockAuthorizeFn.mockResolvedValueOnce([{ result: AuthorizeResult.ALLOW }]);
+      mockK8sClient.proxyMCPRequest.mockRejectedValueOnce(new Error('connection refused'));
+
+      const response = await request(app)
+        .post('/mcp/inspector/mcp-system/extension-1')
+        .set('Content-Type', 'application/json')
+        .send(JSON.stringify(rpcRequest))
+        .expect(502);
+
+      expect(response.body.error).toBe('failed to proxy MCP request');
+    });
   });
 
   describe('GET /apikeys/:namespace/:name/secret', () => {
@@ -1854,6 +1949,7 @@ describe('createRouter', () => {
             spec: {
               targetRef: { kind: 'Service', name: 'toystore', namespace: 'toystore' },
               category: ['data', 'search'],
+              prefix: 'toystore_',
               other: 'drop-me',
             },
             status: { conditions: [{ type: 'Ready', status: 'True' }] },
@@ -1876,6 +1972,7 @@ describe('createRouter', () => {
           spec: {
             targetRef: { group: undefined, kind: 'Service', name: 'toystore', namespace: 'toystore' },
             category: ['data', 'search'],
+            prefix: 'toystore_',
           },
           status: { conditions: [{ type: 'Ready', status: 'True' }] },
         },

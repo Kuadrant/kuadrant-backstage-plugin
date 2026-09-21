@@ -20,6 +20,9 @@ backend:
     origin: http://localhost:3000
     methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
     credentials: true
+  mcpProxy:
+    # The local MCP demo Gateway uses HTTP. Production must use HTTPS instead.
+    allowInsecureAuth: true
   database:
     client: better-sqlite3
     connection: ":memory:"

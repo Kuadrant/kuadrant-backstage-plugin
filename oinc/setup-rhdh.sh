@@ -128,7 +128,12 @@ if [ "${PLUGIN_SOURCE}" = "baked" ]; then
                     importName: McpOverviewPage
                     menuItem:
                       icon: kuadrantIcon
-                      text: MCP Management
+                      text: MCP Overview
+                  - path: /kuadrant/mcp-inspector
+                    importName: McpInspector
+                    menuItem:
+                      icon: kuadrantIcon
+                      text: MCP Inspector
                   - path: /kuadrant/mcp/gatewayextensions/:namespace/:name
                     importName: McpGatewayExtensionDetailPage
                   - path: /kuadrant/mcp/serverregistrations/:namespace/:name
@@ -141,6 +146,8 @@ EOF
   )
   LOCAL_MENU_ITEMS=$(cat <<'EOF'
                   kuadrant.mcp-management:
+                    parent: kuadrant
+                  kuadrant.mcp-inspector:
                     parent: kuadrant
 EOF
   )

@@ -23,12 +23,33 @@ export const KuadrantPage = kuadrantPlugin.provide(
   }),
 );
 
+// Keep the historical component export for existing dynamic-plugin configs.
+export const KuadrantPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'KuadrantPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/KuadrantPage').then(m => m.ApiProductsPage),
+    },
+  }),
+);
+
 export const ApiProductsPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'ApiProductsPage',
     component: () =>
       import('./components/KuadrantPage').then(m => m.ApiProductsPage),
     mountPoint: rootRouteRef,
+  }),
+);
+
+export const ApiProductsPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'ApiProductsPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/KuadrantPage').then(m => m.ApiProductsPage),
+    },
   }),
 );
 
@@ -41,12 +62,34 @@ export const MyApiKeysPage = kuadrantPlugin.provide(
   }),
 );
 
+export const MyApiKeysPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'MyApiKeysPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/MyApiKeysPage').then(m => m.MyApiKeysPage),
+    },
+  }),
+);
+
 export const ApiKeyApprovalPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'ApiKeyApprovalPage',
     component: () =>
       import('./components/ApiKeyApprovalPage').then(m => m.ApiKeyApprovalPageWithPermissions),
     mountPoint: rootRouteRef,
+  }),
+);
+
+export const ApiKeyApprovalPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'ApiKeyApprovalPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/ApiKeyApprovalPage').then(
+          m => m.ApiKeyApprovalPageWithPermissions,
+        ),
+    },
   }),
 );
 
@@ -100,6 +143,16 @@ export const ApiKeyDetailPage = kuadrantPlugin.provide(
   }),
 );
 
+export const ApiKeyDetailPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'ApiKeyDetailPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/ApiKeyDetailPage').then(m => m.ApiKeyDetailPage),
+    },
+  }),
+);
+
 export const EntityKuadrantApiProductOpenApiAlert = kuadrantPlugin.provide(
   createComponentExtension({
     name: 'EntityKuadrantApiProductOpenApiAlert',
@@ -119,6 +172,18 @@ export const ApiProductDetailPage = kuadrantPlugin.provide(
   }),
 );
 
+export const ApiProductDetailPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'ApiProductDetailPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/ApiProductDetailPage').then(
+          m => m.ApiProductDetailPage,
+        ),
+    },
+  }),
+);
+
 export const McpOverviewPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'McpOverviewPage',
@@ -128,12 +193,53 @@ export const McpOverviewPage = kuadrantPlugin.provide(
   }),
 );
 
+export const McpOverviewPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'McpOverviewPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/McpOverviewPage').then(m => m.McpOverviewPage),
+    },
+  }),
+);
+
+export const McpInspector = kuadrantPlugin.provide(
+  createRoutableExtension({
+    name: 'McpInspector',
+    component: () =>
+      import('./components/McpInspector').then(m => m.McpInspector),
+    mountPoint: rootRouteRef,
+  }),
+);
+
+export const McpInspectorComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'McpInspectorComponent',
+    component: {
+      lazy: () =>
+        import('./components/McpInspector').then(m => m.McpInspector),
+    },
+  }),
+);
+
 export const McpGatewayExtensionDetailPage = kuadrantPlugin.provide(
   createRoutableExtension({
     name: 'McpGatewayExtensionDetailPage',
     component: () =>
       import('./components/McpGatewayExtensionDetailPage').then(m => m.McpGatewayExtensionDetailPage),
     mountPoint: rootRouteRef,
+  }),
+);
+
+export const McpGatewayExtensionDetailPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'McpGatewayExtensionDetailPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/McpGatewayExtensionDetailPage').then(
+          m => m.McpGatewayExtensionDetailPage,
+        ),
+    },
   }),
 );
 export const GatewayDetailPage = kuadrantPlugin.provide(
@@ -151,6 +257,18 @@ export const McpServerRegistrationDetailPage = kuadrantPlugin.provide(
     component: () =>
       import('./components/McpServerRegistrationDetailPage').then(m => m.McpServerRegistrationDetailPage),
     mountPoint: rootRouteRef,
+  }),
+);
+
+export const McpServerRegistrationDetailPageComponent = kuadrantPlugin.provide(
+  createComponentExtension({
+    name: 'McpServerRegistrationDetailPageComponent',
+    component: {
+      lazy: () =>
+        import('./components/McpServerRegistrationDetailPage').then(
+          m => m.McpServerRegistrationDetailPage,
+        ),
+    },
   }),
 );
 

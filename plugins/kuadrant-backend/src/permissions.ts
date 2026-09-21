@@ -152,6 +152,11 @@ export const kuadrantMcpServerRegistrationListPermission = createPermission({
   attributes: { action: 'read' },
 });
 
+export const kuadrantMcpInspectorUsePermission = createPermission({
+  name: 'kuadrant.mcp.inspector.use',
+  attributes: { action: 'update' },
+});
+
 /**
  * All Kuadrant permissions as an array for easy iteration
  */
@@ -183,4 +188,5 @@ export const kuadrantPermissions = [
   kuadrantGatewayListPermission,
   kuadrantMcpGatewayExtensionListPermission,
   kuadrantMcpServerRegistrationListPermission,
+  kuadrantMcpInspectorUsePermission,
 ];

@@ -21,6 +21,7 @@ import {
   MCPGatewayExtension,
   MCPServerRegistration,
 } from './types/mcp';
+import type { JsonRpcRequest, McpTransportHeaders } from './components/McpInspector/client';
 
 /**
  * Generic Kuadrant list type for API responses
@@ -311,6 +312,14 @@ export interface KuadrantAPI {
    * @returns Promise with the MCP server registration
    */
   getMcpServerRegistration(namespace: string, name: string): Promise<MCPServerRegistration>;
+
+  /** Relay an MCP JSON-RPC request through the Backstage backend. */
+  requestMcp(
+    namespace: string,
+    name: string,
+    request: JsonRpcRequest,
+    headers: McpTransportHeaders,
+  ): Promise<Response>;
 
   /**
    * Create a secret in consumer's own namespace
@@ -683,6 +692,45 @@ export class KuadrantApiClient implements KuadrantAPI {
     return this.fetchWithRetry(
       `${baseUrl}kuadrant/mcp/serverregistrations/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
       "Failed to fetch MCPServerRegistration."
+    );
+  }
+
+  async requestMcp(
+    namespace: string,
+    name: string,
+    request: JsonRpcRequest,
+    headers: McpTransportHeaders,
+  ): Promise<Response> {
+    const baseUrl = await this.getBaseUrl();
+    const requestHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json, text/event-stream',
+      'MCP-Protocol-Version': headers.protocolVersion,
+      'Mcp-Method': request.method,
+    };
+    if (
+      (request.method === 'tools/call' || request.method === 'prompts/get') &&
+      typeof request.params?.name === 'string'
+    ) {
+      requestHeaders['Mcp-Name'] = request.params.name;
+    }
+    if (headers.sessionId) {
+      requestHeaders['Mcp-Session-Id'] = headers.sessionId;
+    }
+    if (headers.authorization) {
+      requestHeaders['X-Kuadrant-MCP-Authorization'] = headers.authorization;
+    }
+    for (const [name, value] of Object.entries(headers.mcpParamHeaders || {})) {
+      if (name.startsWith('Mcp-Param-')) requestHeaders[name] = value;
+    }
+
+    return this.fetchApi.fetch(
+      `${baseUrl}kuadrant/mcp/inspector/${encodeURIComponent(namespace)}/${encodeURIComponent(name)}`,
+      {
+        method: 'POST',
+        headers: requestHeaders,
+        body: JSON.stringify(request),
+      },
     );
   }
 

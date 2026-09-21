@@ -72,6 +72,13 @@ export const DefaultMainMenuItems = {
       parent: 'default.mcp',
       priority: 30,
     },
+    'default.mcp.inspector': {
+      title: 'MCP Inspector',
+      icon: 'api',
+      to: '/kuadrant/mcp-inspector',
+      parent: 'default.mcp',
+      priority: 20,
+    },
     'default.create': {
       title: 'Self-service',
       titleKey: 'menuItem.selfService',
