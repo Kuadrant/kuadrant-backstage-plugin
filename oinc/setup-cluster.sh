@@ -68,6 +68,21 @@ log "applying MCP demo resources..."
 kubectl create namespace toystore 2>/dev/null || true
 kubectl apply -f "${SCRIPT_DIR}/manifests/mcp-demo.yaml"
 
+# The MCP Gateway addon creates its Gateway independently of the demo
+# resources, so it does not inherit the local MetalLB service parameters used
+# by the demo Gateways above. Apply those parameters explicitly; without them
+# the generated LoadBalancer Service remains pending and host-run Backstage
+# falls back to the MCP publicHost (127.0.0.1:80).
+log "configuring the MCP Gateway LoadBalancer..."
+kubectl apply -f "${SCRIPT_DIR}/manifests/mcp-gateway-parameters.yaml"
+kubectl patch gateway mcp-gateway -n gateway-system --type merge \
+  --patch '{"spec":{"infrastructure":{"parametersRef":{"group":"","kind":"ConfigMap","name":"mcp-gateway-parameters"}}}}'
+# loadBalancerClass is immutable on a Service. The Gateway controller owns this
+# generated Service, so recreate it once for the new parameters to take effect.
+kubectl delete service mcp-gateway-istio -n gateway-system --ignore-not-found
+kubectl wait --for=condition=Programmed gateway/mcp-gateway \
+  -n gateway-system --timeout=120s
+
 # --- host-side SA for local yarn dev ---
 # same ServiceAccount and ClusterRoleBinding as kind-create, so kube-env-setup.sh
 # can write K8S_URL / K8S_CLUSTER_TOKEN into .env. distinct from the in-cluster
