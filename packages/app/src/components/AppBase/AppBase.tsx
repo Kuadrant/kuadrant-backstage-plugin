@@ -29,6 +29,7 @@ import {
   GatewayDetailPage,
   McpGatewayExtensionDetailPage,
   McpHTTPRouteExtensionDetailPage,
+  McpInspector,
   McpOverviewPage,
   McpServerRegistrationDetailPage,
   MyApiKeysPage,
@@ -158,6 +159,10 @@ const AppBase = () => {
               <Route
                 path="/kuadrant/mcp-management"
                 element={<McpOverviewPage />}
+              />
+              <Route
+                path="/kuadrant/mcp-inspector"
+                element={<McpInspector />}
               />
               <Route
                 path="/kuadrant/mcp/gatewayextensions/:namespace/:name"

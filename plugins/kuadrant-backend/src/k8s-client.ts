@@ -1,5 +1,34 @@
 import * as k8s from '@kubernetes/client-node';
 import { RootConfigService } from '@backstage/backend-plugin-api';
+import * as http from 'http';
+import * as https from 'https';
+import {
+  IncomingHttpHeaders,
+  IncomingMessage,
+  OutgoingHttpHeaders,
+} from 'http';
+
+const MCP_PROXY_REQUEST_TIMEOUT_MS = 2 * 60 * 1000;
+const MAX_MCP_REQUEST_BYTES = 1024 * 1024;
+const MCP_AUTHORIZATION_HEADER = 'x-kuadrant-mcp-authorization';
+const MCP_ALLOWED_ORIGINS_CONFIG = 'backend.mcpProxy.allowedOrigins';
+const MCP_ALLOW_INSECURE_AUTH_CONFIG = 'backend.mcpProxy.allowInsecureAuth';
+
+export interface MCPProxyResponse {
+  statusCode: number;
+  headers: IncomingHttpHeaders;
+  body: IncomingMessage;
+}
+
+export class MCPProxyError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'MCPProxyError';
+  }
+}
 
 export interface K8sResource {
   apiVersion: string;
@@ -89,12 +118,28 @@ function k8sApiError(operation: string, error: any): K8sApiError {
   );
 }
 
+export interface MCPGatewayListener {
+  name: string;
+  hostname?: string;
+  protocol: string;
+  port: number;
+}
+
 export class KuadrantK8sClient {
   private kc: k8s.KubeConfig;
   private customApi: k8s.CustomObjectsApi;
   private coreApi: k8s.CoreV1Api;
+  private readonly mcpAllowedOrigins: Set<string>;
+  private readonly allowInsecureMCPAuth: boolean;
 
   constructor(config: RootConfigService) {
+    this.mcpAllowedOrigins = new Set(
+      (config.getOptionalStringArray(MCP_ALLOWED_ORIGINS_CONFIG) || []).map(
+        normalizeMCPOrigin,
+      ),
+    );
+    this.allowInsecureMCPAuth =
+      config.getOptionalBoolean(MCP_ALLOW_INSECURE_AUTH_CONFIG) || false;
     this.kc = new k8s.KubeConfig();
 
     const hasK8sConfig = config.has('kubernetes');
@@ -228,6 +273,128 @@ export class KuadrantK8sClient {
     }
   }
 
+  async proxyMCPRequest(
+    namespace: string,
+    name: string,
+    body: Buffer,
+    headers: IncomingHttpHeaders,
+  ): Promise<MCPProxyResponse> {
+    if (body.length > MAX_MCP_REQUEST_BYTES) {
+      throw new MCPProxyError('MCP request is too large', 413);
+    }
+    let envelope: { method?: unknown };
+    try {
+      envelope = JSON.parse(body.toString('utf8')) as { method?: unknown };
+    } catch {
+      throw new MCPProxyError('unsupported MCP request', 400);
+    }
+    if (
+      typeof envelope.method !== 'string' ||
+      !allowedMCPMethod(envelope.method)
+    ) {
+      throw new MCPProxyError('unsupported MCP request', 400);
+    }
+
+    const extension = await this.getCustomResource(
+      'mcp.kuadrant.io',
+      'v1',
+      namespace,
+      'mcpgatewayextensions',
+      name,
+    );
+    if (!isMCPGatewayReady(extension)) {
+      throw new MCPProxyError('MCPGatewayExtension is not ready', 409);
+    }
+    const targetRef = extension.spec?.targetRef;
+    if (!targetRef?.name || (targetRef.kind && targetRef.kind !== 'Gateway')) {
+      throw new Error('MCPGatewayExtension has an invalid Gateway target');
+    }
+    const gatewayNamespace = targetRef.namespace || namespace;
+    const gateway = await this.getCustomResource(
+      'gateway.networking.k8s.io',
+      'v1',
+      gatewayNamespace,
+      'gateways',
+      targetRef.name,
+    );
+    const endpoint = deriveMCPEndpoint(extension, gateway);
+    const target = new URL(endpoint);
+    const targetOrigin = normalizeMCPOrigin(target.origin);
+    if (
+      this.mcpAllowedOrigins.size > 0 &&
+      !this.mcpAllowedOrigins.has(targetOrigin)
+    ) {
+      throw new MCPProxyError(
+        'MCP gateway origin is not permitted by backend.mcpProxy.allowedOrigins',
+        403,
+      );
+    }
+    const requestHeaders = selectMCPRequestHeaders(headers);
+    // A host-run Backstage cannot resolve Kubernetes service DNS names. Use
+    // privateHost only when the backend itself is running in the cluster.
+    const privateHost = process.env.KUBERNETES_SERVICE_HOST
+      ? extension.spec?.privateHost
+      : undefined;
+    const dialTarget = getMCPGatewayDialTarget(gateway, target.hostname, privateHost);
+    const mcpAuthorization = headers[MCP_AUTHORIZATION_HEADER];
+    if (mcpAuthorization !== undefined) {
+      const authorization = Array.isArray(mcpAuthorization)
+        ? mcpAuthorization[0]
+        : mcpAuthorization;
+      if (authorization) {
+        if (
+          target.protocol !== 'https:' &&
+          !this.allowInsecureMCPAuth
+        ) {
+          throw new MCPProxyError(
+            'refusing to send MCP credentials over an insecure connection',
+            400,
+          );
+        }
+        requestHeaders.Authorization = authorization;
+      }
+    }
+    requestHeaders['Content-Length'] = String(body.length);
+
+    const requestOptions: http.RequestOptions = {
+      protocol: target.protocol,
+      hostname: dialTarget.hostname,
+      port:
+        dialTarget.port || target.port || (target.protocol === 'https:' ? 443 : 80),
+      method: 'POST',
+      path: `${target.pathname}${target.search}`,
+      headers: {
+        ...requestHeaders,
+        Host: target.host,
+      },
+      timeout: MCP_PROXY_REQUEST_TIMEOUT_MS,
+    };
+
+    if (target.protocol === 'https:') {
+      (requestOptions as https.RequestOptions).servername = target.hostname;
+    }
+
+    const requestModule = target.protocol === 'https:' ? https : http;
+
+    return new Promise<MCPProxyResponse>((resolve, reject) => {
+      const upstreamRequest = requestModule.request(
+        requestOptions,
+        (response) => {
+          resolve({
+            statusCode: response.statusCode || 502,
+            headers: response.headers,
+            body: response,
+          });
+        },
+      );
+      upstreamRequest.on('error', reject);
+      upstreamRequest.on('timeout', () => {
+        upstreamRequest.destroy(new Error('MCP proxy request timed out'));
+      });
+      upstreamRequest.end(body);
+    });
+  }
+
   async createSecret(namespace: string, secret: K8sResource): Promise<K8sResource> {
     try {
       const response = await this.coreApi.createNamespacedSecret(namespace, secret as k8s.V1Secret);
@@ -357,4 +524,166 @@ export class KuadrantK8sClient {
       throw k8sApiError('create namespace', error);
     }
   }
+}
+
+export function isMCPGatewayReady(extension: K8sResource): boolean {
+  const generation = extension.metadata?.generation;
+  return (extension.status?.conditions || []).some(
+    (condition: any) =>
+      condition.type === 'Ready' &&
+      condition.status === 'True' &&
+      (generation === undefined || condition.observedGeneration === generation),
+  );
+}
+
+export function deriveMCPEndpoint(
+  extension: K8sResource,
+  gateway: K8sResource,
+): string {
+  const sectionName = extension.spec?.targetRef?.sectionName;
+  const listener = (gateway.spec?.listeners || []).find(
+    (candidate: MCPGatewayListener) => candidate.name === sectionName,
+  ) as MCPGatewayListener | undefined;
+  if (!listener) {
+    throw new Error('MCPGatewayExtension target listener was not found');
+  }
+
+  let host = extension.spec?.publicHost || listener.hostname;
+  if (typeof host !== 'string' || host.length === 0) {
+    throw new Error('MCPGatewayExtension has an invalid public host');
+  }
+  if (host.startsWith('*.')) host = `mcp${host.slice(1)}`;
+  if (host.includes('://') || /[/?#@]/.test(host)) {
+    throw new Error('MCPGatewayExtension has an invalid public host');
+  }
+  if (host.includes(':')) {
+    const hostParts = host.match(/^\[?([^\]]+)\]?:\d+$/);
+    if (!hostParts) {
+      throw new Error('MCPGatewayExtension has an invalid public host');
+    }
+    host = hostParts[1];
+  }
+
+  const protocol = listener.protocol.toUpperCase();
+  if (protocol !== 'HTTP' && protocol !== 'HTTPS') {
+    throw new Error('MCP Gateway listener must use HTTP or HTTPS');
+  }
+  if (
+    !Number.isInteger(listener.port) ||
+    listener.port < 1 ||
+    listener.port > 65535
+  ) {
+    throw new Error('MCP Gateway listener has an invalid port');
+  }
+  const defaultPort = protocol === 'HTTPS' ? 443 : 80;
+  const port = listener.port === defaultPort ? '' : `:${listener.port}`;
+  return `${protocol.toLowerCase()}://${host}${port}/mcp`;
+}
+
+export interface MCPGatewayDialTarget {
+  hostname: string;
+  port?: number;
+}
+
+export function getMCPGatewayDialTarget(
+  gateway: K8sResource,
+  fallback: string,
+  privateHost?: unknown,
+): MCPGatewayDialTarget {
+  if (privateHost !== undefined) {
+    if (typeof privateHost !== 'string' || privateHost.trim().length === 0) {
+      throw new Error('MCPGatewayExtension has an invalid private host');
+    }
+    try {
+      const parsed = new URL(`http://${privateHost.trim()}`);
+      if (
+        parsed.username ||
+        parsed.password ||
+        parsed.pathname !== '/' ||
+        parsed.search ||
+        parsed.hash ||
+        !parsed.hostname
+      ) {
+        throw new Error('invalid private host');
+      }
+      return {
+        hostname: parsed.hostname,
+        port: parsed.port ? Number(parsed.port) : undefined,
+      };
+    } catch {
+      throw new Error('MCPGatewayExtension has an invalid private host');
+    }
+  }
+
+  const address = gateway.status?.addresses?.find(
+    (candidate: any) =>
+      typeof candidate?.value === 'string' && candidate.value.length > 0,
+  )?.value;
+  return { hostname: address || fallback };
+}
+
+export function normalizeMCPOrigin(value: string): string {
+  let origin: URL;
+  try {
+    origin = new URL(value.trim());
+  } catch {
+    throw new Error(
+      'MCP origin must be an exact HTTP(S) origin without credentials, query or path',
+    );
+  }
+
+  if (
+    (origin.protocol !== 'http:' && origin.protocol !== 'https:') ||
+    origin.username ||
+    origin.password ||
+    origin.pathname !== '/' ||
+    origin.search ||
+    origin.hash ||
+    origin.hostname.length === 0 ||
+    value.includes('*')
+  ) {
+    throw new Error(
+      'MCP origin must be an exact HTTP(S) origin without credentials, query or path',
+    );
+  }
+
+  const port = origin.port || (origin.protocol === 'https:' ? '443' : '80');
+  return `${origin.protocol}//${origin.hostname.toLowerCase()}:${port}`;
+}
+
+export function allowedMCPMethod(method: string): boolean {
+  return [
+    'server/discover',
+    'initialize',
+    'notifications/initialized',
+    'tools/list',
+    'tools/call',
+    'prompts/list',
+    'prompts/get',
+  ].includes(method);
+}
+
+export function selectMCPRequestHeaders(
+  headers: IncomingHttpHeaders,
+): OutgoingHttpHeaders {
+  const result: OutgoingHttpHeaders = {};
+  for (const name of [
+    'content-type',
+    'accept',
+    'mcp-protocol-version',
+    'mcp-session-id',
+    'mcp-method',
+    'mcp-name',
+  ]) {
+    const value = headers[name];
+    if (value !== undefined) {
+      result[name] = value;
+    }
+  }
+  for (const name of Object.keys(headers)) {
+    if (name.toLowerCase().startsWith('mcp-param-')) {
+      result[name] = headers[name];
+    }
+  }
+  return result;
 }

@@ -30,6 +30,7 @@ Read-only endpoints backing the MCP Management overview and resource detail view
 | GET    | `/api/kuadrant/mcp/gatewayextensions/:namespace/:name`   | Get a single MCPGatewayExtension (full resource)   | `kuadrant.mcpgatewayextension.list`   |
 | GET    | `/api/kuadrant/mcp/serverregistrations`                  | List MCPServerRegistrations (minimal projection)   | `kuadrant.mcpserverregistration.list` |
 | GET    | `/api/kuadrant/mcp/serverregistrations/:namespace/:name` | Get a single MCPServerRegistration (full resource) | `kuadrant.mcpserverregistration.list` |
+| POST   | `/api/kuadrant/mcp/inspector/:namespace/:name`           | Relay an MCP Inspector JSON-RPC request            | `kuadrant.mcp.inspector.use`          |
 
 The list endpoints return only the fields the overview needs (name, namespace, targetRef, conditions). The detail endpoints return the full resource manifest — including labels, annotations, owner references and creation timestamp — because the read-only detail views render both a Details tab and a raw YAML tab. They respond `403` when the permission is denied and `500` on a Kubernetes client error.
 

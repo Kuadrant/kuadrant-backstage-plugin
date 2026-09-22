@@ -7,7 +7,12 @@ import express from 'express';
 import Router from 'express-promise-router';
 import cors from 'cors';
 import { randomBytes, createHash } from 'crypto';
-import { KuadrantK8sClient, K8sStatusDetails } from './k8s-client';
+import { pipeline } from 'stream/promises';
+import {
+  KuadrantK8sClient,
+  K8sStatusDetails,
+  MCPProxyError,
+} from './k8s-client';
 import { getAPIProductEntityProvider } from './module';
 import {
   kuadrantPermissions,
@@ -31,6 +36,7 @@ import {
   kuadrantAuthPolicyListPermission,
   kuadrantRateLimitPolicyListPermission,
   kuadrantGatewayListPermission,
+  kuadrantMcpInspectorUsePermission,
   kuadrantMcpGatewayExtensionListPermission,
   kuadrantMcpServerRegistrationListPermission,
 } from './permissions';
@@ -310,15 +316,74 @@ export async function createRouter({
 }): Promise<express.Router> {
   const router = Router();
 
-  // enable cors for dev mode (allows frontend on :3000 to call backend on :7007)
-  router.use(cors({
-    origin: 'http://localhost:3000',
-    credentials: true,
-  }));
-
-  router.use(express.json());
+  // Local config sets backend.cors.origin because the host frontend (:3000)
+  // calls the backend (:7007). Same-origin deployments omit that setting.
+  const corsOrigin = config.getOptionalString('backend.cors.origin');
+  if (corsOrigin) {
+    router.use(cors({
+      origin: corsOrigin,
+      credentials: true,
+      exposedHeaders: ['Mcp-Session-Id', 'Mcp-Protocol-Version'],
+    }));
+  }
 
   const k8sClient = new KuadrantK8sClient(config);
+
+  // Keep MCP JSON-RPC bytes intact while the backend resolves and relays the
+  // request to the selected Gateway.
+  router.post(
+    '/mcp/inspector/:namespace/:name',
+    express.raw({ type: '*/*', limit: '1mb' }),
+    async (req, res) => {
+      try {
+        const credentials = await httpAuth.credentials(req);
+        const decision = await permissions.authorize(
+          [{ permission: kuadrantMcpInspectorUsePermission }],
+          { credentials },
+        );
+
+        if (decision[0].result !== AuthorizeResult.ALLOW) {
+          throw new NotAllowedError('unauthorised');
+        }
+        if (!Buffer.isBuffer(req.body)) {
+          res.status(400).json({ error: 'MCP request body is required' });
+          return;
+        }
+
+        const upstream = await k8sClient.proxyMCPRequest(
+          req.params.namespace,
+          req.params.name,
+          req.body,
+          req.headers,
+        );
+        for (const headerName of [
+          'content-type',
+          'mcp-session-id',
+          'mcp-protocol-version',
+        ]) {
+          const value = upstream.headers[headerName];
+          if (value !== undefined) {
+            res.setHeader(headerName, value);
+          }
+        }
+        res.status(upstream.statusCode);
+        await pipeline(upstream.body, res);
+      } catch (error) {
+        console.error('error proxying MCP request:', error);
+        if (res.headersSent) {
+          res.destroy(error instanceof Error ? error : undefined);
+        } else if (error instanceof NotAllowedError) {
+          res.status(403).json({ error: error.message });
+        } else if (error instanceof MCPProxyError) {
+          res.status(error.statusCode).json({ error: error.message });
+        } else {
+          res.status(502).json({ error: 'failed to proxy MCP request' });
+        }
+      }
+    },
+  );
+
+  router.use(express.json());
 
   // apiproduct endpoints
   router.get('/apiproducts', async (req, res) => {
@@ -2120,6 +2185,7 @@ export async function createRouter({
               namespace: reg.spec.targetRef.namespace,
             } : undefined,
             category: reg.spec?.category,
+            prefix: reg.spec?.prefix,
           },
           status: {
             conditions: reg.status?.conditions,
