@@ -21,6 +21,7 @@ export const useMcpConnection = () => {
   );
   const clientRef = useRef<McpClient>();
   const generationRef = useRef(0);
+  const executionRef = useRef(0);
 
   const resources = useAsync(async () => {
     const [extensions, registrations] = await Promise.all([
@@ -160,12 +161,18 @@ export const useMcpConnection = () => {
     ): Promise<T | undefined> => {
       const client = clientRef.current;
       const generation = generationRef.current;
+      const execution = ++executionRef.current;
       if (!client) return undefined;
+      const isCurrentExecution = () =>
+        generation === generationRef.current && execution === executionRef.current;
       try {
         const result = await operation(client);
+        if (isCurrentExecution()) {
+          dispatch({ type: 'CLEAR_ERROR' });
+        }
         return generation === generationRef.current ? result : undefined;
       } catch (error) {
-        if (generation === generationRef.current) {
+        if (isCurrentExecution()) {
           dispatch({ type: 'ERROR' });
           dispatch({ type: 'SET_ERROR', error: error as Error });
         }
@@ -223,6 +230,7 @@ export const useMcpConnection = () => {
     reconnectWithToken,
     refreshTools,
     callTool,
+    execute,
     setAuthToken,
     setShowAuthToken,
     setAuthOpen,
