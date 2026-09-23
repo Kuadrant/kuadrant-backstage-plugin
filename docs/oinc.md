@@ -30,7 +30,7 @@ available at `http://localhost:9000`.
 
 ## Cluster setup
 
-`oinc/setup-cluster.sh` runs:
+`oinc/setup-cluster.sh` requires oinc v0.5.3 or later, then runs:
 
 ```bash
 oinc create --version 4.22 \
@@ -45,8 +45,9 @@ class and the MCP demo, and configures the host service account and `.env`.
 Both the host-app and dynamic-plugin CI paths use this cluster setup.
 Use `OCP_VERSION` and `KUADRANT_VERSION` to override the defaults.
 
-When upgrading an existing disposable cluster from oinc v0.4.3, recreate it after
-saving anything you need. Gateway Service classes cannot be changed in place. See
+When upgrading an existing disposable cluster from oinc v0.5.2 or earlier,
+recreate it after saving anything you need. Gateway Service classes cannot be
+changed in place. See
 [oinc's migration instructions](https://github.com/jasonmadigan/oinc/blob/v0.5.3/docs/addons.md#migration-from-v043)
 to retain an existing cluster.
 

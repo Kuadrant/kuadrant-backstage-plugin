@@ -1,9 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: mcp-gateway-parameters
-  namespace: gateway-system
-data:
-  service: |
-    spec:
-      loadBalancerClass: oinc.io/metallb
