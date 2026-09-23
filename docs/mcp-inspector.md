@@ -32,7 +32,7 @@ protocol version, MCP session ID, and JSON/SSE body are returned to the browser.
 
 ## Destination security
 
-The destination allowlist is optional, like Jason's proxy. When configured,
+The destination allowlist is optional. When configured,
 `backend.mcpProxy.allowedOrigins` must contain exact HTTP(S) origins. Wildcards,
 credentials, query strings, and paths such as `/mcp` are rejected. An empty or
 omitted list allows destinations derived from the admin-managed Gateway and
