@@ -24,10 +24,12 @@ const response = (
 
 const deferred = <T>() => {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((value) => {
-    resolve = value;
+  let reject!: (error: Error) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 };
 
 describe('useMcpConnection', () => {
@@ -101,5 +103,49 @@ describe('useMcpConnection', () => {
       expect(result.current.state.selectedGateway).toBe('ns/b');
       expect(result.current.state.connection).toBe('connected');
     });
+  });
+
+  it('does not clear a later execution error when an earlier execution succeeds', async () => {
+    const tools = deferred<Response>();
+    const api = {
+      getMcpGatewayExtensions: jest.fn().mockResolvedValue({ items: [] }),
+      getMcpServerRegistrations: jest.fn().mockResolvedValue({ items: [] }),
+      requestMcp: jest.fn((
+        _namespace: string,
+        _name: string,
+        request: { id?: number; method: string },
+      ) => {
+        if (request.method === 'server/discover') return Promise.resolve(response(undefined, {}, 404));
+        if (request.method === 'initialize') {
+          return Promise.resolve(response(
+            { jsonrpc: '2.0', id: request.id, result: {} },
+            { 'Mcp-Session-Id': 'session-1' },
+          ));
+        }
+        if (request.method === 'notifications/initialized') return Promise.resolve(response(undefined));
+        if (request.method === 'tools/list') return tools.promise;
+        throw new Error(`unexpected MCP method: ${request.method}`);
+      }),
+    };
+    mockUseApi.mockReturnValue(api as ReturnType<typeof useApi>);
+
+    const { result } = renderHook(() => useMcpConnection());
+    let connection!: Promise<unknown>;
+    await act(async () => {
+      connection = result.current.changeGateway('ns/gateway');
+      tools.resolve(response({ jsonrpc: '2.0', id: 3, result: { tools: [] } }));
+      await connection;
+    });
+
+    const earlier = deferred<string>();
+    await act(async () => {
+      const earlierExecution = result.current.execute(() => earlier.promise);
+      const laterExecution = result.current.execute(() => Promise.reject(new Error('later failure')));
+      await laterExecution;
+      earlier.resolve('earlier success');
+      await earlierExecution;
+    });
+
+    expect(result.current.state.error?.message).toBe('later failure');
   });
 });

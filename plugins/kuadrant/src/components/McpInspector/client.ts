@@ -70,6 +70,31 @@ export interface ToolsCallResult {
   [key: string]: unknown;
 }
 
+export interface McpPromptArgument {
+  name: string;
+  description?: string;
+  required?: boolean;
+}
+
+export interface McpPrompt {
+  name: string;
+  description?: string;
+  arguments?: McpPromptArgument[];
+}
+
+export interface PromptsListResult {
+  prompts: McpPrompt[];
+  nextCursor?: string;
+}
+
+export interface PromptGetResult {
+  description?: string;
+  messages: Array<{
+    role: string;
+    content: { type: string; text?: string; [key: string]: unknown };
+  }>;
+}
+
 export interface McpExchange<T> {
   request: JsonRpcRequest;
   response: JsonRpcResponse<T>;
@@ -246,6 +271,26 @@ export class McpClient {
     return this.callWithExchange<ToolsCallResult>('tools/call', params, {
       mcpParamHeaders,
     });
+  }
+
+  async listPrompts(): Promise<McpPrompt[]> {
+    const prompts: McpPrompt[] = [];
+    const seenCursors = new Set<string>();
+    let cursor: string | undefined;
+    for (;;) {
+      const page = await this.call<PromptsListResult>('prompts/list', cursor ? { cursor } : {});
+      prompts.push(...(page.prompts || []));
+      cursor = page.nextCursor;
+      if (!cursor) return prompts;
+      if (seenCursors.has(cursor) || seenCursors.size >= MAX_LIST_PAGES) {
+        throw new Error('prompts/list pagination did not terminate');
+      }
+      seenCursors.add(cursor);
+    }
+  }
+
+  async getPrompt(name: string, args: Record<string, string>): Promise<PromptGetResult> {
+    return this.call<PromptGetResult>('prompts/get', { name, arguments: args });
   }
 
   private async notification(method: string): Promise<void> {

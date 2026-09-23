@@ -1,4 +1,5 @@
 import * as React from 'react';
+import { useState } from 'react';
 import { Box, Grid, Tab, Tabs, Typography } from '@material-ui/core';
 import {
   Content,
@@ -14,9 +15,11 @@ import { OutputPanel } from './OutputPanel';
 import { useMcpInspectorController } from './useMcpInspectorController';
 import { useMcpInspectorStyles } from './styles';
 import { ToolPanel } from './ToolPanel';
+import { PromptsPanel } from './PromptsPanel';
 
 export const McpInspector = () => {
   const classes = useMcpInspectorStyles();
+  const [tab, setTab] = useState(0);
   const inspectorPermission = useKuadrantPermission(
     kuadrantMcpInspectorUsePermission,
   );
@@ -89,13 +92,13 @@ export const McpInspector = () => {
           </InfoCard>
         ) : (
           <>
-            <Tabs value={0} indicatorColor='primary' textColor='primary'>
+            <Tabs value={tab} onChange={(_, value) => setTab(value)} indicatorColor='primary' textColor='primary'>
               <Tab label='Tools' />
-              <Tab label='Prompts' disabled />
+              <Tab label='Prompts' />
               <Tab label='Logs' disabled />
             </Tabs>
             <Box mt={2}>
-              <Grid container spacing={3} alignItems='stretch'>
+              {tab === 1 ? <PromptsPanel connected={state.connection === 'connected'} execute={controller.execute} /> : <Grid container spacing={3} alignItems='stretch'>
                 <Grid item xs={12} md={6}>
                   <ToolPanel
                     tools={state.tools}
@@ -125,7 +128,7 @@ export const McpInspector = () => {
                     onOutputTabChange={controller.setOutputTab}
                   />
                 </Grid>
-              </Grid>
+              </Grid>}
             </Box>
           </>
         )}

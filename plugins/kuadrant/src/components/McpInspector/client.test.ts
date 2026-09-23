@@ -56,6 +56,60 @@ describe('McpClient', () => {
     expect(transport.mock.calls[1][0].params).toEqual({ cursor: 'page-2' });
   });
 
+  it('follows prompts/list cursors', async () => {
+    const transport = jest
+      .fn()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          jsonrpc: '2.0',
+          id: 1,
+          result: {
+            prompts: [{ name: 'first', description: 'First prompt' }],
+            nextCursor: 'page-2',
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          jsonrpc: '2.0',
+          id: 2,
+          result: { prompts: [{ name: 'second' }] },
+        }),
+      );
+    const client = new McpClient(transport);
+
+    await expect(client.listPrompts()).resolves.toEqual([
+      { name: 'first', description: 'First prompt' },
+      { name: 'second' },
+    ]);
+    expect(transport.mock.calls[1][0].method).toBe('prompts/list');
+    expect(transport.mock.calls[1][0].params).toEqual({ cursor: 'page-2' });
+  });
+
+  it('gets a prompt with its arguments', async () => {
+    const transport = jest.fn().mockResolvedValue(
+      jsonResponse({
+        jsonrpc: '2.0',
+        id: 1,
+        result: {
+          description: 'A greeting',
+          messages: [{ role: 'user', content: { type: 'text', text: 'Hello Alice' } }],
+        },
+      }),
+    );
+    const client = new McpClient(transport);
+
+    await expect(client.getPrompt('greet', { name: 'Alice' })).resolves.toEqual(
+      expect.objectContaining({ description: 'A greeting' }),
+    );
+    expect(transport.mock.calls[0][0]).toEqual(
+      expect.objectContaining({
+        method: 'prompts/get',
+        params: { name: 'greet', arguments: { name: 'Alice' } },
+      }),
+    );
+  });
+
   it('passes gateway authentication separately from Backstage auth', async () => {
     const transport = jest
       .fn()

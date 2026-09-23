@@ -9,8 +9,23 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-check_command oinc "Install from https://github.com/jasonmadigan/oinc"
+check_command oinc "Install v0.5.3 or newer from https://github.com/jasonmadigan/oinc/releases"
 check_command kubectl "Install from https://kubernetes.io/docs/tasks/tools/"
+
+# oinc before v0.5.3 creates the MCP Gateway's Service without its scoped
+# MetalLB class, so the Gateway never gets an address yet setup succeeds.
+# source builds report git describe versions such as v0.5.3-2-gabc1234.
+if ! oinc_version="$(oinc version)"; then
+  echo "error: could not determine the oinc version" >&2
+  exit 1
+fi
+if [[ ! "${oinc_version}" =~ oinc[[:space:]]v([0-9]+)\.([0-9]+)\.([0-9]+) ]] ||
+  (( 10#${BASH_REMATCH[1]} == 0 && (10#${BASH_REMATCH[2]} < 5 ||
+    (10#${BASH_REMATCH[2]} == 5 && 10#${BASH_REMATCH[3]} < 3)) )); then
+  echo "error: oinc v0.5.3 or newer is required, found ${BASH_REMATCH[0]:-an unversioned build}." >&2
+  echo "       upgrade from https://github.com/jasonmadigan/oinc/releases and recreate clusters built by older releases." >&2
+  exit 1
+fi
 
 # default matches kuadrant-console-plugin (mcp-gateway is exercised there on 4.22).
 OCP_VERSION="${OCP_VERSION:-4.22}"
@@ -22,7 +37,7 @@ KUADRANT_VERSION="${KUADRANT_VERSION:-latest}"
 # cert-manager, metallb, and istio; listing them keeps the stack explicit.
 ADDONS="gateway-api,cert-manager,metallb,istio,kuadrant@${KUADRANT_VERSION},mcp-gateway"
 
-# oinc configures the default Gateway for its scoped MetalLB controller.
+# oinc configures its default and MCP Gateways for its scoped MetalLB controller.
 create_args=(create --version "${OCP_VERSION}" --addons "${ADDONS}"
   --metallb-address-pool auto --gateway-api-gateway)
 

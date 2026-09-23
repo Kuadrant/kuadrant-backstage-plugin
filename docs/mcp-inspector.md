@@ -72,4 +72,19 @@ the tool schema are mirrored as `Mcp-Param-*` headers. Values are encoded when
 needed for safe HTTP transport, and invalid header annotations are excluded
 from the tool list.
 
-Prompts and Logs are visible as disabled tabs and remain follow-up work.
+## Using the Prompts view
+
+The **Prompts** tab discovers prompts from the selected gateway with
+`prompts/list`.
+
+1. Select a prompt to view its description and available arguments.
+2. Fill in any required or optional argument fields.
+3. Use **Generate prompt** to call `prompts/get`.
+4. Review the generated text in the Output panel.
+5. Use **Copy output** to copy the generated text.
+
+If the gateway has no registered prompts, the panel shows an empty state. A
+failed MCP request is shown in the Inspector error banner. Use the refresh
+button to re-query the selected gateway.
+
+The **Logs** tab is visible but disabled and remains follow-up work.
