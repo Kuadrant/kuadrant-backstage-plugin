@@ -211,10 +211,16 @@ gh run watch "$RUN_ID" --repo "$REPO" --compact --exit-status
 If it fails, show `gh run view "$RUN_ID" --log-failed`, inspect npm state, and
 stop. Do not automatically rerun it.
 
-After a successful workflow, poll npm for up to five minutes, again pinning the
-public registry. For each of the three package names, require both the exact
-`@$VERSION` lookup and the `latest` dist-tag to resolve to `VERSION`. Report
-each result and the workflow URL.
+After a successful workflow, poll npm every 30 seconds for up to 15 minutes,
+again pinning the public registry. Upload success and public availability are
+separate: npm scanning and registry propagation can take longer than this
+window. For each of the three package names, require both the exact `@$VERSION`
+lookup and the `latest` dist-tag to resolve to `VERSION`.
+
+If the window expires, report upload success, each package's availability and
+dist-tag, and that release verification is incomplete. Resume read-only checks
+later. Never rerun a successful publish job to make a package appear; see the
+npm recovery guidance in `RELEASE.md`.
 
 ## 7. Finish
 
@@ -239,6 +245,9 @@ section in `RELEASE.md`.
   at release creation.
 - If the GitHub Release exists, do not recreate it. Locate its exact publication
   run and inspect npm first.
-- Rerunning the failed publish job is safe only when none of the three versions
-  reached npm. A partial publication needs maintainer recovery because npm
-  versions are immutable and the current job republishes all three in order.
+- Rerun a failed publish job only when its logs confirm it failed before any
+  upload was accepted and none of the three versions exists. A missing version
+  alone is insufficient: an accepted upload may still be awaiting availability.
+  If any upload succeeded or its outcome is uncertain, investigate first. A
+  partial publication needs maintainer recovery because npm versions are
+  immutable and the current job republishes all three in order.

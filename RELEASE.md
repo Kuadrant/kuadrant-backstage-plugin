@@ -278,8 +278,11 @@ RUN_ID=<databaseId>
 gh run watch "$RUN_ID" --repo "$REPO" --compact --exit-status
 ```
 
-After it succeeds, repeat these checks for up to five minutes to allow for npm
-registry propagation:
+A successful workflow confirms the uploads, but npm may not serve every package
+immediately. Poll the public registry every 30 seconds for up to 15 minutes after
+the workflow succeeds. npm's [publish-time scanning](https://github.blog/changelog/2026-07-28-npm-publish-time-malware-scanning-and-dual-use-metadata/)
+can delay availability beyond that window. For each package, verify both the
+exact version and the `latest` dist-tag:
 
 ```shell
 for PACKAGE in \
@@ -293,6 +296,11 @@ do
     --registry https://registry.npmjs.org/)" = "$VERSION"
 done
 ```
+
+If the window expires, report the workflow as successful and list each package's
+availability and dist-tag separately. Report release verification as incomplete;
+continue with read-only registry checks later. Do not rerun a successful publish
+job because a package is not yet visible.
 
 ## Recovery
 
@@ -335,11 +343,18 @@ and publishes a development version.
 
 ### npm publication failed or was partial
 
-Check the exact version of all three packages before rerunning anything.
+Inspect the publish log and the exact version of all three packages before
+rerunning anything. A registry 404 alone does not prove that an upload failed:
+an accepted upload may still be waiting for scanning or registry availability.
+Authentication, network, and registry errors are inconclusive.
 
-- If none exists, it is safe to rerun the failed release-event job with
-  `gh run rerun <run-id> --failed`, then watch and verify it again.
-- If only some exist, do not rerun the current all-in-one publish job: it starts
+- If the workflow failed before any package upload was accepted, and none of the
+  three versions exists, rerun the failed release-event job with
+  `gh run rerun <run-id> --failed`, then watch and verify it again. If the logs
+  show an accepted upload or leave its outcome uncertain, investigate and wait;
+  do not infer permission to republish from missing registry results.
+- If only some exist, first check whether the others were accepted and are still
+  becoming available. Do not rerun the current all-in-one publish job: it starts
   again with the frontend package and npm will reject an already-published
   version. npm versions are immutable. Coordinate a maintainer-approved publish
   of only the missing package(s), built from the exact release tag, then verify
