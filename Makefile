@@ -3,7 +3,7 @@
 
 MAKEFLAGS += --no-print-directory
 
-OINC_VERSION ?= v0.5.3
+OINC_VERSION ?= v0.6.1
 OCP_VERSION ?= 4.22
 KUADRANT_VERSION ?= latest
 RHDH_BASE_IMAGE ?= quay.io/rhdh-community/rhdh:next-1.10
