@@ -83,8 +83,9 @@ record those versions alongside the results.
 
 On OpenShift, `make remote-setup BASE_URL=...` deploys Dex and the fixtures, then
 configures the RHDH instance behind `BASE_URL` to sign in through that Dex.
-`BASE_URL` must be the route of a `Backstage` CR managed by the RHDH operator.
-Setup needs Node 22, Yarn, kubectl and the cluster prerequisites of the
+`BASE_URL` must be the route of a `Backstage` CR managed by the RHDH operator,
+with RHDH running and its rollout finished. Setup needs Node 22, Yarn, kubectl,
+`pods/exec` in the RHDH namespace and the cluster prerequisites of the
 [local app path](#local-backstage-against-an-existing-openshift-cluster), but not
 Docker. Select the cluster's kubectl context, then:
 
@@ -99,8 +100,12 @@ Setup creates two ConfigMaps in the RHDH namespace and adds them to the
 `Backstage` CR after its own entries:
 
 - `kuadrant-e2e-app-config`, last in `spec.application.appConfig.configMaps` so
-  it merges last: the OIDC provider for Dex, `signInPage: oidc`, the persona
-  catalog location and RBAC.
+  it merges last: the OIDC provider for Dex, `signInPage: oidc`, RBAC and
+  `catalog.locations`. An array replaces the instance's rather than merging with
+  it, so setup repeats the locations from the `--config` files the running
+  backend loaded, read with `kubectl exec` in one of its pods, and adds the
+  persona location. It stops if `APP_CONFIG_catalog` or
+  `APP_CONFIG_catalog_locations` is set, since those outrank every file.
 - `kuadrant-e2e-files` in `spec.application.extraFiles.configMaps`, mounted at
   `/opt/app-root/src/kuadrant-e2e`: `catalog-entities/kuadrant-users.yaml` and
   `rbac-policy.csv`, or the files named by `CATALOG_USERS` and `RBAC_POLICY`.

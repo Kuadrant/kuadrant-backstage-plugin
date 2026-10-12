@@ -6,6 +6,8 @@ import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
 import yaml from "js-yaml";
+// backstage's own parser, for files the backend reads
+import YAML from "yaml";
 import { backstageOrigin } from "./origin.mjs";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
@@ -25,10 +27,18 @@ const filesConfigMap = "kuadrant-e2e-files";
 const rhdhConfigMaps = [appConfigMap, filesConfigMap];
 // a directory of its own, so the files cannot replace the instance's
 const rhdhFiles = "/opt/app-root/src/kuadrant-e2e";
+const backendContainer = "backstage-backend";
+// resolved against the file they sit in, so a copy cannot carry them
+const directives = ["$include", "$file"];
+// app-config variables outrank every file, the e2e one included
+const locationVariables = [
+  "APP_CONFIG_catalog",
+  "APP_CONFIG_catalog_locations",
+];
 const authEnvironment = "development";
 let context;
 
-function run(command, args, options = {}) {
+function run(command, args, { raw, ...options } = {}) {
   const result = spawnSync(command, args, {
     cwd: root,
     encoding: "utf8",
@@ -37,7 +47,7 @@ function run(command, args, options = {}) {
   });
   if (result.error) throw result.error;
   if (result.status !== 0) throw new Error(`${command} ${args[0]} failed`);
-  return result.stdout?.trim();
+  return raw ? result.stdout : result.stdout?.trim();
 }
 
 function kube(args, options) {
@@ -229,7 +239,7 @@ async function checkIssuer(issuer) {
   );
 }
 
-function rhdhAppConfig(issuer, client) {
+function rhdhAppConfig(issuer, client, locations) {
   return {
     signInPage: "oidc",
     auth: {
@@ -251,7 +261,9 @@ function rhdhAppConfig(issuer, client) {
       },
     },
     catalog: {
+      // an array replaces the instance's, so it repeats them
       locations: [
+        ...locations,
         {
           type: "file",
           target: `${rhdhFiles}/kuadrant-users.yaml`,
@@ -298,6 +310,130 @@ function references(backstage) {
   );
 }
 
+const isObject = (value) => value !== null && typeof value === "object";
+const isMap = (value) => isObject(value) && !Array.isArray(value);
+const directed = (value) =>
+  isObject(value) && directives.some((key) => Object.hasOwn(value, key));
+const directedWithin = (value) =>
+  directed(value) ||
+  (isObject(value) && Object.values(value).some(directedWithin));
+
+// a ready pod of a finished rollout, so its files are the ones the backend loaded
+function backendPod(id, deployment) {
+  const { name, namespace: ns, generation } = deployment.metadata;
+  const status = deployment.status || {};
+  const replicas = deployment.spec.replicas ?? 1;
+  const selector = Object.entries(deployment.spec.selector?.matchLabels || {})
+    .map(([key, value]) => `${key}=${value}`)
+    .join(",");
+  const pod =
+    replicas > 0 &&
+    status.observedGeneration >= generation &&
+    [status.replicas, status.updatedReplicas, status.availableReplicas].every(
+      (count) => count === replicas,
+    ) &&
+    selector &&
+    list("pods", "-n", ns, "-l", selector).find(
+      (candidate) =>
+        !candidate.metadata.deletionTimestamp &&
+        candidate.status?.conditions?.some(
+          (condition) =>
+            condition.type === "Ready" && condition.status === "True",
+        ),
+    );
+  if (!pod)
+    throw new Error(
+      `Deployment ${ns}/${name} has no ready pod from a finished rollout; setup reads Backstage ${id}'s catalog locations from one, so retry once RHDH is up`,
+    );
+  return pod.metadata.name;
+}
+
+// the catalog.locations the backend loaded, resolved as backstage does: the
+// last --config file to set them wins and null removes them
+function catalogLocations(id, deployment) {
+  const ns = deployment.metadata.namespace;
+  const pod = backendPod(id, deployment);
+  const exec = (...command) => {
+    try {
+      return kube(
+        ["exec", pod, "-n", ns, "-c", backendContainer, "--", ...command],
+        { raw: true, maxBuffer: 64 * 1024 * 1024 },
+      );
+    } catch (error) {
+      throw new Error(
+        `Cannot run ${command.join(" ")} in pod ${ns}/${pod}: ${error.code || "see the kubectl error above"}`,
+      );
+    }
+  };
+  // names only, so no value leaves the pod
+  const overrides = exec(
+    "sh",
+    "-c",
+    `echo ${locationVariables.map((name) => `\${${name}:+${name}}`).join(" ")}`,
+  )
+    .split(/\s+/)
+    .filter(Boolean);
+  if (overrides.length)
+    throw new Error(
+      `Backstage ${id} sets ${overrides.join(" and ")}, which can override the catalog locations setup adds`,
+    );
+  const argv = exec("cat", "/proc/1/cmdline").split("\0");
+  const files = argv
+    .map((arg, index) =>
+      arg === "--config"
+        ? argv[index + 1]
+        : arg.startsWith("--config=") && arg.slice("--config=".length),
+    )
+    .filter(Boolean);
+  if (!files.length)
+    throw new Error(
+      `Backstage ${id} runs ${argv[0] || "a backend"} without --config files; setup cannot tell which catalog locations to keep`,
+    );
+  if (files.some((file) => path.basename(file) === `${appConfigMap}.yaml`))
+    throw new Error(
+      `Pod ${ns}/${pod} still runs with ${appConfigMap}; wait for RHDH to restart without it, or run make remote-teardown`,
+    );
+  let locations = [];
+  for (const file of files) {
+    if (/^https?:/.test(file))
+      throw new Error(
+        `Backstage ${id} loads configuration from ${file}; setup cannot read its catalog locations`,
+      );
+    const text = exec("cat", file);
+    let config;
+    try {
+      // without warnings, which quote the file
+      config = YAML.parse(text, { logLevel: "error" }) ?? {};
+    } catch (error) {
+      // past its first line, the message quotes the file
+      throw new Error(
+        `Cannot parse ${file} from Backstage ${id}: ${error.message.split("\n")[0]}`,
+      );
+    }
+    if (
+      directed(config) ||
+      directed(config.catalog) ||
+      directedWithin(config.catalog?.locations)
+    )
+      throw new Error(
+        `${file} in Backstage ${id} sets catalog locations through ${directives.join(" or ")}, which setup cannot copy`,
+      );
+    if (config.catalog === null) locations = [];
+    else if (
+      isMap(config.catalog) &&
+      Object.hasOwn(config.catalog, "locations")
+    ) {
+      const value = config.catalog.locations ?? [];
+      if (!Array.isArray(value) || !value.every(isMap))
+        throw new Error(
+          `${file} in Backstage ${id} sets catalog.locations to something other than a list of locations, which setup cannot copy`,
+        );
+      locations = value;
+    }
+  }
+  return locations;
+}
+
 // the rhdh operator instance whose route serves BASE_URL
 function findBackstage(origin) {
   if (!get("crd", backstageAPI))
@@ -338,11 +474,12 @@ function findBackstage(origin) {
       );
   }
   const deployment = `backstage-${owner.name}`;
-  if (!get("deployment", deployment, owner.namespace))
+  const live = get("deployment", deployment, owner.namespace);
+  if (!live)
     throw new Error(
       `Backstage ${id} has no deployment ${deployment}; check the RHDH operator`,
     );
-  return { backstage, deployment };
+  return { backstage, deployment, locations: catalogLocations(id, live) };
 }
 
 function addReferences(backstage) {
@@ -452,7 +589,7 @@ async function configureRhdh(state, rhdh, origin, dex, files) {
       appConfigMap,
       {
         [`${appConfigMap}.yaml`]: yaml.dump(
-          rhdhAppConfig(dex.issuer, dex.client),
+          rhdhAppConfig(dex.issuer, dex.client, rhdh.locations),
           { lineWidth: -1 },
         ),
       },

@@ -19,6 +19,14 @@ const deployed = "https://rhdh.example.com";
 const issuer = "https://dex-kuadrant-backstage-e2e.apps.release-test.example";
 const backstage = "backstage/rhdh/developer-hub";
 const rhdhFiles = "/opt/app-root/src/kuadrant-e2e";
+const personas = {
+  type: "file",
+  target: `${rhdhFiles}/kuadrant-users.yaml`,
+  rules: [{ allow: ["User", "Group"] }],
+};
+// the catalog location rhdh's image ships
+const shipped = { type: "file", target: "../../catalog-entities/all.yaml" };
+const backendLabels = { "rhdh.redhat.com/app": "backstage-developer-hub" };
 
 // an rhdh operator instance serving `deployed`, rendered as the operator would
 function rhdh() {
@@ -74,9 +82,12 @@ function rhdh() {
     "deployment/rhdh/backstage-developer-hub": {
       apiVersion: "apps/v1",
       kind: "Deployment",
-      metadata: metadata("backstage-developer-hub"),
+      metadata: { ...metadata("backstage-developer-hub"), generation: 1 },
       spec: {
+        replicas: 1,
+        selector: { matchLabels: backendLabels },
         template: {
+          metadata: { labels: backendLabels },
           spec: {
             volumes: [
               {
@@ -88,6 +99,12 @@ function rhdh() {
             containers: [
               {
                 name: "backstage-backend",
+                args: [
+                  "--config",
+                  "dynamic-plugins-root/app-config.dynamic-plugins.yaml",
+                  "--config",
+                  "/opt/app-root/src/app-config.yaml",
+                ],
                 volumeMounts: [
                   { name: "rhdh-app-config", mountPath: "/opt/app-root/src" },
                   { name: "rbac-policies", mountPath: "/opt/app-root/etc" },
@@ -96,6 +113,13 @@ function rhdh() {
             ],
           },
         },
+      },
+      // rolled out
+      status: {
+        observedGeneration: 1,
+        replicas: 1,
+        updatedReplicas: 1,
+        availableReplicas: 1,
       },
     },
     "configmap/rhdh/rhdh-app-config": configMap("rhdh-app-config", {
@@ -210,6 +234,20 @@ const kind = (resource) => ({
 })[resource] || resource.toLowerCase();
 const operatorFile = process.env.FAKE_DB + '.operator';
 const operator = fs.existsSync(operatorFile) ? JSON.parse(fs.readFileSync(operatorFile, 'utf8')) : { reads: {}, running: {} };
+// rhdh's entrypoint, the configuration its image ships and the dynamic plugins' one its
+// init container writes, all in its working directory
+const locations = 'catalog:\\n  locations:\\n    - type: file\\n      target: ../../catalog-entities/all.yaml\\n';
+const image = {
+  entrypoint: ['node', '--require', './instrumentation.js', 'packages/backend', '--config', 'app-config.yaml',
+    '--config', 'app-config.example.yaml', '--config', 'app-config.example.production.yaml'],
+  files: {
+    '/opt/app-root/src/app-config.yaml': locations,
+    '/opt/app-root/src/app-config.example.yaml': locations,
+    '/opt/app-root/src/app-config.example.production.yaml': 'app:\\n  title: Red Hat Developer Hub\\n',
+    '/opt/app-root/src/dynamic-plugins-root/app-config.dynamic-plugins.yaml': 'dynamicPlugins:\\n  frontend: {}\\n',
+  },
+  ...JSON.parse(process.env.FAKE_IMAGE || '{}'),
+};
 // stands in for the rhdh operator: after FAKE_OPERATOR_LAG reads, a deployment follows its
 // backstage cr once every configmap the cr names exists
 function reconcile() {
@@ -222,13 +260,21 @@ function reconcile() {
     const deployment = db[id];
     const app = cr.spec?.application || {};
     const refs = ['appConfig', 'extraFiles'].flatMap(field =>
-      (app[field]?.configMaps || []).map(ref => ({ ...ref, shared: app[field].mountPath || '/opt/app-root/src' })));
+      (app[field]?.configMaps || []).map(ref => ({ ...ref, field, shared: app[field].mountPath || '/opt/app-root/src' })));
     if (!deployment || refs.some(ref => !db[key('ConfigMap', ref.name, cr.metadata.namespace)])) continue;
+    // each app-config key is a --config file, after the dynamic plugins' configuration
+    const configs = refs.filter(ref => ref.field === 'appConfig').flatMap(ref =>
+      Object.keys(db[key('ConfigMap', ref.name, cr.metadata.namespace)].data || {})
+        .flatMap(file => ['--config', (ref.mountPath || ref.shared) + '/' + file]));
     const current = deployment.spec.template.spec;
     const rendered = {
       ...current,
       volumes: refs.map(ref => ({ name: ref.name, configMap: { name: ref.name } })),
-      containers: [{ ...current.containers[0], volumeMounts: refs.map(ref => ({ name: ref.name, mountPath: ref.mountPath || ref.shared })) }],
+      containers: [{
+        ...current.containers[0],
+        args: ['--config', 'dynamic-plugins-root/app-config.dynamic-plugins.yaml', ...configs],
+        volumeMounts: refs.map(ref => ({ name: ref.name, mountPath: ref.mountPath || ref.shared })),
+      }],
     };
     if (JSON.stringify(rendered) === JSON.stringify(current)) continue;
     // the previous pods keep running until the rollout replaces them
@@ -256,13 +302,19 @@ if (args[0] === 'config' && args[1] === 'current-context') {
   process.exit(1);
 } else if (args[0] === 'get' && kind(args[1]) === 'pod') {
   reconcile();
+  const [label, value] = (flag('-l') || '').split('=');
   // pods from before a template change last FAKE_POD_LAG reads
   output = {
     items: Object.values(db).filter(obj => obj.kind === 'Deployment' && obj.metadata.namespace === ns).map(deployment => {
       const old = operator.running[key('Deployment', deployment.metadata.name, ns)];
       const spec = old && old.reads++ < Number(process.env.FAKE_POD_LAG || 0) ? old.spec : deployment.spec.template.spec;
-      return { kind: 'Pod', metadata: { name: deployment.metadata.name + '-0', namespace: ns }, spec };
-    }),
+      return {
+        kind: 'Pod',
+        metadata: { name: deployment.metadata.name + '-0', namespace: ns, labels: deployment.spec.template.metadata?.labels },
+        spec,
+        status: { conditions: [{ type: 'Ready', status: process.env.FAKE_BACKEND_STOPPED ? 'False' : 'True' }] },
+      };
+    }).filter(pod => !label || pod.metadata.labels?.[label] === value),
   };
 } else if (args[0] === 'get' && (!args[2] || args[2].startsWith('-'))) {
   if (kind(args[1]) === 'deployment') reconcile();
@@ -340,6 +392,38 @@ if (args[0] === 'config' && args[1] === 'current-context') {
   if (args[1] === 'Namespace') {
     for (const [id, obj] of Object.entries(db)) {
       if (obj.metadata.namespace === args[2]) delete db[id];
+    }
+  }
+} else if (args[0] === 'exec') {
+  // stands in for a pod's running backend: the image's entrypoint and files, then the
+  // args and configmap mounts of its deployment
+  const pod = db[key('Deployment', args[1].replace(/-0$/, ''), ns)]?.spec.template.spec;
+  const container = pod?.containers.find(c => c.name === flag('-c'));
+  if (!container || process.env.FAKE_BACKEND_STOPPED) {
+    console.error('error: unable to upgrade connection: container not found ("' + flag('-c') + '")');
+    process.exit(1);
+  }
+  const command = args.slice(args.indexOf('--') + 1);
+  const file = command[1];
+  if (command[0] === 'sh') {
+    // echoes the names of the set, non-empty variables the script asks about
+    const env = JSON.parse(process.env.FAKE_BACKEND_ENV || '{}');
+    output = [...command[2].matchAll(/\\$\\{(\\w+):\\+\\w+\\}/g)].map(match => match[1]).filter(name => env[name]).join(' ');
+  } else if (file === '/proc/1/cmdline') {
+    output = [...image.entrypoint, ...(container.args || [])].join('\\0') + '\\0';
+  } else {
+    // a configmap key mounted over an image file shadows it, as a subPath mount does
+    const target = file.startsWith('/') ? file : '/opt/app-root/src/' + file;
+    output = container.volumeMounts
+      .filter(mount => target.startsWith(mount.mountPath + '/'))
+      .map(mount => {
+        const volume = pod.volumes.find(v => v.name === mount.name);
+        return db[key('ConfigMap', volume?.configMap?.name || '', ns)]?.data?.[target.slice(mount.mountPath.length + 1)];
+      })
+      .find(content => content !== undefined) ?? image.files[target];
+    if (output === undefined) {
+      console.error('cat: ' + file + ': No such file or directory');
+      process.exit(1);
     }
   }
 } else if (!['wait', 'rollout'].includes(args[0])) {
@@ -680,6 +764,7 @@ test("setup without BASE_URL leaves Dex and RHDH to the local app", (t) => {
         (call) =>
           call.includes("ingresses.config.openshift.io") ||
           call.includes("routes.route.openshift.io") ||
+          call.includes("exec") ||
           call.includes("rollout") ||
           call.includes("patch"),
       ),
@@ -817,13 +902,8 @@ test("setup with BASE_URL points the RHDH instance behind it at owned Dex", (t) 
       resolvers: [{ resolver: "emailMatchingUserEntityProfileEmail" }],
     },
   });
-  assert.deepEqual(app.catalog.locations, [
-    {
-      type: "file",
-      target: `${rhdhFiles}/kuadrant-users.yaml`,
-      rules: [{ allow: ["User", "Group"] }],
-    },
-  ]);
+  // the image's location stays, since an app-config array replaces earlier ones
+  assert.deepEqual(app.catalog.locations, [shipped, personas]);
   assert.deepEqual(app.permission, {
     enabled: true,
     rbac: {
@@ -881,6 +961,265 @@ test("setup takes the personas and RBAC policy from CATALOG_USERS and RBAC_POLIC
     "rbac-policy.csv": "g, user:default/admin, role:default/release\n",
   });
 });
+
+const instanceConfig = (db, text) => {
+  db["configmap/rhdh/rhdh-app-config"].data["app-config.yaml"] = text;
+};
+const github = {
+  type: "url",
+  target: "https://github.com/example/catalog/blob/main/all.yaml",
+};
+const githubConfig = yaml.dump({ catalog: { locations: [github] } });
+const backend = "deployment/rhdh/backstage-developer-hub";
+
+for (const [title, change, overrides, kept] of [
+  [
+    "setup keeps the catalog locations of RHDH's image ahead of the personas",
+    () => {},
+    {},
+    [shipped],
+  ],
+  [
+    "setup keeps only the last file's catalog locations",
+    // a key of its own, so the file loads after the image's rather than over it
+    (db) => {
+      db["configmap/rhdh/rhdh-app-config"].data = {
+        "app-config-rhdh.yaml": githubConfig,
+      };
+    },
+    {},
+    [github],
+  ],
+  [
+    "setup keeps no catalog locations that a later file sets to null",
+    (db) => instanceConfig(db, "catalog:\n  locations: null\n"),
+    {},
+    [],
+  ],
+  [
+    "setup keeps no catalog locations once a later file sets the catalog to null",
+    (db) => instanceConfig(db, "catalog: null\n"),
+    {},
+    [],
+  ],
+  [
+    "setup reads catalog locations from --config=file arguments",
+    () => {},
+    {
+      FAKE_IMAGE: JSON.stringify({
+        entrypoint: [
+          "node",
+          "packages/backend",
+          "--config=app-config.example.yaml",
+        ],
+      }),
+    },
+    [shipped],
+  ],
+  [
+    "setup parses tags as backstage does, without quoting the file",
+    (db) =>
+      instanceConfig(
+        db,
+        `auth:\n  token: !vault secret/token\n${githubConfig}`,
+      ),
+    {},
+    [github],
+  ],
+  [
+    "setup reads a file indented throughout as it stands",
+    (db) =>
+      instanceConfig(
+        db,
+        `app:\n  title: Developer Hub\n${githubConfig}`.replace(/^/gm, "  "),
+      ),
+    {},
+    [github],
+  ],
+  [
+    "setup ignores an empty APP_CONFIG_catalog_locations, as backstage does",
+    () => {},
+    { FAKE_BACKEND_ENV: JSON.stringify({ APP_CONFIG_catalog_locations: "" }) },
+    [shipped],
+  ],
+]) {
+  test(title, (t) => {
+    const h = harness(t);
+    const db = rhdh();
+    change(db);
+    h.write(db);
+    const setup = h.run("setup", { BASE_URL: deployed, ...overrides });
+    assert.equal(setup.status, 0, setup.stderr);
+    const app = yaml.load(
+      h.read()["configmap/rhdh/kuadrant-e2e-app-config"].data[
+        "kuadrant-e2e-app-config.yaml"
+      ],
+    );
+    assert.deepEqual(app.catalog.locations, [...kept, personas]);
+    assert.ok(!setup.stderr.includes("secret/token"));
+    // read in a ready pod of the backend, before anything changes
+    const calls = h.calls();
+    const execs = calls.filter((call) => call.includes("exec"));
+    assert.ok(execs.some((call) => call.includes("sh")));
+    assert.ok(execs.some((call) => call.includes("/proc/1/cmdline")));
+    for (const call of execs)
+      assert.deepEqual(call.slice(3, 10), [
+        "exec",
+        "backstage-developer-hub-0",
+        "-n",
+        "rhdh",
+        "-c",
+        "backstage-backend",
+        "--",
+      ]);
+    assert.ok(
+      calls.lastIndexOf(execs.at(-1)) <
+        calls.findIndex((call) => call.includes("create")),
+    );
+  });
+}
+
+for (const [label, change, overrides, error] of [
+  [
+    "a deployment still rolling out",
+    (db) => {
+      db[backend].status.updatedReplicas = 0;
+    },
+    {},
+    /Deployment rhdh\/backstage-developer-hub has no ready pod from a finished rollout/,
+  ],
+  [
+    "a deployment whose latest spec has no rollout yet",
+    (db) => {
+      db[backend].metadata.generation = 2;
+    },
+    {},
+    /has no ready pod from a finished rollout/,
+  ],
+  [
+    "a deployment scaled to zero",
+    (db) => {
+      db[backend].spec.replicas = 0;
+      db[backend].status = { observedGeneration: 1 };
+    },
+    {},
+    /has no ready pod from a finished rollout/,
+  ],
+  [
+    "an RHDH backend with no ready pod",
+    () => {},
+    { FAKE_BACKEND_STOPPED: "1" },
+    /has no ready pod from a finished rollout/,
+  ],
+  [
+    "catalog locations set through APP_CONFIG_ variables",
+    () => {},
+    {
+      FAKE_BACKEND_ENV: JSON.stringify({ APP_CONFIG_catalog_locations: "[]" }),
+    },
+    /Backstage rhdh\/developer-hub sets APP_CONFIG_catalog_locations, which can override the catalog locations setup adds/,
+  ],
+  [
+    "a backend that names no --config files",
+    (db) => delete db[backend].spec.template.spec.containers[0].args,
+    {
+      FAKE_OPERATOR_STOPPED: "1",
+      FAKE_IMAGE: JSON.stringify({ entrypoint: ["/pause"] }),
+    },
+    /Backstage rhdh\/developer-hub runs \/pause without --config files/,
+  ],
+  [
+    "a pod still running with the e2e configuration",
+    (db) =>
+      db[backend].spec.template.spec.containers[0].args.push(
+        "--config",
+        "/opt/app-root/src/kuadrant-e2e-app-config.yaml",
+      ),
+    { FAKE_OPERATOR_STOPPED: "1" },
+    /Pod rhdh\/backstage-developer-hub-0 still runs with kuadrant-e2e-app-config/,
+  ],
+  [
+    "configuration loaded from a URL",
+    () => {},
+    {
+      FAKE_IMAGE: JSON.stringify({
+        entrypoint: [
+          "node",
+          "packages/backend",
+          "--config",
+          "https://config.example.com/app-config.yaml",
+        ],
+      }),
+    },
+    /loads configuration from https:\/\/config\.example\.com\/app-config\.yaml/,
+  ],
+  [
+    "catalog locations set through $include",
+    (db) =>
+      instanceConfig(
+        db,
+        "catalog:\n  locations:\n    $include: locations.yaml\n",
+      ),
+    {},
+    /app-config\.yaml in Backstage rhdh\/developer-hub sets catalog locations through \$include or \$file/,
+  ],
+  [
+    "a catalog location that reads $file",
+    (db) =>
+      instanceConfig(
+        db,
+        yaml.dump({
+          catalog: {
+            locations: [{ type: "url", target: { $file: "target.txt" } }],
+          },
+        }),
+      ),
+    {},
+    /sets catalog locations through \$include or \$file/,
+  ],
+  [
+    "a catalog included whole",
+    (db) => instanceConfig(db, "catalog:\n  $include: catalog.yaml\n"),
+    {},
+    /sets catalog locations through \$include or \$file/,
+  ],
+  [
+    "a whole file included",
+    (db) => instanceConfig(db, "$include: other.yaml\n"),
+    {},
+    /sets catalog locations through \$include or \$file/,
+  ],
+  [
+    "catalog locations that are not a list",
+    (db) => instanceConfig(db, "catalog:\n  locations: ${CATALOG_LOCATIONS}\n"),
+    {},
+    /sets catalog\.locations to something other than a list of locations/,
+  ],
+  [
+    "configuration it cannot parse, without quoting it",
+    (db) => instanceConfig(db, "auth:\n  clientSecret: s3cr3t-value: x\n"),
+    {},
+    /Cannot parse app-config\.yaml from Backstage rhdh\/developer-hub: [^\n]+ at line 2, column \d+:\n/,
+  ],
+]) {
+  test(`setup refuses ${label} before creating anything`, (t) => {
+    const h = harness(t);
+    const db = rhdh();
+    change(db);
+    h.write(db);
+    const result = h.run("setup", { BASE_URL: deployed, ...overrides });
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, error);
+    assert.ok(!result.stderr.includes("s3cr3t-value"));
+    assert.ok(
+      !h
+        .calls()
+        .some((call) => call.includes("create") || call.includes("patch")),
+    );
+    assert.ok(!fs.existsSync(h.stateDir));
+    assert.deepEqual(h.read(), db);
+  });
+}
 
 for (const [label, overrides, error] of [
   [
