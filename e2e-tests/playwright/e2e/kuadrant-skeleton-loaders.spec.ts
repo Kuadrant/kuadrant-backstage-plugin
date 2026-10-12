@@ -1,6 +1,23 @@
-import { test, expect } from "../fixtures/test";
+import { test, expect, type Page } from "../fixtures/test";
 import { Common } from "../utils/common";
 import { TIMEOUTS } from "../utils/kuadrant-helpers";
+
+// skeletons on screen in the page content, read in one evaluateAll(). they can go
+// between separate calls, and an auto-waiting assertion on one that has gone fails
+// at its timeout. returns the classes of any without the text or rect variant.
+async function malformedSkeletons(page: Page): Promise<string[]> {
+  return page
+    .locator("main .MuiSkeleton-root:visible")
+    .evaluateAll((els) =>
+      els
+        .filter(
+          (el) =>
+            !el.classList.contains("MuiSkeleton-text") &&
+            !el.classList.contains("MuiSkeleton-rect"),
+        )
+        .map((el) => el.className),
+    );
+}
 
 test.describe("Kuadrant Skeleton Loaders", () => {
   let common: Common;
@@ -24,26 +41,9 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     await page.goto("/kuadrant/my-api-keys");
 
     // Check for skeleton loaders (Material-UI Skeleton creates spans with specific classes)
-    // We look for the MuiSkeleton class which is present during loading
-    const skeletons = page.locator(".MuiSkeleton-root");
-
     // Either skeletons are visible (still loading) or they're gone (loaded fast)
     // We can't guarantee we'll catch them, but if we do, they should be proper skeletons
-    const skeletonCount = await skeletons.count();
-
-    if (skeletonCount > 0) {
-      // If skeletons are present, verify they look correct
-      const firstSkeleton = skeletons.first();
-      await expect(firstSkeleton).toBeVisible();
-
-      // Skeletons should have the text variant or rect variant class
-      const hasTextVariant = await firstSkeleton.evaluate(
-        (el) =>
-          el.classList.contains("MuiSkeleton-text") ||
-          el.classList.contains("MuiSkeleton-rect"),
-      );
-      expect(hasTextVariant).toBe(true);
-    }
+    expect(await malformedSkeletons(page)).toEqual([]);
 
     // Eventually, skeletons should disappear and real content should load
     await expect(async () => {
@@ -72,14 +72,8 @@ test.describe("Kuadrant Skeleton Loaders", () => {
 
     await page.goto("/kuadrant/api-products");
 
-    // Check for skeleton loaders during initial load
-    const skeletons = page.locator(".MuiSkeleton-root");
-    const skeletonCount = await skeletons.count();
-
-    if (skeletonCount > 0) {
-      // Verify skeleton structure if present
-      await expect(skeletons.first()).toBeVisible();
-    }
+    // Check for skeleton loaders during initial load, and their structure if present
+    expect(await malformedSkeletons(page)).toEqual([]);
 
     // Wait for page to fully load
     await expect(async () => {
