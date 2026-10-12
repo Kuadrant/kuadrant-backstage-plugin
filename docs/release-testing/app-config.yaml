@@ -1,0 +1,4 @@
+# make remote-setup adds sign-in, the personas and RBAC
+catalog:
+  rules:
+    - allow: [Component, System, API, Resource, Location]

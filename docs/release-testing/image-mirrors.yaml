@@ -1,0 +1,13 @@
+# release candidate images resolve through brew, as on the qe clusters
+apiVersion: config.openshift.io/v1
+kind: ImageDigestMirrorSet
+metadata:
+  name: rhcl-release-candidate
+spec:
+  imageDigestMirrors:
+    - source: registry.stage.redhat.io
+      mirrors:
+        - brew.registry.redhat.io
+    - source: registry.redhat.io/rhcl-1
+      mirrors:
+        - brew.registry.redhat.io/rhcl-1
