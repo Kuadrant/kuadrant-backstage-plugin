@@ -1,0 +1,26 @@
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata:
+  name: mcp-gateway
+  namespace: kuadrant-backstage-e2e
+spec:
+  gatewayClassName: istio
+  listeners:
+    - name: mcp
+      port: 80
+      protocol: HTTP
+      allowedRoutes:
+        namespaces:
+          from: All
+---
+apiVersion: mcp.kuadrant.io/v1
+kind: MCPGatewayExtension
+metadata:
+  name: mcp-gateway
+  namespace: kuadrant-backstage-e2e
+spec:
+  targetRef:
+    group: gateway.networking.k8s.io
+    kind: Gateway
+    name: mcp-gateway
+    sectionName: mcp

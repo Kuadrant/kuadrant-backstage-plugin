@@ -1,5 +1,5 @@
 .PHONY: help preflight dynamic-build e2e-deps dynamic-cluster dynamic-up \
-	e2e-specs e2e-dynamic teardown
+	e2e-specs e2e-dynamic teardown remote-setup remote-dev e2e-remote remote-teardown
 
 MAKEFLAGS += --no-print-directory
 
@@ -19,6 +19,7 @@ RHDH_IMAGE = $(RHDH_IMAGE_REPOSITORY):$(RHDH_IMAGE_TAG)
 
 export OCP_VERSION KUADRANT_VERSION RHDH_BASE_IMAGE RHDH_IMAGE_REPOSITORY
 export RHDH_IMAGE_TAG RHDH_CHART_VERSION RHDH_URL DEX_URL
+export BASE_URL
 
 help:
 	@echo "Dynamic-plugin RHDH testing:"
@@ -27,6 +28,15 @@ help:
 	@echo "  make e2e-specs    run the full e2e suite against a running RHDH"
 	@echo "  make e2e-dynamic  run the full build, test and teardown path"
 	@echo "  make teardown     delete the oinc cluster"
+	@echo ""
+	@echo "Deployed Backstage/RHDH:"
+	@echo "  make remote-setup BASE_URL=https://backstage.example.com  on OpenShift, also deploy Dex and point that RHDH at it"
+	@echo "  make e2e-remote BASE_URL=https://backstage.example.com    run the suite against that deployment"
+	@echo ""
+	@echo "Local app against an existing OpenShift cluster (active kubectl context):"
+	@echo "  make remote-setup     check prerequisites and create owned test fixtures"
+	@echo "  make remote-dev       start the local app and Dex against that cluster"
+	@echo "  make remote-teardown  remove only this run's fixtures, retaining the cluster"
 	@echo ""
 	@echo "Override versions and image settings on the make command line."
 
@@ -73,6 +83,18 @@ e2e-specs:
 		exit 1; \
 	}
 	cd e2e-tests && BASE_URL="$(RHDH_URL)" yarn test $(PLAYWRIGHT_ARGS)
+
+remote-setup:
+	node e2e-tests/remote/cluster.mjs setup
+
+remote-dev:
+	node e2e-tests/remote/cluster.mjs dev
+
+e2e-remote:
+	node e2e-tests/remote/run.mjs $(PLAYWRIGHT_ARGS)
+
+remote-teardown:
+	node e2e-tests/remote/cluster.mjs teardown
 
 teardown:
 	./oinc/teardown.sh

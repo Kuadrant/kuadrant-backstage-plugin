@@ -31,6 +31,12 @@ yarn install
 
 Three developer loops. Pick one. Do not run kind and oinc together (both write `.env`).
 
+To test the plugins loaded by an existing Backstage/RHDH deployment, run
+`make e2e-remote BASE_URL=https://backstage.example.com`.
+See the [deployment prerequisites](docs/e2e-testing.md#running-against-a-deployed-backstage).
+For local plugin development against remote Kubernetes, use the separate
+[local-app workflow](docs/e2e-testing.md#local-backstage-against-an-existing-openshift-cluster).
+
 | | Commands | URL | Auth | For |
 |---|---|---|---|---|
 | **1. kind + host app** | `make -C kuadrant-dev-setup kind-create` then `yarn dev:kind` (or `yarn dev`) | http://localhost:3000 | OIDC (Dex :5556) | In-tree plugins, hot reload. Lighter Kubernetes. |

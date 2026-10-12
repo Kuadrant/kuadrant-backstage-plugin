@@ -15,7 +15,7 @@ async function waitForMcpPageReady(page: Page): Promise<void> {
   });
   await page.waitForLoadState("load").catch(() => {});
   await expect(async () => {
-    const spinner = page.locator('[role="progressbar"]:visible');
+    const spinner = page.locator('main [role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
     const heading = page.locator("h1").filter({ hasText: /mcp management/i });
     await expect(heading).toBeVisible();
@@ -28,7 +28,7 @@ async function waitForGatewayDetailReady(page: Page): Promise<void> {
   });
   await page.waitForLoadState("load").catch(() => {});
   await expect(async () => {
-    const spinner = page.locator('[role="progressbar"]:visible');
+    const spinner = page.locator('main [role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
   }).toPass({ timeout: TIMEOUTS.VERY_SLOW, intervals: [500, 1000, 2000] });
 }
@@ -45,7 +45,7 @@ test.describe("Kuadrant Gateway detail view", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("owner1@kuadrant.local");
   });
 
   test("navigates from the MCP Gateways table and shows Details and YAML tabs", async ({
