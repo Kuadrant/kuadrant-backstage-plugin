@@ -1,7 +1,8 @@
+# not the docs' rhcl-rhdh-plugin-{role,binding}: an existing install may use those
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: rhcl-rhdh-plugin-role
+  name: kuadrant-rhdh-release-test
   labels:
     app.kubernetes.io/part-of: kuadrant-rhdh-release-test
 rules:
@@ -37,13 +38,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: rhcl-rhdh-plugin-binding
+  name: kuadrant-rhdh-release-test
   labels:
     app.kubernetes.io/part-of: kuadrant-rhdh-release-test
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
-  name: rhcl-rhdh-plugin-role
+  name: kuadrant-rhdh-release-test
 subjects:
   - kind: ServiceAccount
     name: default

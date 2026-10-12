@@ -77,6 +77,11 @@ configuration. The plugin image comes from the release candidate's advisory unde
 plugins. `rc-plugin-auth.json` holds the `registry.stage.redhat.io` credentials: RHDH's
 plugin installer pulls the image itself and ignores cluster mirrors.
 
+If `oc get subscriptions.operators.coreos.com -A | grep -w rhdh` finds an RHDH operator
+already on the cluster, use it and leave out the first two commands: a second operator
+conflicts with it. If its version does not suit the plugin (below), use another cluster. The
+`rhdh` namespace must not exist yet: this step creates it and cleanup deletes it.
+
 ```bash
 oc apply -f docs/release-testing/rhdh-operator.yaml
 until oc get csv -n rhdh-operator -l operators.coreos.com/rhdh.rhdh-operator \
@@ -166,12 +171,16 @@ oc delete -f docs/release-testing/backstage.yaml
 oc delete namespace rhdh
 oc delete -f docs/release-testing/plugin-rbac.yaml
 oc delete -f docs/release-testing/rhdh-operator.yaml   # its namespace takes the CSV with it
-oc delete crd backstages.rhdh.redhat.com
 ```
+
+Leave out the last command if step 3 used an operator that was already on the cluster. The
+`backstages.rhdh.redhat.com` CRD stays either way, as OLM leaves an uninstalled operator's
+CRDs: deleting it deletes every `Backstage` on the cluster, in every namespace.
 
 On a cluster you created for the test, also remove RHCL (`helm uninstall kuadrant-instances`
 then `helm uninstall kuadrant-operators`), the mirrors and the pull secret entries, or
-delete the cluster.
+delete the cluster. If you keep it, remove the CRD too once no `Backstage` is left, as
+`oc get backstages.rhdh.redhat.com -A` shows: `oc delete crd backstages.rhdh.redhat.com`.
 
 ## Known issues
 
