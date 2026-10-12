@@ -141,32 +141,27 @@ test.describe("Kuadrant Skeleton Loaders", () => {
     for (const url of pages) {
       await page.goto(url);
 
-      // Wait for initial load
-      await page.waitForLoadState("load").catch(() => {});
-
-      // Wait for global app loader to disappear (it uses CircularProgress but is app infrastructure)
-      // The loader is a centered, full-height box
-      await page.waitForTimeout(500); // Give the loader time to disappear
-
       // The Backstage Progress component renders as a CircularProgress with role="progressbar"
       // but we want to make sure it's not being used for page-level loading in Kuadrant components
       // (it's still OK for inline operations like delete buttons)
 
       // Check that we're using skeletons OR the page is already loaded
       await expect(async () => {
-        const progressBars = page.locator('[role="progressbar"]:visible');
-        const skeletons = page.locator(".MuiSkeleton-root:visible");
-        const progressCount = await progressBars.count();
-        const skeletonCount = await skeletons.count();
+        // the app's own loaders show briefly after navigation. count them in one pass:
+        // one can vanish between two calls, and evaluate() then waits out the timeout
+        const pageSpinners = await page
+          .locator('[role="progressbar"]:visible')
+          .evaluateAll(
+            (els) => els.filter((el) => el.closest("button") === null).length,
+          );
+        const skeletonCount = await page
+          .locator(".MuiSkeleton-root:visible")
+          .count();
 
         // Either we have skeletons (new loading pattern) or nothing (already loaded)
         // We should NOT have progress bars without skeletons for main page loading
-        if (progressCount > 0 && skeletonCount === 0) {
-          // Only acceptable if it's a small inline spinner (like in a button)
-          const isInButton = await progressBars.first().evaluate((el) => {
-            return el.closest("button") !== null;
-          });
-          expect(isInButton).toBe(true);
+        if (skeletonCount === 0) {
+          expect(pageSpinners).toBe(0);
         }
       }).toPass({ timeout: TIMEOUTS.DEFAULT });
     }
