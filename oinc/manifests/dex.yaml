@@ -46,6 +46,9 @@ spec:
               mountPath: /srv/dex/web/templates/password.html
               subPath: password.html
               readOnly: true
+            # the image entrypoint renders the config into /tmp
+            - name: tmp
+              mountPath: /tmp
           readinessProbe:
             httpGet:
               path: /healthz
@@ -72,6 +75,8 @@ spec:
         - name: web
           configMap:
             name: dex-web
+        - name: tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
