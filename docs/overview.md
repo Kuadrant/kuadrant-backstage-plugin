@@ -1,8 +1,10 @@
-# Developer Portal Overview
+# Kuadrant Backstage Plugin Overview
 
-The Developer Portal brings self-service API access management to Kubernetes-native organizations. It bridges the gap between API providers who want to share their services and developers who need to consume them, providing a structured workflow for API discovery, access requests, and credential management.
+The Kuadrant Backstage Plugin supports API publishing and access management, and MCP (Model Context Protocol) resource monitoring and inspection. API owners and consumers use the Developer Portal to publish and discover APIs, request access, and manage credentials. The Gateway and MCP views show resource health and let you test tools and prompts.
 
-## The Problem: API Access at Scale
+## Developer Portal
+
+### The Problem: API Access at Scale
 
 Organizations running microservices on Kubernetes face a common challenge: how do you let developers both internal and external discover and consume your APIs safely and efficiently?
 
@@ -16,7 +18,7 @@ Without a structured approach, teams resort to ad-hoc solutions:
 
 The Developer Portal addresses this by providing a Kubernetes-native system where APIs are cataloged, access is requested through a formal workflow, and credentials are managed automatically.
 
-## How It Works
+### How It Works
 
 The Developer Portal introduces two Custom Resource Definitions (CRDs) that model API products and access requests:
 
@@ -26,11 +28,11 @@ The Developer Portal introduces two Custom Resource Definitions (CRDs) that mode
 
 This model means that API access follows the same patterns as other Kubernetes resources: declarative, auditable, and managed through standard tooling.
 
-## Authentication Methods
+### Authentication Methods
 
 The Developer Portal supports two authentication methods for protecting APIs. The method is configured at the platform level via AuthPolicy and automatically discovered by the controller.
 
-### API Key Authentication
+#### API Key Authentication
 
 API key authentication uses Kubernetes Secrets to store credentials. This method involves a request and approval workflow:
 
@@ -44,7 +46,7 @@ API key authentication uses Kubernetes Secrets to store credentials. This method
 
 This method is ideal for internal APIs, development environments, or scenarios where you want fine-grained control over who can access your API.
 
-### OIDC/JWT Authentication
+#### OIDC/JWT Authentication
 
 OIDC (OpenID Connect) authentication delegates credential management to an external identity provider. There is no request/approval workflow in the Developer Portal:
 
@@ -58,11 +60,11 @@ OIDC (OpenID Connect) authentication delegates credential management to an exter
 
 This method is ideal for APIs that integrate with existing identity providers (Keycloak, Auth0, Azure AD, etc.), need stronger authentication, or require integration with enterprise SSO systems. No APIKey resources are created—access control happens at the identity provider level.
 
-## Developer Portal Personas
+### Developer Portal Personas
 
 The Developer Portal serves four distinct personas, each with different concerns and workflows.
 
-### 1. The API Consumer
+#### 1. The API Consumer
 
 API consumers are developers who need to integrate with services provided by other teams. They experience the portal primarily through Backstage, where they can:
 
@@ -73,11 +75,13 @@ API consumers are developers who need to integrate with services provided by oth
 The authentication experience depends on how the API is protected:
 
 **For API Key Authentication:**
+
 - Request access by creating an APIKey resource (either directly or through the Backstage UI)
 - Receive an API key once their request is approved (credentials are shown once and must be saved immediately)
 - Use the API key in the `Authorization` header when making requests
 
 **For OIDC/JWT Authentication:**
+
 - View the OIDC provider details and token endpoint
 - Obtain an access token from the identity provider using their client credentials
 - Use the JWT token in the `Authorization` header when making requests
@@ -85,7 +89,7 @@ The authentication experience depends on how the API is protected:
 
 From the consumer's perspective, the value is discoverability and self-service. Rather than searching through wikis or asking colleagues, they find what they need in a single catalog. The portal surfaces the authentication method and provides clear guidance on how to obtain credentials, whether through the API key request workflow or by interacting with an OIDC provider.
 
-### 2. The API Owner
+#### 2. The API Owner
 
 API owners are the teams responsible for specific services. They control how their APIs are presented and accessed:
 
@@ -99,7 +103,7 @@ The authentication and approval workflow depends on the authentication requireme
 
 For **OIDC/JWT authentication**, there is no config required. Access control is managed entirely by the external identity provider.
 
-### 3. The API Admin
+#### 3. The API Admin
 
 API Admins provide cross-team oversight and governance without being infrastructure-focused platform engineers. They bridge the gap between individual API owners and the platform team:
 
@@ -110,7 +114,7 @@ API Admins provide cross-team oversight and governance without being infrastruct
 
 This role is particularly valuable in larger organizations where individual API owners may be unavailable, or where a central team needs visibility into all API access for compliance or security reasons. Unlike platform engineers, API Admins work within the Developer Portal rather than managing the underlying infrastructure.
 
-### 4. The Platform Engineer
+#### 4. The Platform Engineer
 
 Platform engineers install and configure the Developer Portal infrastructure. Their responsibilities include:
 
@@ -124,7 +128,7 @@ Platform engineers install and configure the Developer Portal infrastructure. Th
 
 The platform team doesn't need to be involved in individual API publications or access requests — those are handled by API owners and consumers. Instead, they establish the guardrails and infrastructure that make self-service possible. When configuring OIDC authentication, platform engineers work with identity provider administrators to obtain issuer URLs and configure the AuthPolicy accordingly.
 
-## Architecture
+### Architecture
 
 The Developer Portal consists of several components working together:
 
@@ -173,7 +177,7 @@ The flow works as follows:
 9. **AuthPolicy** validates incoming requests against the generated Secrets
 10. **PlanPolicy** enforces rate limits based on the consumer's selected tier
 
-## Integration with Kuadrant
+### Integration with Kuadrant
 
 The Developer Portal is designed as part of the Kuadrant ecosystem. It builds on:
 
@@ -185,7 +189,26 @@ The Developer Portal is designed as part of the Kuadrant ecosystem. It builds on
 
 This integration means the Developer Portal doesn't duplicate functionality, it adds the product catalog and credential discovery workflow on top of existing traffic management and policy enforcement. Whether using API keys or OIDC, authentication is always enforced by Kuadrant's AuthPolicy—the Developer Portal simply makes the authentication requirements discoverable and, for API keys, manages the credential lifecycle.
 
+## Gateway and MCP
+
+### Gateway Visibility
+
+The Gateway view shows the Gateways targeted by MCPGatewayExtension resources and the HTTPRoutes attached to them. You can inspect their metadata, status conditions, and YAML, including route acceptance and policy enforcement status. Gateway health is based on its `Accepted` and `Programmed` conditions.
+
+### MCP Management
+
+The MCP overview lists gateway extensions and registered servers, with summary cards for Gateway health and server readiness. You can filter the tables by name, namespace, or status to find resources.
+
+**MCPGatewayExtension** adds MCP support to a Gateway. **MCPServerRegistration** registers a server behind an HTTPRoute and sets a prefix for its tools. Their detail views show target references and resource YAML.
+
+### MCP Inspector
+
+The MCP Inspector discovers a gateway's tools and prompts. You can enter tool inputs in forms generated from JSON schemas, validate and run tools, and inspect results alongside the JSON-RPC request and response. For prompts, provide arguments and review the generated text.
+
+The Inspector supports automatic protocol discovery, explicit protocol selection, and bearer tokens for gateway authentication. Backstage permissions control access to the Gateway and MCP views and the Inspector. See the [MCP Inspector guide](mcp-inspector.md) for connection and authentication details.
+
 ## Next Steps
 
 - [Getting Started Tutorial](getting-started.md): Set up a complete example with an API product and access request
 - [Installation Guide](installation.md): Deploy the Developer Portal Controller to your cluster
+- [MCP Inspector Guide](mcp-inspector.md): Connect to a gateway and test tools and prompts
