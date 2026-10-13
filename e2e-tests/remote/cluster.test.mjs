@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import fs from "node:fs";
-import net from "node:net";
 import os from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -195,18 +194,7 @@ globalThis.fetch = async (url, options = {}) => {
     const config = yaml.load(db['configmap/' + route.metadata.namespace + '/dex-config'].data['config.yaml']);
     return { ok: true, status: 200, json: async () => ({ issuer: process.env.FAKE_DEX_ISSUER || config.issuer }) };
   }
-  // stands in for the local backend, which only accepts the token remote-dev gave it
-  const state = JSON.parse(fs.readFileSync(process.env.E2E_REMOTE_STATE_DIR + '/state.json', 'utf8'));
-  if (options.headers?.Authorization !== 'Bearer ' + (process.env.FAKE_BACKEND_TOKEN || state.checkToken))
-    return { ok: false, status: 401 };
-  return {
-    ok: true,
-    status: 200,
-    json: async () => ({ items: [{ metadata: {
-      name: 'toystore', namespace: 'toystore',
-      labels: { 'kuadrant.io/backstage-e2e-run': process.env.FAKE_BACKEND_RUN_ID || state.runID }
-    } }] })
-  };
+  throw new Error('Unexpected fetch: ' + url);
 };
 `,
   );
@@ -354,8 +342,6 @@ if (args[0] === 'config' && args[1] === 'current-context') {
   obj.metadata.resourceVersion = String(Number(obj.metadata.resourceVersion) + 1);
   obj.metadata.generation += 1;
   output = kind(args[1]) + '/' + args[2] + ' patched';
-} else if (args[0] === 'create' && args[1] === 'token') {
-  output = 'service-account-token';
 } else if (args[0] === 'create' && args[1] === '-f') {
   const obj = input;
   if (obj.kind === process.env.FAKE_FAIL_KIND) process.exit(1);
@@ -436,15 +422,6 @@ if (output) console.log(typeof output === 'string' ? output : JSON.stringify(out
 `,
     { mode: 0o755 },
   );
-  // stands in for the local app: records the environment remote-dev starts it with
-  const yarnEnv = path.join(dir, "yarn-env.json");
-  fs.writeFileSync(
-    path.join(dir, "yarn"),
-    `#!${process.execPath}
-require('node:fs').writeFileSync(${JSON.stringify(yarnEnv)}, JSON.stringify(process.env));
-`,
-    { mode: 0o755 },
-  );
   const env = {
     ...process.env,
     PATH: `${dir}${path.delimiter}${process.env.PATH}`,
@@ -459,7 +436,6 @@ require('node:fs').writeFileSync(${JSON.stringify(yarnEnv)}, JSON.stringify(proc
     stateDir,
     state: () =>
       JSON.parse(fs.readFileSync(path.join(stateDir, "state.json"), "utf8")),
-    appEnv: () => JSON.parse(fs.readFileSync(yarnEnv, "utf8")),
     read: () => JSON.parse(fs.readFileSync(dbFile, "utf8")),
     write: (db) => fs.writeFileSync(dbFile, JSON.stringify(db)),
     calls: () =>
@@ -522,8 +498,11 @@ test("setup and cleanup own fixtures without changing installed operators", (t) 
   assert.equal(setup.status, 0, setup.stderr);
   const resources = Object.values(h.read());
   assert.ok(!JSON.stringify(resources).includes("oinc.io/metallb"));
-  const role = resources.find((r) => r.kind === "ClusterRole");
-  assert.equal(role.metadata.name, "kuadrant-backstage-e2e");
+  assert.ok(
+    !resources.some((r) =>
+      ["ClusterRole", "ClusterRoleBinding", "ServiceAccount"].includes(r.kind),
+    ),
+  );
   assert.ok(resources.some((r) => r.kind === "MCPServerRegistration"));
   assert.ok(
     !resources.some(
@@ -590,9 +569,10 @@ for (const ownership of ["unowned", "different run"]) {
     assert.equal(h.run("setup").status, 0);
     fs.rmSync(h.stateDir, { recursive: true });
     const db = h.read();
-    const role = db["clusterrole//kuadrant-backstage-e2e"];
-    if (ownership === "unowned") delete role.metadata.labels;
-    else role.metadata.labels["kuadrant.io/backstage-e2e-run"] = "another-run";
+    const fixture = db["namespace//toystore"];
+    if (ownership === "unowned") delete fixture.metadata.labels;
+    else
+      fixture.metadata.labels["kuadrant.io/backstage-e2e-run"] = "another-run";
     h.write(db);
 
     const result = h.run("teardown");
@@ -636,98 +616,6 @@ test("cleanup without state or fixtures does not create a recovery record", (t) 
   assert.ok(!h.calls().some((call) => call.includes("delete")));
 });
 
-test("rejects a Backstage backend serving another run's fixtures", (t) => {
-  const h = harness(t);
-  assert.equal(h.run("setup").status, 0);
-  const result = h.run("check", { FAKE_BACKEND_RUN_ID: "old-local-cluster" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /not connected to this run's remote fixtures/);
-  const correct = h.run("check");
-  assert.equal(correct.status, 0, correct.stderr);
-  assert.match(correct.stdout, /Verified: the Backstage backend/);
-});
-
-// turbo runs tasks in strict env mode, so whatever remote-dev sets must be
-// passed through or the backend falls back to .env
-test("turbo passes remote-dev's environment through to the app", () => {
-  const turbo = JSON.parse(
-    fs.readFileSync(path.join(repo, "turbo.json"), "utf8"),
-  );
-  for (const name of [
-    "K8S_URL",
-    "K8S_CLUSTER_TOKEN",
-    "BROWSER",
-    "APP_CONFIG_backend_auth_externalAccess",
-  ])
-    assert.ok(turbo.tasks.start.passThroughEnv?.includes(name), name);
-});
-
-test("check refuses a local app that remote-dev did not start for this run", (t) => {
-  const h = harness(t);
-  assert.equal(h.run("setup").status, 0);
-  const result = h.run("check", { FAKE_BACKEND_TOKEN: "another-run" });
-  assert.equal(result.status, 1);
-  assert.match(result.stderr, /not started by make remote-dev for this run/);
-});
-
-// remote-dev binds the local app's ports first; skip where a local app holds them
-async function portsInUse() {
-  for (const port of [3000, 7007, 5556]) {
-    const busy = await new Promise((resolve) => {
-      const server = net.createServer();
-      server.once("error", () => resolve(true));
-      server.listen(port, () => server.close(() => resolve(false)));
-    });
-    if (busy) return `port ${port} is in use`;
-  }
-  return false;
-}
-
-test("remote-dev lets the local app accept a token that only lists httproutes", async (t) => {
-  const busy = await portsInUse();
-  if (busy) return t.skip(busy);
-  const h = harness(t);
-  assert.equal(h.run("setup").status, 0);
-  const { checkToken, runID } = h.state();
-  assert.match(checkToken, /^[0-9a-f]{64}$/);
-  const dev = h.run("dev");
-  assert.equal(dev.status, 0, dev.stderr);
-  const app = h.appEnv();
-  assert.equal(app.K8S_CLUSTER_TOKEN, "service-account-token");
-  assert.deepEqual(JSON.parse(app.APP_CONFIG_backend_auth_externalAccess), [
-    {
-      type: "static",
-      options: { token: checkToken, subject: "kuadrant-e2e-check" },
-      accessRestrictions: [
-        { plugin: "kuadrant", permission: "kuadrant.httproute.list" },
-      ],
-    },
-  ]);
-  assert.equal(h.state().runID, runID);
-});
-
-test("remote-dev gives a run recorded before check tokens one", async (t) => {
-  const busy = await portsInUse();
-  if (busy) return t.skip(busy);
-  const h = harness(t);
-  assert.equal(h.run("setup").status, 0);
-  const state = h.state();
-  delete state.checkToken;
-  fs.writeFileSync(
-    path.join(h.stateDir, "state.json"),
-    JSON.stringify(state, null, 2),
-  );
-  assert.match(h.run("check").stderr, /predates the check token/);
-  assert.equal(h.run("dev").status, 0);
-  const { checkToken } = h.state();
-  assert.match(checkToken, /^[0-9a-f]{64}$/);
-  const [access] = JSON.parse(
-    h.appEnv().APP_CONFIG_backend_auth_externalAccess,
-  );
-  assert.equal(access.options.token, checkToken);
-  assert.equal(h.run("check").status, 0);
-});
-
 test("cleanup rejects changed context, changed cluster and replaced resources", (t) => {
   const h = harness(t);
   const setup = h.run("setup");
@@ -749,7 +637,7 @@ test("cleanup rejects changed context, changed cluster and replaced resources", 
   assert.ok(!h.calls().some((call) => call.includes("delete")));
 });
 
-test("setup without BASE_URL leaves Dex and RHDH to the local app", (t) => {
+test("fixture-only setup preserves the deployment authentication and RBAC", (t) => {
   const h = harness(t);
   h.write(rhdh());
   const setup = h.run("setup");
@@ -770,7 +658,7 @@ test("setup without BASE_URL leaves Dex and RHDH to the local app", (t) => {
       ),
   );
   assert.deepEqual(h.state().configMaps, []);
-  assert.match(setup.stdout, /make remote-dev/);
+  assert.match(setup.stdout, /make e2e-remote BASE_URL/);
 });
 
 test("setup with BASE_URL points the RHDH instance behind it at owned Dex", (t) => {
@@ -897,6 +785,7 @@ test("setup with BASE_URL points the RHDH instance behind it at owned Dex", (t) 
     metadataUrl: `${issuer}/.well-known/openid-configuration`,
     clientId: "backstage",
     clientSecret: "backstage-dev-secret",
+    title: "OIDC",
     additionalScopes: ["offline_access"],
     signIn: {
       resolvers: [{ resolver: "emailMatchingUserEntityProfileEmail" }],
@@ -948,7 +837,7 @@ test("setup takes the personas and RBAC policy from CATALOG_USERS and RBAC_POLIC
   h.write(rhdh());
   const users = path.join(h.dir, "users.yaml");
   const policy = path.join(h.dir, "policy.csv");
-  fs.writeFileSync(users, "kind: User\n");
+  fs.writeFileSync(users, "kind: User\nmetadata:\n  name: tester\n");
   fs.writeFileSync(policy, "g, user:default/admin, role:default/release\n");
   const setup = h.run("setup", {
     BASE_URL: deployed,
@@ -957,7 +846,7 @@ test("setup takes the personas and RBAC policy from CATALOG_USERS and RBAC_POLIC
   });
   assert.equal(setup.status, 0, setup.stderr);
   assert.deepEqual(h.read()["configmap/rhdh/kuadrant-e2e-files"].data, {
-    "kuadrant-users.yaml": "kind: User\n",
+    "kuadrant-users.yaml": "kind: User\nmetadata:\n  name: tester\n",
     "rbac-policy.csv": "g, user:default/admin, role:default/release\n",
   });
 });
@@ -1331,7 +1220,6 @@ test("setup warns, but completes, when this machine cannot verify Dex", (t) => {
   assert.match(result.stderr, /self-signed certificate in certificate chain/);
   assert.match(result.stderr, /ingress CA/);
   assert.match(result.stderr, /NODE_EXTRA_CA_CERTS/);
-  assert.equal(h.state().ready, true);
   assert.ok(h.read()["configmap/rhdh/kuadrant-e2e-app-config"]);
 });
 
@@ -1364,7 +1252,6 @@ for (const [label, overrides, error] of [
     const result = h.run("setup", { BASE_URL: deployed, ...overrides });
     assert.equal(result.status, 1);
     assert.match(result.stderr, error);
-    assert.equal(h.state().ready, false);
     const db = h.read();
     assert.deepEqual(db[backstage], rhdh()[backstage]);
     assert.ok(!Object.keys(db).some((id) => id.includes("kuadrant-e2e-")));
@@ -1392,7 +1279,6 @@ test("setup warns, but completes, when this machine cannot verify RHDH sign-in",
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stderr, /self-signed certificate in certificate chain/);
   assert.match(result.stderr, /https:\/\/rhdh\.example\.com/);
-  assert.equal(h.state().ready, true);
 });
 
 test("setup fails, leaving RHDH for teardown, when RHDH does not send sign-in to Dex", (t) => {
@@ -1403,7 +1289,6 @@ test("setup fails, leaving RHDH for teardown, when RHDH does not send sign-in to
   assert.match(setup.stderr, /HTTP 500/);
   assert.match(setup.stderr, /NODE_EXTRA_CA_CERTS/);
   assert.match(setup.stderr, /make remote-teardown/);
-  assert.equal(h.state().ready, false);
   const teardown = h.run("teardown");
   assert.equal(teardown.status, 0, teardown.stderr);
   assert.deepEqual(withoutVersions(h.read()), withoutVersions(rhdh()));
@@ -1604,7 +1489,7 @@ test("make remote-setup passes BASE_URL, CATALOG_USERS and RBAC_POLICY through",
   h.write(rhdh());
   const users = path.join(h.dir, "users.yaml");
   const policy = path.join(h.dir, "policy.csv");
-  fs.writeFileSync(users, "kind: User\n");
+  fs.writeFileSync(users, "kind: User\nmetadata:\n  name: tester\n");
   fs.writeFileSync(policy, "g, user:default/admin, role:default/release\n");
   const result = h.make([
     "remote-setup",
@@ -1624,7 +1509,7 @@ test("make remote-setup passes BASE_URL, CATALOG_USERS and RBAC_POLICY through",
     `${issuer}/.well-known/openid-configuration`,
   );
   assert.deepEqual(db["configmap/rhdh/kuadrant-e2e-files"].data, {
-    "kuadrant-users.yaml": "kind: User\n",
+    "kuadrant-users.yaml": "kind: User\nmetadata:\n  name: tester\n",
     "rbac-policy.csv": "g, user:default/admin, role:default/release\n",
   });
 });

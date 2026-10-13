@@ -34,8 +34,6 @@ Three developer loops. Pick one. Do not run kind and oinc together (both write `
 To test the plugins loaded by an existing Backstage/RHDH deployment, run
 `make e2e-remote BASE_URL=https://backstage.example.com`.
 See the [deployment prerequisites](docs/e2e-testing.md#running-against-a-deployed-backstage).
-For local plugin development against remote Kubernetes, use the separate
-[local-app workflow](docs/e2e-testing.md#local-backstage-against-an-existing-openshift-cluster).
 
 | | Commands | URL | Auth | For |
 |---|---|---|---|---|

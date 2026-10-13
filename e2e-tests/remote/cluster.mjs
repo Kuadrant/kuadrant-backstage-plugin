@@ -1,7 +1,6 @@
 import { spawnSync } from "node:child_process";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import fs from "node:fs";
-import net from "node:net";
 import path from "node:path";
 import { setTimeout as sleep } from "node:timers/promises";
 import { fileURLToPath } from "node:url";
@@ -35,7 +34,8 @@ const locationVariables = [
   "APP_CONFIG_catalog",
   "APP_CONFIG_catalog_locations",
 ];
-const authEnvironment = "development";
+const [testAuth] = readYaml("kuadrant-dev-setup/rhdh-auth.yaml");
+const authEnvironment = testAuth.auth.environment;
 let context;
 
 function run(command, args, { raw, ...options } = {}) {
@@ -110,13 +110,14 @@ function fixtures() {
     kind: "Namespace",
     metadata: { name: namespace },
   });
-  // Pre-create all persona namespaces so cleanup also owns keys made by the UI.
-  for (const user of ["admin", "owner1", "owner2", "consumer1", "consumer2"]) {
+  // Own the namespaces where the UI creates keys for the Dex personas.
+  const [dex] = readYaml("kuadrant-dev-setup/dex/config.yaml");
+  for (const { username } of dex.staticPasswords) {
     const hash = createHash("sha256")
-      .update(`user:default/${user}`)
+      .update(`user:default/${username}`)
       .digest("hex")
       .slice(0, 8);
-    const name = `kuadrant-${user}-${hash}`;
+    const name = `kuadrant-${username}-${hash}`;
     namespaces.set(name, {
       apiVersion: "v1",
       kind: "Namespace",
@@ -126,19 +127,6 @@ function fixtures() {
       },
     });
   }
-  const [role] = readYaml("kuadrant-dev-setup/rbac/rhdh-cluster-role.yaml");
-  role.metadata.name = namespace;
-  const binding = {
-    apiVersion: "rbac.authorization.k8s.io/v1",
-    kind: "ClusterRoleBinding",
-    metadata: { name: namespace },
-    roleRef: {
-      apiGroup: "rbac.authorization.k8s.io",
-      kind: "ClusterRole",
-      name: namespace,
-    },
-    subjects: [{ kind: "ServiceAccount", name: "rhdh", namespace }],
-  };
   const namespaced = resources.filter((r) => r.kind !== "Namespace");
   for (const resource of namespaced) {
     if (resource.metadata.namespace === "gateway-system")
@@ -151,12 +139,7 @@ function fixtures() {
         parent.namespace = namespace;
     }
   }
-  namespaced.push({
-    apiVersion: "v1",
-    kind: "ServiceAccount",
-    metadata: { name: "rhdh", namespace },
-  });
-  return { roots: [...namespaces.values(), role, binding], namespaced };
+  return { roots: [...namespaces.values()], namespaced };
 }
 
 function ingressDomain() {
@@ -240,46 +223,26 @@ async function checkIssuer(issuer) {
 }
 
 function rhdhAppConfig(issuer, client, locations) {
-  return {
-    signInPage: "oidc",
-    auth: {
-      environment: authEnvironment,
-      session: { secret: randomBytes(32).toString("hex") },
-      providers: {
-        oidc: {
-          [authEnvironment]: {
-            metadataUrl: `${issuer}/.well-known/openid-configuration`,
-            clientId: client.id,
-            clientSecret: client.secret,
-            // without offline_access dex issues no refresh token and sessions end on reload
-            additionalScopes: ["offline_access"],
-            signIn: {
-              resolvers: [{ resolver: "emailMatchingUserEntityProfileEmail" }],
-            },
-          },
-        },
+  const config = structuredClone(testAuth);
+  config.auth.session = { secret: randomBytes(32).toString("hex") };
+  Object.assign(config.auth.providers.oidc[authEnvironment], {
+    metadataUrl: `${issuer}/.well-known/openid-configuration`,
+    clientId: client.id,
+    clientSecret: client.secret,
+  });
+  config.catalog = {
+    // An array replaces the instance's, so repeat its existing locations.
+    locations: [
+      ...locations,
+      {
+        type: "file",
+        target: `${rhdhFiles}/kuadrant-users.yaml`,
+        rules: [{ allow: ["User", "Group"] }],
       },
-    },
-    catalog: {
-      // an array replaces the instance's, so it repeats them
-      locations: [
-        ...locations,
-        {
-          type: "file",
-          target: `${rhdhFiles}/kuadrant-users.yaml`,
-          rules: [{ allow: ["User", "Group"] }],
-        },
-      ],
-    },
-    permission: {
-      enabled: true,
-      rbac: {
-        admin: { superUsers: [{ name: "user:default/admin" }] },
-        "policies-csv-file": `${rhdhFiles}/rbac-policy.csv`,
-        policyFileReload: true,
-      },
-    },
+    ],
   };
+  config.permission.rbac["policies-csv-file"] = `${rhdhFiles}/rbac-policy.csv`;
+  return config;
 }
 
 function rhdhFileData() {
@@ -743,69 +706,6 @@ function assertOwned(state, resource) {
   return live;
 }
 
-function checkReady(state) {
-  if (!state.ready)
-    throw new Error(
-      "Setup did not finish; inspect the error and run make remote-teardown before retrying",
-    );
-  for (const resource of state.roots) {
-    if (!assertOwned(state, resource))
-      throw new Error(
-        `Missing fixture ${resource.kind}/${resource.metadata.name}`,
-      );
-  }
-  console.log(`Remote cluster: ${state.server} (OpenShift ${state.version})`);
-}
-
-// the local app only accepts this token when make remote-dev started it, and
-// then only to list httproutes
-function checkAccess(state) {
-  return [
-    {
-      type: "static",
-      options: { token: state.checkToken, subject: "kuadrant-e2e-check" },
-      accessRestrictions: [
-        { plugin: "kuadrant", permission: "kuadrant.httproute.list" },
-      ],
-    },
-  ];
-}
-
-async function checkBackend(state) {
-  if (!state.checkToken)
-    throw new Error(
-      "This run predates the check token; restart make remote-dev, then retry",
-    );
-  const response = await fetch(
-    "http://localhost:7007/api/kuadrant/httproutes",
-    {
-      headers: { Authorization: `Bearer ${state.checkToken}` },
-      signal: AbortSignal.timeout(10000),
-    },
-  );
-  if (response.status === 401)
-    throw new Error(
-      "The local Backstage was not started by make remote-dev for this run",
-    );
-  if (!response.ok)
-    throw new Error(
-      `Backstage cannot read the cluster: HTTP ${response.status}`,
-    );
-  const routes = await response.json();
-  if (
-    !routes.items?.some(
-      (route) => route.metadata.labels?.[ownerLabel] === state.runID,
-    )
-  ) {
-    throw new Error(
-      "Backstage is not connected to this run's remote fixtures; stop the app and use make remote-dev",
-    );
-  }
-  console.log(
-    "Verified: the Backstage backend reads this run's remote fixtures.",
-  );
-}
-
 async function setup() {
   const origin = process.env.BASE_URL
     ? backstageOrigin(process.env.BASE_URL)
@@ -873,10 +773,8 @@ async function setup() {
     context,
     version,
     runID: randomUUID(),
-    checkToken: randomBytes(32).toString("hex"),
     roots: [],
     configMaps: [],
-    ready: false,
   };
   fs.mkdirSync(stateDir, { mode: 0o700 });
   save(state);
@@ -929,7 +827,6 @@ async function setup() {
     await checkIssuer(dex.issuer);
     await configureRhdh(state, rhdh, origin, dex, files);
   }
-  state.ready = true;
   save(state);
   if (rhdh) {
     const { name, namespace: ns } = rhdh.backstage.metadata;
@@ -938,7 +835,7 @@ async function setup() {
     );
   } else {
     console.log(
-      "Fixtures ready. Run make remote-dev, then make e2e-remote in another terminal.",
+      "Fixtures ready. Run make e2e-remote BASE_URL=<Backstage origin> against your configured deployment.",
     );
   }
 }
@@ -950,7 +847,6 @@ function recover() {
     context,
     roots: [],
     configMaps: [],
-    ready: false,
   };
   const claim = (runID) => {
     if (state.runID && state.runID !== runID)
@@ -1078,59 +974,14 @@ async function teardown(state) {
   );
 }
 
-async function checkPort(port) {
-  await new Promise((resolve, reject) => {
-    const server = net.createServer();
-    server.once("error", () =>
-      reject(
-        new Error(
-          `Port ${port} is in use; stop the existing local app/Dex before make remote-dev`,
-        ),
-      ),
-    );
-    server.listen(port, () => server.close(resolve));
-  });
-}
-
 try {
   const action = process.argv[2];
-  if (!["setup", "dev", "check", "teardown"].includes(action))
-    throw new Error("Usage: cluster.mjs setup|dev|check|teardown");
   if (action === "setup") {
     await setup();
   } else if (action === "teardown") {
     await teardown(fs.existsSync(stateFile) ? load() : recover());
   } else {
-    const state = load();
-    checkReady(state);
-    if (action === "check") await checkBackend(state);
-    if (action === "dev") {
-      for (const port of [3000, 7007, 5556]) await checkPort(port);
-      if (!state.checkToken) {
-        state.checkToken = randomBytes(32).toString("hex");
-        save(state);
-      }
-      const token = kube([
-        "create",
-        "token",
-        "rhdh",
-        "-n",
-        namespace,
-        "--duration=8h",
-      ]);
-      run("yarn", ["dev"], {
-        stdio: "inherit",
-        env: {
-          ...process.env,
-          K8S_URL: state.server,
-          K8S_CLUSTER_TOKEN: token,
-          APP_CONFIG_backend_auth_externalAccess: JSON.stringify(
-            checkAccess(state),
-          ),
-          BROWSER: "none",
-        },
-      });
-    }
+    throw new Error("Usage: cluster.mjs setup|teardown");
   }
 } catch (error) {
   console.error(`error: ${error.message}`);

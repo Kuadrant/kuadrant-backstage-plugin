@@ -22,7 +22,8 @@ fs.appendFileSync(process.env.FAKE_CALLS, JSON.stringify({
   baseURL: process.env.BASE_URL, htmlOpen: process.env.PLAYWRIGHT_HTML_OPEN
 }) + '\\n');
 process.exit(${JSON.stringify(command)} === 'yarn' && args[0] === 'test'
-  ? Number(process.env.FAKE_TEST_EXIT || 0) : 99);
+  ? Number(process.env.FAKE_TEST_EXIT || 0)
+  : ${JSON.stringify(command)} === 'curl' ? Number(process.env.FAKE_CURL_EXIT || 0) : 99);
 `,
       { mode: 0o755 },
     );
@@ -32,8 +33,8 @@ process.exit(${JSON.stringify(command)} === 'yarn' && args[0] === 'test'
       fs.existsSync(callsFile)
         ? fs.readFileSync(callsFile, "utf8").trim().split("\n").map(JSON.parse)
         : [],
-    run: (args = [], env = {}) =>
-      spawnSync("make", ["e2e-remote", ...args], {
+    run: (args = [], env = {}, target = "e2e-remote") =>
+      spawnSync("make", [target, ...args], {
         cwd: fileURLToPath(new URL("../../", import.meta.url)),
         env: {
           ...process.env,
@@ -89,6 +90,38 @@ test("remote target accepts BASE_URL from the environment and reports failed tes
   assert.equal(h.calls().length, 1);
   assert.equal(h.calls()[0].htmlOpen, "never");
   assert.match(result.stderr, /Error 23/);
+});
+
+test("oinc target uses the shared runner and forwards filters after checking RHDH", (t) => {
+  const h = harness(t);
+  const result = h.run(
+    [
+      "RHDH_URL=https://rhdh.example.com",
+      "PLAYWRIGHT_ARGS=--grep 'Smoke test' --list",
+    ],
+    {},
+    "e2e-specs",
+  );
+  assert.equal(result.status, 0, result.stderr);
+  const [check, tests] = h.calls();
+  assert.equal(h.calls().length, 2);
+  assert.equal(check.command, "curl");
+  assert.equal(check.args.at(-1), "https://rhdh.example.com");
+  assert.equal(tests.command, "yarn");
+  assert.deepEqual(tests.args, ["test", "--grep", "Smoke test", "--list"]);
+  assert.equal(tests.baseURL, "https://rhdh.example.com");
+  assert.equal(tests.htmlOpen, "never");
+});
+
+test("oinc target does not run tests when RHDH is unavailable", (t) => {
+  const h = harness(t);
+  const result = h.run([], { FAKE_CURL_EXIT: "7" }, "e2e-specs");
+  assert.notEqual(result.status, 0);
+  assert.match(result.stdout, /no RHDH responding/);
+  assert.deepEqual(
+    h.calls().map((call) => call.command),
+    ["curl"],
+  );
 });
 
 for (const url of [

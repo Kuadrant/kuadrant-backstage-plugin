@@ -1,5 +1,5 @@
 .PHONY: help preflight dynamic-build e2e-deps dynamic-cluster dynamic-up \
-	e2e-specs e2e-dynamic teardown remote-setup remote-dev e2e-remote remote-teardown
+	e2e-specs e2e-dynamic teardown remote-setup e2e-remote remote-teardown
 
 MAKEFLAGS += --no-print-directory
 
@@ -33,9 +33,8 @@ help:
 	@echo "  make remote-setup BASE_URL=https://backstage.example.com  on OpenShift, also deploy Dex and point that RHDH at it"
 	@echo "  make e2e-remote BASE_URL=https://backstage.example.com    run the suite against that deployment"
 	@echo ""
-	@echo "Local app against an existing OpenShift cluster (active kubectl context):"
+	@echo "Fixtures on an existing OpenShift cluster (active kubectl context):"
 	@echo "  make remote-setup     check prerequisites and create owned test fixtures"
-	@echo "  make remote-dev       start the local app and Dex against that cluster"
 	@echo "  make remote-teardown  remove only this run's fixtures, retaining the cluster"
 	@echo ""
 	@echo "Override versions and image settings on the make command line."
@@ -82,13 +81,10 @@ e2e-specs:
 		echo "error: no RHDH responding at $(RHDH_URL); run 'make dynamic-up' first"; \
 		exit 1; \
 	}
-	cd e2e-tests && BASE_URL="$(RHDH_URL)" yarn test $(PLAYWRIGHT_ARGS)
+	$(MAKE) e2e-remote BASE_URL="$(RHDH_URL)"
 
 remote-setup:
 	node e2e-tests/remote/cluster.mjs setup
-
-remote-dev:
-	node e2e-tests/remote/cluster.mjs dev
 
 e2e-remote:
 	node e2e-tests/remote/run.mjs $(PLAYWRIGHT_ARGS)

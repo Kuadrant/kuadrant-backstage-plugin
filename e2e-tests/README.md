@@ -37,9 +37,6 @@ kubeconfig or `.e2e-remote/` state. The deployment must already provide the
 suite's Dex personas, RBAC and demo resources; see
 [deployment prerequisites](../docs/e2e-testing.md#running-against-a-deployed-backstage).
 
-For local plugin development against a remote cluster, see the separate
-[local-app workflow](../docs/e2e-testing.md#local-backstage-against-an-existing-openshift-cluster).
-
 CI uses oinc (Kuadrant + MCP Gateway), not kind. Locally, match that or use kind as a lighter fallback:
 
 ```bash

@@ -12,13 +12,7 @@
   "tasks": {
     "start": {
       "cache": false,
-      "persistent": true,
-      "passThroughEnv": [
-        "K8S_URL",
-        "K8S_CLUSTER_TOKEN",
-        "BROWSER",
-        "APP_CONFIG_backend_auth_externalAccess"
-      ]
+      "persistent": true
     },
     "build": {
       "outputs": ["dist/**"],
