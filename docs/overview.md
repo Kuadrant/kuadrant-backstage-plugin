@@ -20,11 +20,15 @@ The Developer Portal addresses this by providing a Kubernetes-native system wher
 
 ### How It Works
 
-The Developer Portal introduces two Custom Resource Definitions (CRDs) that model API products and access requests:
+The Developer Portal uses four Custom Resource Definitions (CRDs) to model API products and access requests:
 
 **APIProduct** represents an API offering. It wraps an existing HTTPRoute with the business context needed for consumption: a human-readable name, documentation links, contact information, and access policies. When an API owner creates an APIProduct and sets its `publishStatus` to `Published`, it becomes discoverable in the Backstage developer portal.
 
-**APIKey** represents a developer's request for API access. It captures the requester's identity, their intended use case, and their desired service tier. Depending on the APIProduct's approval mode, the request is either automatically approved or queued for manual review. Upon approval, the controller generates secure credentials stored as Kubernetes Secrets.
+**APIKey** represents a developer's request for API access in the consumer's namespace. It captures the requester's identity, use case, and service tier, and references a consumer Secret containing the generated key value. The APIKey and consumer Secret exist before approval.
+
+**APIKeyRequest** is a shadow of the APIKey, created by the controller in the APIProduct's namespace so the API owner can review the request without reading the consumer's Secret.
+
+**APIKeyApproval** records an approval or rejection in the APIProduct's namespace. The controller creates it for automatic approval; Backstage creates it when an owner makes a decision. On approval, the controller copies the consumer's key value into an enforcement Secret in the Kuadrant namespace for authentication.
 
 This model means that API access follows the same patterns as other Kubernetes resources: declarative, auditable, and managed through standard tooling.
 
@@ -36,13 +40,13 @@ The Developer Portal supports two authentication methods for protecting APIs. Th
 
 API key authentication uses Kubernetes Secrets to store credentials. This method involves a request and approval workflow:
 
-1. API consumer creates an APIKey resource requesting access
-2. Depending on the APIProduct's `approvalMode`:
-   - **Manual**: Request enters `Pending` state, awaiting API owner approval
-   - **Automatic**: Request is immediately approved by the controller
-3. Upon approval, the controller generates a Secret containing the API key
-4. Consumer retrieves the key from Backstage and uses it in API requests
-5. AuthPolicy validates incoming requests against the generated Secrets
+1. Backstage generates a key value and creates a Secret in the consumer's namespace, then creates an APIKey referencing that Secret and the APIProduct
+2. The controller creates an APIKeyRequest in the APIProduct's namespace
+3. Depending on the APIProduct's `approvalMode`, an owner reviews the request or the controller automatically creates an APIKeyApproval
+4. The controller updates the APIKey's status conditions and, when approved, copies the key into an enforcement Secret in the Kuadrant namespace
+5. The consumer reveals the key in Backstage and uses it in API requests; AuthPolicy validates it against the enforcement Secret
+
+Generating or storing the consumer's key does not grant access. The enforcement Secret is created only after approval.
 
 This method is ideal for internal APIs, development environments, or scenarios where you want fine-grained control over who can access your API.
 
@@ -77,7 +81,7 @@ The authentication experience depends on how the API is protected:
 **For API Key Authentication:**
 
 - Request access by creating an APIKey resource (either directly or through the Backstage UI)
-- Receive an API key once their request is approved (credentials are shown once and must be saved immediately)
+- Reveal their approved API key on demand from their consumer Secret
 - Use the API key in the `Authorization` header when making requests
 
 **For OIDC/JWT Authentication:**
@@ -144,13 +148,14 @@ flowchart TB
         subgraph Controller["Developer Portal Controller"]
             Reconcile["Reconciles APIProduct and APIKey"]
             Discover["Discovers PlanPolicy and AuthPolicy"]
-            Generate["Generates Secrets for approved APIKeys"]
+            Generate["Copies approved keys into enforcement Secrets"]
             Fetch["Fetches OpenAPI and OIDC discovery"]
         end
 
         APIProduct["APIProduct<br/>displayName, targetRef<br/>approvalMode, status"]
         APIKey["APIKey<br/>apiProductRef, planTier<br/>requestedBy, status"]
-        Secret["Secret<br/>api_key"]
+        ConsumerSecret["Consumer Secret<br/>api_key"]
+        Secret["Enforcement Secret<br/>api_key"]
         HTTPRoute["HTTPRoute<br/>Gateway"]
         PlanPolicy["PlanPolicy<br/>tiers, rate limits"]
         AuthPolicy["AuthPolicy<br/>API key validation"]
@@ -158,7 +163,9 @@ flowchart TB
 
     Backstage -->|"Reads/Creates CRDs"| K8s
     APIKey -->|"references"| APIProduct
-    APIKey -->|"creates"| Secret
+    APIKey -->|"spec.secretRef"| ConsumerSecret
+    Generate -->|"reads"| ConsumerSecret
+    Generate -->|"creates after approval"| Secret
     APIProduct -->|"references"| HTTPRoute
     PlanPolicy -->|"targets"| HTTPRoute
     AuthPolicy -->|"targets"| HTTPRoute
@@ -170,11 +177,11 @@ The flow works as follows:
 2. **API owners** select an available HTTPRoute and create an APIProduct that adds catalog metadata
 3. The **controller** discovers these policies and updates the APIProduct status with available plans
 4. **Backstage** reads APIProduct resources and displays them in the catalog
-5. **Consumers** browse the catalog and create APIKey resources to request access
-6. The **controller** processes APIKey requests, auto-approving or waiting for manual approval based on the APIProduct's configuration
-7. Upon approval, the **controller** generates a Secret containing the API key
+5. **Consumers** request access through Backstage, which creates a consumer Secret and an APIKey referencing it
+6. The **controller** creates an APIKeyRequest for review; an APIKeyApproval records the automatic or manual decision
+7. Upon approval, the **controller** copies the consumer's key into an enforcement Secret in the Kuadrant namespace
 8. The **consumer** retrieves their key and uses it to authenticate API requests
-9. **AuthPolicy** validates incoming requests against the generated Secrets
+9. **AuthPolicy** validates incoming requests against the enforcement Secrets
 10. **PlanPolicy** enforces rate limits based on the consumer's selected tier
 
 ### Integration with Kuadrant
