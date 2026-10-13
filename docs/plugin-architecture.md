@@ -147,7 +147,7 @@ sequenceDiagram
     opt Approved
         DPC->>K8s: Read consumer Secret and create enforcement<br/>Secret in Kuadrant namespace
     end
-    FE->>BE: Poll /requests/my for APIKey status
+    FE->>BE: Fetch APIKey status via /requests/my
     opt Approved
         FE->>BE: GET /apikeys/:ns/:name/secret
         BE-->>FE: Key value from consumer Secret
