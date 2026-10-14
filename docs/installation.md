@@ -58,7 +58,7 @@ The Kuadrant plugins are tested and supported on **Red Hat Developer Hub 1.8.4**
 
 **Installation guide:**
 
-- [Installing Red Hat Developer Hub](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/)
+- [Installing Red Hat Developer Hub]( https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/)
 
 Choose your preferred deployment method:
 
@@ -206,7 +206,7 @@ catalog:
     - allow: [Component, System, API, APIProduct, Resource, Location]
 ```
 
-Follow the steps in [Provisioning your custom Red Hat Developer Hub configuration](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/html/installing_red_hat_developer_hub_on_openshift_container_platform/assembly-install-rhdh-ocp-operator) for the full procedure.
+Follow the steps in [Provisioning your custom Red Hat Developer Hub configuration](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/installing_red_hat_developer_hub_on_openshift_container_platform/assembly-install-rhdh-ocp-operator) for the full procedure.
 
 <details><summary>A full example for "app-config.yaml"</summary>
 

@@ -119,7 +119,7 @@ If you want to submit code changes to the project, here are some guidelines:
      yarn showcase     # Run e2e tests
      ```
 
-     _For more on the e2e, check the [e2e contributing guidelines](./docs/e2e-tests/CONTRIBUTING.MD)_
+     _For more on the e2e, check the [e2e testing documentation](./docs/e2e-testing.md)_
 
    - **Note on Environment Dependencies:**
 
@@ -189,7 +189,7 @@ COPY $EXTERNAL_SOURCE_NESTED/plugins/dynamic-plugins-info/package.json ./plugins
 
 ## Support
 
-You can reach out to us in our [community Slack channel](https://join.slack.com/t/janus-idp/shared_invite/zt-1pxtehxom-fCFtF9rRe3vFqUiFFeAkmg) if you run into any issues with setup, running, or testing the application. Members of the team and community can assist you with questions and concerns you might have. Even if you don't need help, please consider joining and being involved in our community.
+Join [Kuadrant Community](https://kuadrant.io/community/) for help with setup, running, or testing the application. We hold **periodic community meetings** where members of the team and community can assist with your questions and concerns. You can also reach us via the mailing list or GitHub discussions. Even if you don't need help, please consider joining and being involved in our community.
 
 ## License
 

@@ -109,4 +109,4 @@ RHDH uses a specific pattern for sidebar menu items with parent-child relationsh
 
 **Adding new icons:** Import from `@mui/icons-material` and add to the `CommonIcons` map in `CommonIcons.tsx`.
 
-**Documentation:** [RHDH Customizing Appearance](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.6/html/customizing_red_hat_developer_hub/customizing-appearance)
+**Documentation:** [RHDH Customizing Appearance](https://docs.redhat.com/en/documentation/red_hat_developer_hub/1.8/html/customizing_red_hat_developer_hub/customizing-appearance#proc-customize-rhdh-sidebar-menuitems_customizing-appearance)
