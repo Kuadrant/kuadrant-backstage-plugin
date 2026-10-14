@@ -121,7 +121,7 @@ Requests immediately approved by controller:
 
 **CRD field:** `spec.approvalMode` with enum values: `automatic`, `manual`
 
-See CRD definition at [`kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml`](../kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml)
+See CRD definition at [`devportal.kuadrant.io_apiproducts.yaml`](https://github.com/Kuadrant/developer-portal-controller/blob/main/config/crd/bases/devportal.kuadrant.io_apiproducts.yaml)
 
 ## Plan Discovery via Controller
 
@@ -232,14 +232,14 @@ APIProducts have a Draft/Published workflow:
 - Default value is `Draft` (hidden from catalog)
 - Entity provider filters APIProducts, only syncing those with `publishStatus: Published`
 
-See [`plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts`](../plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts) for filtering logic.
+See [`plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts`](../plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts) for filtering logic.
 
 ## Immediate Catalog Sync
 
 After successful APIProduct create/delete operations, the router immediately calls `provider.refresh()` for instant catalog updates.
 
 See:
-- Provider: [`plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts`](../plugins/kuadrant-backend/src/provider/APIProductEntityProvider.ts)
+- Provider: [`plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts`](../plugins/kuadrant-backend/src/providers/APIProductEntityProvider.ts)
 - Router refresh calls: [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/router.ts) - search for `getAPIProductEntityProvider`
 
 ## MCP Resources
