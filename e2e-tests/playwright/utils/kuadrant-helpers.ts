@@ -130,7 +130,7 @@ export async function waitForKuadrantPageReady(page: Page): Promise<void> {
 
   await expect(async () => {
     // no visible spinners
-    const spinner = page.locator('[role="progressbar"]:visible');
+    const spinner = page.locator('main [role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
     // page header is visible (Backstage Header renders as h1)
     const heading = page.locator("h1").filter({ hasText: /api products/i });
@@ -158,7 +158,7 @@ export async function waitForApiKeysPageReady(
 
   await expect(async () => {
     // no visible spinners
-    const spinner = page.locator('[role="progressbar"]:visible');
+    const spinner = page.locator('main [role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
     // page header is visible (Backstage Header renders as h1)
     const heading = page.locator("h1").filter({ hasText: headingPattern });
@@ -179,7 +179,7 @@ export async function waitForMcpPageReady(
   await page.waitForLoadState("load").catch(() => {});
 
   await expect(async () => {
-    const spinner = page.locator('[role="progressbar"]:visible');
+    const spinner = page.locator('main [role="progressbar"]:visible');
     await expect(spinner).toHaveCount(0);
     const heading = page.locator("h1").filter({ hasText: headingPattern });
     await expect(heading).toBeVisible();

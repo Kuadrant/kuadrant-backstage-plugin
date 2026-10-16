@@ -304,30 +304,32 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   }) => {
     const common = new Common(page);
     await common.dexQuickLogin("owner2@kuadrant.local");
+    const requestsCall = page.waitForResponse(
+      (response) =>
+        new URL(response.url()).pathname === "/api/kuadrant/requests" &&
+        response.request().method() === "GET",
+    );
     await page.goto("/kuadrant/api-key-approval");
+    const response = await requestsCall;
+    expect(response.status(), "Owner2's request queue should load").toBe(200);
     await waitForApiKeysPageReady(page);
 
-    // owner2 should NOT see requests for owner1's api. the claim is about that
-    // api, not about owner2's queue being empty overall - owner2 owns other
-    // demo apis, so requests for those are legitimately there and asserting a
-    // globally empty queue only held while nothing else had ever been
-    // requested. narrow to owner1's product and assert nothing comes back.
+    // Owner2 may have requests for their own APIs from earlier runs. Wait for
+    // the queue to render before filtering for the product requested in step 3.
     const search = page.getByRole("textbox", { name: "Search" });
-    if (await search.count()) {
-      await search.fill(testData.name);
+    const emptyQueue = page.getByText(/no api keys found/i);
+    await expect(search.or(emptyQueue).first()).toBeVisible({
+      timeout: TIMEOUTS.SLOW,
+    });
+    if (await search.isVisible()) {
+      await search.fill("toystore-api");
     }
     await expect(
-      page.locator("tbody tr").filter({ hasText: testData.name }),
-      "Owner2 should see no requests for owner1's api",
+      page.locator("tbody tr").filter({ hasText: "toystore-api" }),
+      "Owner2 should see no requests for toystore-api",
     ).toHaveCount(0, { timeout: TIMEOUTS.DEFAULT });
-    // and the page says so, rather than the count being zero because nothing
-    // rendered: an empty queue shows "No API keys found", a search that matches
-    // nothing shows the table's own "No records to display".
     await expect(
-      page
-        .getByText(/no api keys found/i)
-        .or(page.getByText(/no records to display/i))
-        .first(),
+      emptyQueue.or(page.getByText(/no records to display/i)).first(),
       "the queue should report nothing matching owner1's api",
     ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });

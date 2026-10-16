@@ -12,6 +12,19 @@ export default [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    files: ["remote/*.mjs"],
+    languageOptions: {
+      globals: {
+        AbortSignal: "readonly",
+        console: "readonly",
+        fetch: "readonly",
+        process: "readonly",
+        structuredClone: "readonly",
+        URL: "readonly",
+      },
+    },
+  },
+  {
     files: ["**/*.ts", "**/*.tsx"],
     languageOptions: {
       parserOptions: {

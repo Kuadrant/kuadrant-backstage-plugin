@@ -1,6 +1,24 @@
-import { test, expect } from "@playwright/test";
+import { test, expect, type Page } from "@playwright/test";
 import { Common } from "../utils/common";
 import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
+
+// the host app has an "MCP Management" sidebar section; rhdh's dynamic menu
+// config nests the mcp entries in the "Kuadrant" group instead
+function mcpNavEntry(page: Page) {
+  const nav = page.locator("nav");
+  return nav
+    .getByText("MCP Management")
+    .or(nav.getByRole("button", { name: "Kuadrant" }))
+    .first();
+}
+
+async function openMcpNav(page: Page) {
+  const nav = page.locator("nav");
+  await expect(mcpNavEntry(page)).toBeVisible({ timeout: TIMEOUTS.SLOW });
+  const section = nav.getByText("MCP Management").first();
+  if (await section.count()) await section.click();
+  else await nav.getByRole("button", { name: "Kuadrant" }).click();
+}
 
 test.describe("Kuadrant MCP Management", () => {
   let common: Common;
@@ -14,17 +32,15 @@ test.describe("Kuadrant MCP Management", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("owner1@kuadrant.local");
   });
 
   test("should display MCP Management section in sidebar", async ({ page }) => {
-    const mcpSection = page.locator("nav").getByText("MCP Management");
-    await expect(mcpSection.first()).toBeVisible({ timeout: TIMEOUTS.SLOW });
+    await expect(mcpNavEntry(page)).toBeVisible({ timeout: TIMEOUTS.SLOW });
   });
 
   test("should display MCP Overview sub-menu item", async ({ page }) => {
-    const mcpSection = page.locator("nav").getByText("MCP Management").first();
-    await mcpSection.click();
+    await openMcpNav(page);
 
     const overviewLink = page.locator('nav a[href="/kuadrant/mcp-management"]');
     await expect(overviewLink).toBeVisible({ timeout: TIMEOUTS.DEFAULT });

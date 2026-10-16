@@ -2,11 +2,10 @@ import { test, expect } from "@playwright/test";
 import { Common } from "../utils/common";
 import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
 
-// the oinc demo fixture (oinc/manifests/mcp-demo.yaml) always creates this
-// HTTPRoute in CI, so tests assert against it directly instead of
-// skipping when the routes table happens to be empty.
-const FIXTURE_NAMESPACE = "mcp-gateway-system";
-const FIXTURE_NAME = "mcp-gateway-route";
+// Both oinc and remote setup install this route from the shared MCP demo.
+// Assert against it directly so a missing fixture fails the test.
+const fixtureNamespace = "toystore";
+const fixtureName = "mcp-test-server-route";
 
 test.describe("Kuadrant MCP HTTPRoute detail", () => {
   let common: Common;
@@ -20,7 +19,7 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
 
   test.beforeEach(async ({ page }) => {
     common = new Common(page);
-    await common.loginAsGuest();
+    await common.dexQuickLogin("owner1@kuadrant.local");
     await page.goto("/kuadrant/mcp-management");
     await waitForMcpPageReady(page);
   });
@@ -28,7 +27,7 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
   test("opens the detail page from the HTTPRoutes table", async ({ page }) => {
     // the route name is a link into the read-only detail view
     const routeLink = page.locator(
-      `a[href="/kuadrant/mcp/httproutes/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}"]`,
+      `a[href="/kuadrant/mcp/httproutes/${fixtureNamespace}/${fixtureName}"]`,
     );
 
     await expect(routeLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
@@ -36,7 +35,7 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
     await routeLink.click();
 
     await page.waitForURL(
-      `**/kuadrant/mcp/httproutes/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}`,
+      `**/kuadrant/mcp/httproutes/${fixtureNamespace}/${fixtureName}`,
       { timeout: TIMEOUTS.VERY_SLOW },
     );
 
@@ -50,8 +49,8 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
     await expect(page.getByText("Resource Details").first()).toBeVisible({
       timeout: TIMEOUTS.SLOW,
     });
-    await expect(page.getByText(FIXTURE_NAME).first()).toBeVisible();
-    await expect(page.getByText(FIXTURE_NAMESPACE).first()).toBeVisible();
+    await expect(page.getByText(fixtureName).first()).toBeVisible();
+    await expect(page.getByText(fixtureNamespace).first()).toBeVisible();
 
     // breadcrumb links back to the overview
     const breadcrumb = page.locator('a[href="/kuadrant/mcp-management"]', {
@@ -62,14 +61,14 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
 
   test("shows the read-only YAML manifest", async ({ page }) => {
     const routeLink = page.locator(
-      `a[href="/kuadrant/mcp/httproutes/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}"]`,
+      `a[href="/kuadrant/mcp/httproutes/${fixtureNamespace}/${fixtureName}"]`,
     );
 
     await expect(routeLink).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
     await routeLink.click();
     await page.waitForURL(
-      `**/kuadrant/mcp/httproutes/${FIXTURE_NAMESPACE}/${FIXTURE_NAME}`,
+      `**/kuadrant/mcp/httproutes/${fixtureNamespace}/${fixtureName}`,
       { timeout: TIMEOUTS.VERY_SLOW },
     );
 
@@ -83,10 +82,10 @@ test.describe("Kuadrant MCP HTTPRoute detail", () => {
       page.getByText(/apiVersion:\s*gateway\.networking\.k8s\.io/).first(),
     ).toBeVisible();
     await expect(
-      page.getByText(new RegExp(`name:\\s*${FIXTURE_NAME}`)).first(),
+      page.getByText(new RegExp(`name:\\s*${fixtureName}`)).first(),
     ).toBeVisible();
     await expect(
-      page.getByText(new RegExp(`namespace:\\s*${FIXTURE_NAMESPACE}`)).first(),
+      page.getByText(new RegExp(`namespace:\\s*${fixtureNamespace}`)).first(),
     ).toBeVisible();
   });
 });
