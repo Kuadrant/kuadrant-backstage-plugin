@@ -1,6 +1,6 @@
 import { test, expect } from "../fixtures/test";
-import { Common } from "../utils/common";
 import { TIMEOUTS, isElementVisible } from "../utils/kuadrant-helpers";
+import { storageStatePath } from "../support/auth/personas";
 
 /**
  * Tests for auth scheme-specific UI behaviour.
@@ -12,18 +12,15 @@ import { TIMEOUTS, isElementVisible } from "../utils/kuadrant-helpers";
  * - toystore-api: API Key only
  */
 test.describe("Auth Scheme UI Behaviour", () => {
-  let common: Common;
+  // every test here acts as admin; load the pre-authenticated session instead
+  // of running the popup login per test.
+  test.use({ storageState: storageStatePath("admin") });
 
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
       description: "kuadrant",
     });
-  });
-
-  test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
   });
 
   test.describe("OIDC-only API (gamestore-api)", () => {

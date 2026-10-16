@@ -33,13 +33,19 @@ test.describe("Kuadrant MCP Management", () => {
   test("should open the MCP Inspector empty state", async ({ page }) => {
     await page.goto("/kuadrant/mcp-inspector");
 
-    await expect(page.getByRole("heading", { name: "MCP Inspector" })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: "MCP Inspector" }),
+    ).toBeVisible({
       timeout: TIMEOUTS.SLOW,
     });
-    await expect(page.getByLabel("Select an MCP gateway extension")).toBeVisible({
+    await expect(
+      page.getByLabel("Select an MCP gateway extension"),
+    ).toBeVisible({
       timeout: TIMEOUTS.DEFAULT,
     });
-    await expect(page.getByText("No connection", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText("No connection", { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test("should display MCP management page header", async ({ page }) => {

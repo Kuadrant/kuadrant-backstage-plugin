@@ -1,10 +1,8 @@
 import { test, expect } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import { TIMEOUTS } from "../utils/kuadrant-helpers";
 
 test.describe("Kuadrant Skeleton Loaders", () => {
-  let common: Common;
-
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
@@ -13,8 +11,7 @@ test.describe("Kuadrant Skeleton Loaders", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
+    await loginAs(page, "admin@kuadrant.local");
   });
 
   test("should show skeleton loaders on My API Keys page while loading", async ({

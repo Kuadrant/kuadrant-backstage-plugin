@@ -7,7 +7,7 @@
     "node": "22"
   },
   "scripts": {
-    "test": "playwright test --project=kuadrant",
+    "test": "playwright test --project=kuadrant --project=kuadrant-happy-path",
     "test:smoke": "playwright test --project=smoke-test",
     "lint:check": "eslint . --ext .js,.ts",
     "lint:fix": "eslint . \"playwright/**/*.{ts,js}\" --fix",

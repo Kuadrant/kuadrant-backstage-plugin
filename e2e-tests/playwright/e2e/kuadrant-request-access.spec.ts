@@ -1,15 +1,16 @@
 import { test, expect } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import {
   TIMEOUTS,
-  apiKeyTableTotal,
+  requestApiKey,
+  generateTestId,
+  waitForApiKeyRow,
   waitForApiKeysPageReady,
   selectFirstOption,
   openSelect,
 } from "../utils/kuadrant-helpers";
 
-// a demo APIProduct seeded by setup-cluster.sh. named so a test can narrow the
-// table to it rather than counting every row on a paginated page.
+// A demo APIProduct seeded by setup-cluster.sh.
 const targetApi = "owner1-payment-api";
 
 /**
@@ -27,8 +28,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should display Request Access button on My API Keys page", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -43,8 +43,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should open SimpleRequestAccessDialog when Request Access is clicked", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -66,8 +65,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should display API dropdown with published APIs", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -105,8 +103,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should populate tiers dropdown after selecting an API", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -152,8 +149,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should show tier limits in dropdown options", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -189,8 +185,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should enable Submit button only when API and Tier are selected", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -228,8 +223,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should allow entering a use case", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -257,8 +251,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should successfully submit a request and close dialog", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -294,8 +287,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should show loading state while submitting", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -337,8 +329,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should reset form when Cancel is clicked", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -375,8 +366,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   });
 
   test("should display helper text for fields", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -415,8 +405,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     test("should display error message when request fails", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/my-api-keys");
       await waitForApiKeysPageReady(page);
 
@@ -465,8 +454,7 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
     test("should display user-friendly error for email validation failure", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/my-api-keys");
       await waitForApiKeysPageReady(page);
 
@@ -518,48 +506,9 @@ test.describe("Request Access Dialog - My API Keys Page", () => {
   test("should refresh My API Keys table after successful request", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
-    await page.goto("/kuadrant/my-api-keys");
-    await waitForApiKeysPageReady(page);
-
-    // the total, not the visible rows: the table pages at 20, so a bare count
-    // stops growing once the first page is full and this test would then never
-    // see its own request arrive. wait for the body to render before taking the
-    // baseline - reading it mid-load returns 0 and the comparison is then
-    // against a number that was never true.
-    await expect(
-      page
-        .locator("table tbody tr")
-        .first()
-        .or(page.getByText(/no api keys found/i)),
-      "the keys table should finish loading before the baseline is taken",
-    ).toBeVisible({ timeout: TIMEOUTS.SLOW });
-    const initialCount = await apiKeyTableTotal(page);
-
-    const requestButton = page.getByTestId("request-access-button");
-    await requestButton.click();
-
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
-
-    // select API and tier
-    await selectFirstOption(page, dialog, "api-select", targetApi);
-
-    await selectFirstOption(page, dialog, "tier-select");
-
-    // submit
-    const submitButton = dialog.getByTestId("submit-button");
-    await submitButton.click();
-
-    // wait for dialog to close
-    await expect(dialog).not.toBeVisible({ timeout: TIMEOUTS.SLOW });
-
-    await expect
-      .poll(() => apiKeyTableTotal(page), {
-        timeout: TIMEOUTS.SLOW,
-        message: "Table should have one more row after successful request",
-      })
-      .toBe(initialCount + 1);
+    await loginAs(page, "consumer1@kuadrant.local");
+    const useCase = `table refresh ${generateTestId()}`;
+    await requestApiKey(page, useCase, targetApi);
+    await waitForApiKeyRow(page, useCase);
   });
 });
