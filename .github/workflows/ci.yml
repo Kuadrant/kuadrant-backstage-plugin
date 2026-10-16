@@ -116,7 +116,7 @@ jobs:
 
   # CI e2e cluster is oinc (same addons as `yarn oinc:cluster` / kuadrant-console-plugin),
   # not kind. Based on kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
-  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.5.3 from GitHub releases,
+  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.6.1 from GitHub releases,
   # Helm, Docker on the hosted runner (no extra DinD/privileged job). oinc create is
   # nested k8s (~6+ min; Istio + Kuadrant + MCP Gateway). Kind stays local loop 1;
   # unit tests do not need a cluster.
@@ -140,8 +140,8 @@ jobs:
       # with "Is a directory" (console-plugin does not have that path).
       - name: Install oinc
         run: |
-          OINC_VERSION="${OINC_VERSION:-v0.5.3}"
-          curl -fL -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
+          OINC_VERSION="${OINC_VERSION:-v0.6.1}"
+          curl -fL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
           chmod +x /tmp/oinc
           file /tmp/oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
           /tmp/oinc version

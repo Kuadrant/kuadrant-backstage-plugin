@@ -144,11 +144,15 @@ if [ "${PLUGIN_SOURCE}" = "baked" ]; then
                     importName: GatewayDetailPage
 EOF
   )
+  # mcp gets its own sidebar section, as in the host app (packages/app/src/consts.ts)
   LOCAL_MENU_ITEMS=$(cat <<'EOF'
+                  kuadrant-mcp:
+                    icon: kuadrantIcon
+                    title: MCP Management
                   kuadrant.mcp-management:
-                    parent: kuadrant
+                    parent: kuadrant-mcp
                   kuadrant.mcp-inspector:
-                    parent: kuadrant
+                    parent: kuadrant-mcp
 EOF
   )
 fi
