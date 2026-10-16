@@ -53,6 +53,7 @@ For specific topics, refer to these focused guides:
 | [docs/e2e-testing.md](docs/e2e-testing.md) | E2E test setup, Playwright configuration, test structure |
 | [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
 | [docs/oinc.md](docs/oinc.md) | Development loops: kind or oinc host app, and RHDH with published or locally built dynamic plugins |
+| [docs/release-testing.md](docs/release-testing.md) | Release testing: RHCL release candidate, RHDH and the productised plugin on one cluster, then the e2e suite |
 
 ## Prerequisites
 

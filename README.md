@@ -256,6 +256,7 @@ This repo is a fork of RHDH with Kuadrant-specific customisations. See [KUADRANT
 - [docs/api-reference.md](docs/api-reference.md) - Backend API reference
 - [kuadrant-dev-setup/README.md](kuadrant-dev-setup/README.md) - Kind development cluster
 - [docs/oinc.md](docs/oinc.md) - oinc: host app (`yarn dev:oinc`) and published dynamic plugins in RHDH (`yarn oinc:rhdh`)
+- [docs/release-testing.md](docs/release-testing.md) - Release testing of the productised plugins in RHDH, with manifests
 - [KUADRANT.md](KUADRANT.md) - Branching strategy and customisations
 
 ## Technical Details
