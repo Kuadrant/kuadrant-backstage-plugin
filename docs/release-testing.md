@@ -47,11 +47,13 @@ the `stable` channel, OSSM3 and the QE catalog; set `indexImage` for the release
 and OCP version.
 
 ```bash
-git clone https://github.com/Kuadrant/helm-charts-olm && cd helm-charts-olm
-helm install kuadrant-operators charts/kuadrant-operators --values values.yaml \
-  --values <repo>/docs/release-testing/rhcl-values.yaml --wait --timeout 25m
-helm install kuadrant-instances charts/kuadrant-instances --values values.yaml \
-  --values <repo>/docs/release-testing/rhcl-values.yaml --wait --timeout 25m
+git clone https://github.com/Kuadrant/helm-charts-olm
+helm install kuadrant-operators helm-charts-olm/charts/kuadrant-operators \
+  --values helm-charts-olm/values.yaml \
+  --values docs/release-testing/rhcl-values.yaml --wait --timeout 25m
+helm install kuadrant-instances helm-charts-olm/charts/kuadrant-instances \
+  --values helm-charts-olm/values.yaml \
+  --values docs/release-testing/rhcl-values.yaml --wait --timeout 25m
 ```
 
 RHCL 1.5 includes the MCP Gateway controller, and the chart enables the developer portal
