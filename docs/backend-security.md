@@ -76,17 +76,19 @@ For RBAC permissions and access control patterns, see [rbac-permissions.md](rbac
 
 ## 6. Follow Namespace Organisation Pattern
 
-**Principle:** Respect Kuadrant's namespace architecture where all API resources live in the same namespace.
+**Principle:** Keep consumer credentials in the consumer's namespace and approval decisions in the APIProduct's namespace.
 
 **See [kuadrant-resources.md](kuadrant-resources.md) for detailed namespace architecture.**
 
 **Implementation:**
-- Never accept `namespace` from client input for resource creation
-- Use the namespace of the referenced resource (APIProduct, HTTPRoute)
-- Create APIKeys in the API's namespace (spec.apiNamespace)
-- Create Secrets in the API's namespace (not user namespace)
 
-**Why:** Cross-namespace creation can bypass RBAC, pollute namespaces, or break AuthPolicy references.
+- Derive the consumer namespace from the authenticated user's identity, not client input
+- Create APIKeys and their source Secrets in that consumer namespace
+- Treat `namespace` in `POST /requests` as the APIProduct's namespace and store it in `spec.apiProductRef.namespace`; authorize access to that product
+- Read APIKeyRequests and create APIKeyApprovals in the APIProduct's namespace after checking approval permissions and product ownership
+- Let the controller copy approved key values into enforcement Secrets in the Kuadrant namespace
+
+**Why:** Consumer credentials remain separate from owner review resources. Cross-namespace product references are intentional and must retain the backend's identity and permission checks.
 
 ## 7. Explicit Error Responses
 

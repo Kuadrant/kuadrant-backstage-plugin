@@ -4,32 +4,37 @@ This document describes the Kuadrant CRDs, namespace organisation, and resource 
 
 ## Resource Namespace Organisation
 
-Kuadrant follows a strict namespace organisation pattern where all resources for an API must live in the same namespace:
+API infrastructure and review resources live in the API owner's namespace. Consumer credentials and enforcement Secrets live separately:
 
 ```
-namespace: toystore
+APIProduct namespace: toystore
+├── apiproduct (toystore-api) - references the httproute
 ├── httproute (toystore) - gateway api route definition
 ├── authpolicy (toystore) - authentication policy targeting httproute
 ├── planpolicy (toystore-plans) - rate limiting policy targeting httproute
 ├── service (toystore) - backend service
-└── secrets (api keys) - created by backstage with plan-id annotations
+├── apikeyrequests - controller-created shadows for owner review
+└── apikeyapprovals - automatic or owner approval decisions
+
+Consumer namespace: derived from the authenticated Backstage user
+├── apikeys - access requests referencing the APIProduct across namespaces
+└── secrets - generated key values, referenced by APIKey spec.secretRef
+
+Kuadrant namespace
+└── enforcement secrets - approved key values with authentication metadata
 ```
 
 ### Why This Matters
 
-1. **AuthPolicy references Secrets**: AuthPolicy needs to access Secrets in the same namespace for authentication
+1. **AuthPolicy selects enforcement Secrets**: API key authentication must discover the labeled Secrets in the Kuadrant namespace, for example with `apiKey.allNamespaces: true`
 2. **Policies target HTTPRoute**: Both AuthPolicy and PlanPolicy use `targetRef` to reference the HTTPRoute by name (same namespace lookup)
-3. **Secrets placement**: API keys (Secrets) must be in the API's namespace so AuthPolicy can reference them
+3. **Consumer isolation**: APIKeys and their source Secrets belong to the consumer; owners review APIKeyRequests in the APIProduct's namespace
 
 ### Implementation in Backstage
 
-**Frontend validation:** PlanPolicy dropdown filtered to only show policies in the same namespace as the APIProduct being created.
+Backstage generates the key value and calls `POST /secrets` before `POST /requests`. The backend derives the consumer namespace from the authenticated user. The request's `namespace` identifies the APIProduct's namespace, not where the APIKey or consumer Secret is created.
 
-See [`plugins/kuadrant/src/components/CreateAPIProductDialog/CreateAPIProductDialog.tsx`](../plugins/kuadrant/src/components/CreateAPIProductDialog/CreateAPIProductDialog.tsx)
-
-**Backend Secret creation:** Secrets always created in `apiNamespace` (not request namespace).
-
-See [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/router.ts) - search for `apiNamespace` usage in request creation endpoints.
+See [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/router.ts), particularly `getConsumerNamespace` and the Secret/request creation endpoints.
 
 ## HTTPRoute-First APIProduct Model
 
@@ -52,7 +57,8 @@ See [`plugins/kuadrant-backend/src/router.ts`](../plugins/kuadrant-backend/src/r
 
 ## APIKey Scoping to APIProduct
 
-APIKey `spec.apiName` references the **APIProduct name** (not HTTPRoute name):
+APIKey `spec.apiProductRef.name` and `spec.apiProductRef.namespace` reference the **APIProduct** across namespaces (not the HTTPRoute):
+
 - Each APIProduct has its own isolated set of API key requests
 - Multiple APIProducts can safely reference the same HTTPRoute with separate keys/requests
 
@@ -60,27 +66,29 @@ See [`plugins/kuadrant/src/components/ApiKeyManagementTab/ApiKeyManagementTab.ts
 
 ## API Key Management Model
 
-APIKeys are the source of truth for API keys, not Kubernetes Secrets.
+An APIKey represents the consumer's access request, including while it is Pending. Its status uses `status.conditions`; the key value is stored in a separate consumer Secret. See the [API management RBAC design](https://github.com/Kuadrant/kuadrant-console-plugin/blob/main/docs/designs/2026-03-26-api-management-rbac-design.md) for the consumer-provided Secret model.
 
 ### Resource Relationship
 
 ```
-APIKey (CRD)                    Secret (Kubernetes)
-├── metadata.name               Created by controller when approved
-├── spec.planTier               Name: {apikey-name}-apikey-secret
-├── spec.apiProductRef.name     annotations:
-├── spec.requestedBy.userId       - secret.kuadrant.io/plan-id
-└── status.secretRef              - secret.kuadrant.io/user-id
-    ├── name                    labels:
-    └── key                       - app: <apiProductName>
-                                  - authorino.kuadrant.io/managed-by: authorino
+APIKey (consumer namespace)
+├── spec.apiProductRef          -> APIProduct (owner namespace)
+├── spec.secretRef.name         -> consumer Secret, data.api_key
+├── spec.planTier
+├── spec.requestedBy.userId
+└── status.conditions           <- reconciled approval state
+
+APIKeyRequest (owner namespace) -> APIKey via spec.apiKeyRef
+APIKeyApproval (owner namespace) -> APIKeyRequest via spec.apiKeyRequestRef
+Enforcement Secret (Kuadrant namespace) <- key copied only after approval
 ```
 
 **Key points:**
-- Controller creates Secret when APIKey phase is Approved
-- Controller sets OwnerReference on Secret (garbage collected when APIKey deleted)
-- `status.secretRef` points to the Secret (name + key)
-- Frontend fetches actual key via GET /requests/:namespace/:name/secret
+
+- Backstage creates the consumer Secret and APIKey before approval; the controller creates the shadow APIKeyRequest
+- Approval is recorded in an APIKeyApproval, created automatically by the controller or by Backstage for an owner's decision
+- The controller copies the approved key value into an enforcement Secret with the labels and annotations needed by AuthPolicy and PlanPolicy
+- Frontend reads the consumer Secret via `GET /api/kuadrant/apikeys/:namespace/:name/secret`, using the APIKey's `spec.secretRef.name`
 
 ### UI Behaviour
 
@@ -97,9 +105,10 @@ APIKey (CRD)                    Secret (Kubernetes)
 ### Deletion Flow
 
 When user deletes an approved API key:
+
 1. Backend deletes APIKey resource
-2. Controller's OwnerReference causes Secret to be garbage collected
-3. Both disappear from Kubernetes
+2. Controller removes the shadow APIKeyRequest and enforcement Secret; the APIKeyApproval is garbage-collected through its owner reference to the APIKeyRequest
+3. The consumer Secret is separate: Backstage's request-delete endpoint does not delete it or give it an APIKey owner reference. It can be removed through `DELETE /api/kuadrant/secrets/:name` in the consumer's namespace
 
 ## Approval Modes
 
@@ -108,20 +117,22 @@ APIProducts support two approval modes for API key requests:
 ### Manual (default)
 
 Requests require explicit approval by API owner:
-1. User requests API access → status: Pending
-2. API Owner reviews → clicks approve → status: Approved
-3. Controller creates Secret → user sees API key
+
+1. Backstage creates the consumer Secret and APIKey; the controller creates a Pending APIKeyRequest for review
+2. API Owner clicks approve → Backstage creates an APIKeyApproval
+3. Controller sets the APIKey's Approved condition and creates the enforcement Secret
 
 ### Automatic
 
-Requests immediately approved by controller:
-1. User requests API access
-2. Controller auto-approves and creates Secret
-3. User sees API key
+Requests approved by the controller without owner intervention:
+
+1. Backstage creates the consumer Secret and APIKey; the controller creates the APIKeyRequest
+2. Controller creates an APIKeyApproval for the pending request
+3. Controller sets the APIKey's Approved condition and creates the enforcement Secret
 
 **CRD field:** `spec.approvalMode` with enum values: `automatic`, `manual`
 
-See CRD definition at [`kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml`](../kuadrant-dev-setup/crds/devportal.kuadrant.io_apiproduct.yaml)
+The developer-portal-controller supplies the APIProduct CRD; the plugin uses the [API management types](../plugins/kuadrant/src/types/api-management.ts).
 
 ## Plan Discovery via Controller
 
