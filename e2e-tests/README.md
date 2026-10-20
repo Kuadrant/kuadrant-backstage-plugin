@@ -25,6 +25,18 @@ yarn test:smoke
 
 ## Prerequisites
 
+To test a deployed Backstage/RHDH, run from the repository root:
+
+```bash
+make e2e-deps
+make e2e-remote BASE_URL=https://backstage.example.com
+```
+
+This tests the plugins loaded by that deployment. It needs no local app,
+kubeconfig or `.e2e-remote/` state. The deployment must already provide the
+suite's Dex personas, RBAC and demo resources; see
+[deployment prerequisites](../docs/e2e-testing.md#running-against-a-deployed-backstage).
+
 CI uses oinc (Kuadrant + MCP Gateway), not kind. Locally, match that or use kind as a lighter fallback:
 
 ```bash

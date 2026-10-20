@@ -1,0 +1,24 @@
+# Shared test authentication for oinc and remote RHDH.
+# Each environment supplies the Dex URL, session settings and policy file path.
+signInPage: oidc
+auth:
+  environment: development
+  providers:
+    oidc:
+      development:
+        clientId: backstage
+        clientSecret: backstage-dev-secret
+        title: OIDC
+        # Keep sessions alive across the full-page navigations in the tests.
+        additionalScopes:
+          - offline_access
+        signIn:
+          resolvers:
+            - resolver: emailMatchingUserEntityProfileEmail
+permission:
+  enabled: true
+  rbac:
+    admin:
+      superUsers:
+        - name: user:default/admin
+    policyFileReload: true

@@ -309,6 +309,8 @@ upstream:
         cors:
           origin: ${RHDH_URL}
     extraAppConfig:
+      - configMapRef: kuadrant-auth-rhdh
+        filename: app-config-kuadrant-auth.yaml
       - configMapRef: app-config-rhdh
         filename: app-config-kuadrant.yaml
     extraEnvVarsSecrets:
@@ -363,7 +365,7 @@ VALS
 # entities the resolver and rbac need, the k8s cluster locator (sa token),
 # catalog rules and rbac. backstage merges it after the addon's config.
 #
-# the addon also configures guest auth. signInPage below moves the sign-in page
+# the addon also configures guest auth. rhdh-auth.yaml moves the sign-in page
 # onto oidc so nothing arrives as guest, which is what makes the multi-user
 # specs meaningful here: personas come from dex and their roles from group
 # membership, exactly as under `yarn dev`.
@@ -378,6 +380,11 @@ kubectl create configmap catalog-entities-rhdh \
   --from-file=kuadrant-users.yaml="${REPO_DIR}/catalog-entities/kuadrant-users.yaml" \
   --dry-run=client -o yaml | kubectl apply -f -
 
+kubectl create configmap kuadrant-auth-rhdh \
+  --namespace rhdh \
+  --from-file=app-config-kuadrant-auth.yaml="${REPO_DIR}/kuadrant-dev-setup/rhdh-auth.yaml" \
+  --dry-run=client -o yaml | kubectl apply -f -
+
 kubectl apply -n rhdh -f - <<EOF
 apiVersion: v1
 kind: ConfigMap
@@ -386,10 +393,7 @@ metadata:
   namespace: rhdh
 data:
   app-config-kuadrant.yaml: |
-    signInPage: oidc
-
     auth:
-      environment: development
       # the oidc provider is session-backed; without this it answers
       # /api/auth/oidc/start with "authentication requires session support".
       # secure: false because this environment is served over plain http (the
@@ -406,19 +410,6 @@ data:
         oidc:
           development:
             metadataUrl: ${DEX_URL}/.well-known/openid-configuration
-            clientId: backstage
-            clientSecret: backstage-dev-secret
-            title: OIDC
-            # the provider asks for openid/profile/email only, so dex issues no
-            # refresh token and the session dies on the first full page load -
-            # every spec navigates, so that is every spec. offline_access is what
-            # makes dex mint one. (the option is additionalScopes; the module
-            # rejects "scope" outright.)
-            additionalScopes:
-              - offline_access
-            signIn:
-              resolvers:
-                - resolver: emailMatchingUserEntityProfileEmail
 
     kubernetes:
       serviceLocatorMethod:
@@ -440,13 +431,8 @@ data:
           target: /opt/app-root/src/catalog-entities/kuadrant-users.yaml
 
     permission:
-      enabled: true
       rbac:
-        admin:
-          superUsers:
-            - name: user:default/admin
         policies-csv-file: /opt/app-root/src/rbac/rbac-policy.csv
-        policyFileReload: true
 EOF
 
 # rbac policy from repo root, verbatim. it already grants the three groups their

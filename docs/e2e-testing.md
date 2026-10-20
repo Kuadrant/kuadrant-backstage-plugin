@@ -43,6 +43,102 @@ yarn test --grep "permissions matrix"  # RBAC tests only
 
 Kind has no MCP Gateway operator. Prefer oinc when exercising MCP. Do not run kind and oinc at the same time (both write `.env`).
 
+## Running against a deployed Backstage
+
+Run the existing suite against the plugins loaded by an existing Backstage/RHDH
+installation:
+
+```bash
+make e2e-deps
+make e2e-remote BASE_URL=https://backstage.example.com
+# Or select tests:
+make e2e-remote BASE_URL=https://backstage.example.com PLAYWRIGHT_ARGS="--grep 'Smoke test'"
+```
+
+`BASE_URL` must be the application's HTTP(S) origin, without a path, query,
+fragment or credentials. Playwright already supports this setting; the Make
+wrapper requires it explicitly, forwards `PLAYWRIGHT_ARGS`, and leaves the HTML
+report closed. It needs no local app, kubeconfig or setup record. Tests create
+and delete resources through the deployed plugin as part of their flows.
+
+The deployment must provide:
+
+- Both Kuadrant plugins, connected to the intended cluster with permission to
+  manage test resources.
+- The existing Dex test personas, catalog groups and policy from
+  `kuadrant-dev-setup/dex/config.yaml`, `catalog-entities/kuadrant-users.yaml`
+  and `rbac-policy.csv`. The login helper expects the Dex quick-login picker;
+  another login flow needs a matching helper.
+- The demo API products and MCP fixtures used by the suite, from
+  `kuadrant-dev-setup/demo/`, `e2e-tests/remote/mcp-gateway.yaml` and
+  `oinc/manifests/mcp-demo.yaml`.
+
+These are the same roles and test identities used locally and on oinc. Existing
+RBAC alone is insufficient if the deployment lacks those users or grants them
+different permissions. Record the deployed plugin versions alongside results.
+
+### Preparing fixtures on OpenShift
+
+If authentication and RBAC are already configured for the suite, create just the
+cluster fixtures:
+
+```bash
+make remote-setup BASE_URL=
+make e2e-remote BASE_URL=https://backstage.example.com
+make remote-teardown
+```
+
+Setup needs Node 22, the E2E dependencies, kubectl and a logged-in OpenShift
+context. Kuadrant must already have the developer portal enabled, the
+APIProduct/APIKey/approval/PlanPolicy APIs, an accepted `istio` GatewayClass,
+and the MCP APIs/controllers. RHDH uses its existing Kubernetes credentials.
+
+Setup reuses the demo manifests and creates owned fixture namespaces, including
+the consumer namespaces for the Dex personas. It refuses to overwrite existing
+namespaces. Run ownership and cluster identity are recorded in `.e2e-remote/`;
+`E2E_REMOTE_STATE_DIR` selects another record directory. A failed setup retains
+its record for cleanup. If the record is lost, teardown recovers ownership from
+run labels and refuses unlabelled resources or mixed runs.
+
+Teardown deletes the run's MCP resources before their namespaces, avoiding the
+RHCL 1.5.0 RC3 MCP Gateway finalizer hang. It retains the cluster and its installed
+operators. `make teardown` belongs to oinc; use `make remote-teardown` here.
+
+### Preparing RHDH on OpenShift
+
+For an RHDH instance that still needs the test login and policy, pass its URL to
+setup. The instance must be managed by the RHDH operator and have a completed
+rollout:
+
+```bash
+make remote-setup BASE_URL=https://rhdh.example.com
+make e2e-remote BASE_URL=https://rhdh.example.com
+make remote-teardown
+```
+
+This also deploys Dex and mounts the existing catalog users and `rbac-policy.csv`
+into RHDH through two ConfigMaps on its `Backstage` CR. OIDC and RBAC defaults
+come from `kuadrant-dev-setup/rhdh-auth.yaml`, shared with oinc. `CATALOG_USERS`
+and `RBAC_POLICY` can select files from the plugin release being tested.
+
+The test configuration merges last and temporarily overrides OIDC sign-in, the
+RBAC policy-file path and superusers. Such a run tests the installed plugins
+under the supplied test policy. Setup preserves existing catalog locations by
+reading the backend's loaded configuration through `pods/exec`; it refuses
+catalog environment overrides or file directives it cannot preserve. It waits
+for RHDH to restart and checks that sign-in redirects to Dex.
+
+Dex uses an edge TLS route in the owned `kuadrant-backstage-e2e` namespace.
+RHDH must trust the ingress CA, for example through `NODE_EXTRA_CA_CERTS`.
+Until teardown, anyone who can reach RHDH can sign in as a test persona,
+including the RBAC superuser.
+
+Teardown removes the added configuration and waits until no RHDH pod uses it
+before deleting Dex. It refuses to remove configuration owned by another run.
+
+The runner and lifecycle regression tests use fake commands without contacting
+a cluster: `node --test e2e-tests/remote/*.test.mjs`.
+
 ## Running against RHDH (dynamic plugins)
 
 The required CI job above remains the static-plugin path. The separate `E2E (dynamic plugins)` workflow is manually dispatched and runs the same full suite against the current branch's `export-dynamic` output in RHDH on oinc.
