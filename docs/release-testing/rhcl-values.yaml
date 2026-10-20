@@ -1,0 +1,14 @@
+# helm-charts-olm values for an rhcl release candidate, on top of its values.yaml
+kuadrant:
+  operatorName: rhcl-operator
+  channel: stable
+  # per release candidate and ocp version
+  indexImage: quay.io/kuadrant/qe-rhcl-prerelease-images:rhcl-1.5.0-v4.22-rc3
+  installPlanApproval: Automatic
+  extensionsImage: ""
+  # tracing targets the jaeger in the tools charts, which are not installed
+  enableObservability: false
+istio:
+  istioProvider: ossm3
+tools:
+  enabled: "false"

@@ -1,0 +1,108 @@
+# plugin 0.5.0 (rhcl 1.5.0 rc3); update the image tag and pluginConfig per release from oinc/setup-rhdh.sh at the plugin's tag
+includes:
+  - dynamic-plugins.default.yaml
+plugins:
+  - package: oci://registry.stage.redhat.io/rhcl-1/rhcl-rhdh-dynamic-plugin-rhel9:0.5.0!kuadrant-backstage-plugin-backend-dynamic
+    disabled: false
+  - package: oci://registry.stage.redhat.io/rhcl-1/rhcl-rhdh-dynamic-plugin-rhel9:0.5.0!kuadrant-backstage-plugin-frontend-dynamic
+    disabled: false
+    pluginConfig:
+      dynamicPlugins:
+        frontend:
+          kuadrant.kuadrant-backstage-plugin-frontend:
+            apiFactories:
+              - importName: kuadrantApiFactory
+            appIcons:
+              - name: kuadrantIcon
+                importName: KuadrantIcon
+            dynamicRoutes:
+              - path: /kuadrant
+                importName: KuadrantPage
+              - path: /kuadrant/api-products
+                importName: ApiProductsPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: API Products
+              - path: /kuadrant/my-api-keys
+                importName: MyApiKeysPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: My API Keys
+              - path: /kuadrant/api-key-approval
+                importName: ApiKeyApprovalPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: API Key Approval
+              - path: /kuadrant/api-products/:namespace/:name
+                importName: ApiProductDetailPage
+              - path: /kuadrant/api-keys/:namespace/:name
+                importName: ApiKeyDetailPage
+              - path: /kuadrant/mcp-management
+                importName: McpOverviewPage
+                menuItem:
+                  icon: kuadrantIcon
+                  text: MCP Overview
+              - path: /kuadrant/mcp-inspector
+                importName: McpInspector
+                menuItem:
+                  icon: kuadrantIcon
+                  text: MCP Inspector
+              - path: /kuadrant/mcp/gatewayextensions/:namespace/:name
+                importName: McpGatewayExtensionDetailPage
+              - path: /kuadrant/mcp/serverregistrations/:namespace/:name
+                importName: McpServerRegistrationDetailPage
+              - path: /kuadrant/mcp/httproutes/:namespace/:name
+                importName: McpHTTPRouteExtensionDetailPage
+              - path: /kuadrant/gateways/:namespace/:name
+                importName: GatewayDetailPage
+            menuItems:
+              kuadrant:
+                icon: kuadrantIcon
+                title: Kuadrant
+              kuadrant.api-products:
+                parent: kuadrant
+              kuadrant.my-api-keys:
+                parent: kuadrant
+              kuadrant.api-key-approval:
+                parent: kuadrant
+              kuadrant.mcp-management:
+                parent: kuadrant
+              kuadrant.mcp-inspector:
+                parent: kuadrant
+            entityTabs:
+              - mountPoint: entity.page.api-keys
+                path: /api-keys
+                title: API Keys
+              - mountPoint: entity.page.api-product-info
+                path: /api-product-info
+                title: API Product Info
+            mountPoints:
+              - mountPoint: entity.page.overview/cards
+                importName: EntityKuadrantApiAccessCard
+                config:
+                  layout:
+                    gridColumnEnd:
+                      lg: "span 6"
+                      md: "span 6"
+                      xs: "span 12"
+                  if:
+                    allOf:
+                      - isKind: api
+                      - hasAnnotation: kuadrant.io/auth-apikey
+              - mountPoint: entity.page.api-keys/cards
+                importName: EntityKuadrantApiKeyManagementTab
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
+                      - hasAnnotation: kuadrant.io/auth-apikey
+              - mountPoint: entity.page.api-product-info/cards
+                importName: EntityKuadrantApiProductInfoContent
+                config:
+                  layout:
+                    gridColumn: "1 / -1"
+                  if:
+                    allOf:
+                      - isKind: api
