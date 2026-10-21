@@ -136,6 +136,14 @@ jobs:
       - name: Enable Corepack
         run: corepack enable
 
+      - name: Cache Yarn packages
+        uses: actions/cache@0400d5f644dc74513175e3cd8d07132dd4860809 # ratchet:actions/cache@v4.2.4
+        with:
+          path: ~/.yarn/berry/cache
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock', 'e2e-tests/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+
       # Download to /tmp: this repo has an oinc/ directory, so curl -o oinc fails
       # with "Is a directory" (console-plugin does not have that path).
       - name: Install oinc
@@ -173,8 +181,22 @@ jobs:
           cd e2e-tests
           yarn playwright install chromium
 
-      - name: Create oinc cluster
-        run: yarn oinc:cluster
+      - name: Create oinc cluster and build Backstage
+        run: |
+          yarn oinc:cluster &
+          cluster_pid=$!
+          yarn build &
+          build_pid=$!
+
+          cluster_status=0
+          build_status=0
+          wait "$cluster_pid" || cluster_status=$?
+          wait "$build_pid" || build_status=$?
+
+          if [ "$cluster_status" -ne 0 ] || [ "$build_status" -ne 0 ]; then
+            echo "Cluster setup exited with $cluster_status; build exited with $build_status"
+            exit 1
+          fi
 
       - name: Verify Kuadrant and MCP Gateway
         run: |
@@ -187,24 +209,34 @@ jobs:
 
       - name: Start Backstage
         run: |
-          yarn dev:oinc &
+          # Serve the pre-built frontend from the backend on a single port (:7007),
+          # no webpack dev server - that frees the runner's CPU so the parallel
+          # Playwright workers get real spare cores. The backend loads the cluster
+          # env (K8S_URL/K8S_CLUSTER_TOKEN) from the .env that `yarn oinc:cluster`
+          # wrote, so it still talks to the oinc cluster. Dex + backend only.
+          yarn concurrently -k -n dex,backend \
+            "yarn dev:setup-dex && yarn dev:dex" \
+            "yarn dev:backend:built" &
           echo $! > backstage.pid
           DEV_PID=$(cat backstage.pid)
           for i in $(seq 1 90); do
-            if curl -sf http://localhost:3000 >/dev/null 2>&1; then
-              echo "yarn-dev ready on :3000"
+            if curl -sf http://localhost:7007 >/dev/null 2>&1 && \
+               curl -sf http://localhost:5556/.well-known/openid-configuration >/dev/null 2>&1; then
+              echo "backstage and Dex ready"
               exit 0
             fi
             if ! kill -0 "$DEV_PID" 2>/dev/null; then
-              echo "yarn-dev process died unexpectedly"
+              echo "backstage process died unexpectedly"
               exit 1
             fi
             sleep 2
           done
-          echo "yarn-dev not ready after 180s"
+          echo "backstage or Dex not ready after 180s"
           exit 1
 
       - name: Run e2e tests
+        env:
+          BASE_URL: http://localhost:7007
         run: |
           cd e2e-tests
           yarn test

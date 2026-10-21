@@ -1,5 +1,5 @@
 import { test, expect } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import {
   TIMEOUTS,
   apiKeyTableTotal,
@@ -42,9 +42,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     const context = await browser.newContext();
     try {
       const page = await context.newPage();
-      const common = new Common(page);
-
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
 
       // wait for the table, not just the heading: searching before the rows
@@ -63,21 +61,23 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
 
       // matched on the id, which both name and displayName carry: the search
       // indexes the resource name, but the row renders the display name.
-      const apiProductRow = page
-        .locator("tbody tr")
-        .filter({ hasText: testData.id })
-        .first();
-      await apiProductRow.waitFor({ state: "visible", timeout: TIMEOUTS.SLOW });
-
-      await apiProductRow
-        .getByRole("button", { name: /delete api product/i })
-        .click();
-
+      //
+      // the products table re-renders as its data settles, which can detach the
+      // row mid-click ("element was detached from the DOM"). Re-resolve the row
+      // and retry the open until the confirm dialog is actually up, skipping the
+      // click if a prior attempt already opened it.
       const confirmDialog = page.getByRole("dialog");
-      await confirmDialog.waitFor({
-        state: "visible",
-        timeout: TIMEOUTS.DEFAULT,
-      });
+      await expect(async () => {
+        if (!(await confirmDialog.isVisible())) {
+          await page
+            .locator("tbody tr")
+            .filter({ hasText: testData.id })
+            .first()
+            .getByRole("button", { name: /delete api product/i })
+            .click({ timeout: TIMEOUTS.DEFAULT });
+        }
+        await expect(confirmDialog).toBeVisible({ timeout: TIMEOUTS.QUICK });
+      }).toPass({ timeout: TIMEOUTS.SLOW, intervals: [500, 1000, 2000] });
       await confirmDialog.getByRole("textbox").fill(testData.name);
       await confirmDialog.getByRole("button", { name: /delete/i }).click();
       await confirmDialog.waitFor({ state: "hidden", timeout: TIMEOUTS.SLOW });
@@ -98,8 +98,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test.describe.configure({ mode: "serial" });
 
   test("1. owner1 creates a new API Product", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("owner1@kuadrant.local");
+    await loginAs(page, "owner1@kuadrant.local");
     await page.goto("/kuadrant/api-products");
     await waitForKuadrantPageReady(page);
 
@@ -177,8 +176,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("2. consumer1 discovers the API in catalog", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
 
     await retryUntilSuccess(
       async () => {
@@ -197,8 +195,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("3. consumer1 requests API access", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
 
     await page.goto("/catalog/default/api/toystore-api");
     await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, {
@@ -277,8 +274,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("4. admin sees the request in approval queue", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
+    await loginAs(page, "admin@kuadrant.local");
     await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
 
@@ -302,8 +298,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   test("5. owner2 cannot see toystore requests (owned by owner1)", async ({
     page,
   }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("owner2@kuadrant.local");
+    await loginAs(page, "owner2@kuadrant.local");
     const requestsCall = page.waitForResponse(
       (response) =>
         new URL(response.url()).pathname === "/api/kuadrant/requests" &&
@@ -324,19 +319,21 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
     if (await search.isVisible()) {
       await search.fill("toystore-api");
     }
+    // waitForApiKeysPageReady above already proved the page rendered (heading
+    // visible, spinners cleared), so a zero count here is a real "nothing for
+    // owner1", not an empty error page. Do NOT also assert an empty-state
+    // message or a table element: owner2 legitimately has requests for its own
+    // apis (other specs seed those concurrently under fullyParallel), and when
+    // the queue is empty the page renders an empty-state with no <table> at all -
+    // both states are valid, so asserting either one is flaky.
     await expect(
       page.locator("tbody tr").filter({ hasText: "toystore-api" }),
       "Owner2 should see no requests for toystore-api",
     ).toHaveCount(0, { timeout: TIMEOUTS.DEFAULT });
-    await expect(
-      emptyQueue.or(page.getByText(/no records to display/i)).first(),
-      "the queue should report nothing matching owner1's api",
-    ).toBeVisible({ timeout: TIMEOUTS.DEFAULT });
   });
 
   test("6. admin approves consumer1's request", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
+    await loginAs(page, "admin@kuadrant.local");
     await page.goto("/kuadrant/api-key-approval");
     await waitForApiKeysPageReady(page);
 
@@ -367,8 +364,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("7. consumer1 sees their approved API key", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -381,8 +377,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("8. consumer1 views API key detail page", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 
@@ -430,8 +425,7 @@ test.describe("Kuadrant Happy Path - Full API Lifecycle", () => {
   });
 
   test("9. consumer1 deletes their API key", async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("consumer1@kuadrant.local");
+    await loginAs(page, "consumer1@kuadrant.local");
     await page.goto("/kuadrant/my-api-keys");
     await waitForApiKeysPageReady(page);
 

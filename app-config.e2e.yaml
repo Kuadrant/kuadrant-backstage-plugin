@@ -1,0 +1,18 @@
+# Serve the pre-built frontend from the backend on a single port (:7007) instead
+# of running the webpack dev server on :3000. Layer this on top of
+# app-config.yaml + app-config.local.yaml (it only overrides the two keys that
+# differ between the dev split-port setup and single-port static serving).
+#
+# Why: the webpack dev server is the CPU hog in CI e2e. Serving the built bundle
+# frees the runner's cores so parallel Playwright workers get real spare CPU.
+# The OIDC callback stays on backend.baseUrl (:7007), and dex already registers
+# http://localhost:7007/api/auth/oidc/handler/frame, so login needs no changes.
+#
+# Used by `yarn serve:built:oinc` / `serve:built:kind` and (eventually) CI, with
+# BASE_URL=http://localhost:7007.
+app:
+  baseUrl: http://localhost:7007
+
+backend:
+  cors:
+    origin: http://localhost:7007

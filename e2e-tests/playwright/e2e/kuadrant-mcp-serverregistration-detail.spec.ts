@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
 
 // the oinc demo fixture (oinc/manifests/mcp-demo.yaml) always registers this
@@ -9,8 +9,6 @@ const fixtureNamespace = "toystore";
 const fixtureName = "toystore-mcp-server";
 
 test.describe("Kuadrant MCP Server Registration detail", () => {
-  let common: Common;
-
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
@@ -19,8 +17,7 @@ test.describe("Kuadrant MCP Server Registration detail", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("owner1@kuadrant.local");
+    await loginAs(page, "owner1@kuadrant.local");
     await page.goto("/kuadrant/mcp-management");
     await waitForMcpPageReady(page);
   });

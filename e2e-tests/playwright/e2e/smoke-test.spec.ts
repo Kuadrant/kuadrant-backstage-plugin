@@ -1,8 +1,6 @@
 import { test, expect } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 test.describe("Smoke test", () => {
-  let common: Common;
-
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
@@ -11,8 +9,7 @@ test.describe("Smoke test", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
+    await loginAs(page, "admin@kuadrant.local");
   });
 
   test("Verify the Homepage renders", async ({ page }) => {

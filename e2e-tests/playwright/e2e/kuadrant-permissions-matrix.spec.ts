@@ -1,5 +1,7 @@
-import { test, expect, Page } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { test as baseTest, expect, Page } from "../fixtures/test";
+import { execFile } from "node:child_process";
+import { promisify } from "node:util";
+import { loginAs } from "../support/auth/login-as";
 import {
   TIMEOUTS,
   expectButtonPermission,
@@ -7,12 +9,54 @@ import {
   waitForApiKeysPageReady,
   seedPendingApiKeyRequest,
   generateTestId,
+  waitForApiKeyRow,
 } from "../utils/kuadrant-helpers";
 
 // demo APIProducts seeded by setup-cluster.sh, named so a test can seed a
 // request against an api with a known owner.
-const owner1Api = "owner1-inventory-api";
+const owner1Api = "owner1-payment-api";
 const owner2Api = "owner2-shipping-api";
+const execFileAsync = promisify(execFile);
+
+// Each test owns its seeded requests and removes them even when an assertion
+// fails. This keeps repeated parallel runs from filling the shared queue.
+const test = baseTest.extend<{
+  seedRequest: (
+    useCase: string,
+    apiProductName: string,
+    consumer?: string,
+  ) => Promise<void>;
+}>({
+  seedRequest: async ({ browser }, use) => {
+    const created: Array<{ namespace: string; name: string }> = [];
+    await use(async (useCase, apiProductName, consumer) => {
+      created.push(
+        await seedPendingApiKeyRequest(
+          browser,
+          useCase,
+          apiProductName,
+          consumer,
+        ),
+      );
+    });
+    for (const key of created) {
+      await execFileAsync(
+        "kubectl",
+        [
+          "delete",
+          "apikey",
+          key.name,
+          "-n",
+          key.namespace,
+          "--ignore-not-found=true",
+          "--wait=false",
+          "--request-timeout=10s",
+        ],
+        { timeout: 15000 },
+      );
+    }
+  },
+});
 
 /**
  * Filter the current table when it renders a search box.
@@ -55,8 +99,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
   test.describe("APIProduct Permissions", () => {
     test("kuadrant.apiproduct.create - admin CAN create", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -69,8 +112,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     });
 
     test("kuadrant.apiproduct.create - owner CAN create", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -85,8 +127,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.create - consumer CANNOT create", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -101,8 +142,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - admin CAN list all products", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -118,8 +158,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - owner CAN list all products", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -135,8 +174,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.list - consumer CAN list all products", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -152,8 +190,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.update.all - admin CAN edit any product", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -174,8 +211,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.update.own - owner sees edit button only on own products", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -211,8 +247,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.delete.all - admin CAN delete any product", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -233,8 +268,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apiproduct.delete - consumer CANNOT delete any product", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -262,8 +296,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.create - admin CAN request access", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/catalog/default/api/toystore-api");
       await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, {
         timeout: TIMEOUTS.VERY_SLOW,
@@ -286,8 +319,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.create - owner CAN request access", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
 
       await page.goto("/catalog/default/api/toystore-api");
       await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, {
@@ -311,8 +343,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.create - consumer CAN request access", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
 
       await page.goto("/catalog/default/api/toystore-api");
       await page.waitForURL(/\/catalog\/.*\/api\/toystore-api/, {
@@ -335,19 +366,12 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
     test("kuadrant.apikey.approve - admin CAN see approval page", async ({
       page,
-      browser,
+      seedRequest,
     }) => {
-      // seed a request first: a heading renders whether or not the admin can
-      // actually read anyone's requests, so the heading alone proved nothing.
-      // owner2's api, to show the admin is not limited to their own.
-      await seedPendingApiKeyRequest(
-        browser,
-        `admin sees pending ${generateTestId()}`,
-        owner2Api,
-      );
+      const useCase = `admin sees pending ${generateTestId()}`;
+      await seedRequest(useCase, owner2Api, "consumer2");
 
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-key-approval");
       await waitForApiKeysPageReady(page);
 
@@ -359,30 +383,23 @@ test.describe("Kuadrant Permissions Matrix", () => {
         "Admin should see API Key Approval page",
       ).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-      // the queue pages at 20 rows, so narrow to the seeded api first -
-      // otherwise a fresh request can sit off the visible page.
-      await narrowTable(page, owner2Api);
-
+      const requestRow = await waitForApiKeyRow(page, useCase, owner2Api);
+      await expect(requestRow).toContainText(owner2Api);
+      await expect(requestRow).toContainText("consumer2");
       await expect(
-        page.locator("tbody tr").filter({ hasText: owner2Api }).first(),
-        "Admin should see the consumer's pending request for owner2's api",
-      ).toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
+        requestRow.getByText("Pending", { exact: true }),
+      ).toBeVisible();
     });
 
     test("kuadrant.apikey.approve - owner CAN see approval page", async ({
       page,
-      browser,
+      seedRequest,
     }) => {
-      // owner1's own api: an approval queue only carries requests for apis the
-      // approver owns, so seeding against anything else proves nothing here.
-      await seedPendingApiKeyRequest(
-        browser,
-        `owner sees pending ${generateTestId()}`,
-        owner1Api,
-      );
+      const useCase = `owner sees pending ${generateTestId()}`;
+      // Inventory approves automatically; payment requires owner approval.
+      await seedRequest(useCase, owner1Api);
 
-      const common = new Common(page);
-      await common.dexQuickLogin("owner1@kuadrant.local");
+      await loginAs(page, "owner1@kuadrant.local");
       await page.goto("/kuadrant/api-key-approval");
       await waitForApiKeysPageReady(page);
 
@@ -394,21 +411,17 @@ test.describe("Kuadrant Permissions Matrix", () => {
         "Owner should see API Key Approval page",
       ).toBeVisible({ timeout: TIMEOUTS.SLOW });
 
-      // the queue pages at 20 rows, so narrow to the seeded api first -
-      // otherwise a fresh request can sit off the visible page.
-      await narrowTable(page, owner1Api);
-
+      const requestRow = await waitForApiKeyRow(page, useCase, owner1Api);
+      await expect(requestRow).toContainText(owner1Api);
       await expect(
-        page.locator("tbody tr").filter({ hasText: owner1Api }).first(),
-        "Owner should see the pending request for their own api",
-      ).toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
+        requestRow.getByText("Pending", { exact: true }),
+      ).toBeVisible();
     });
 
     test("kuadrant.apikey.approve - consumer CANNOT access approval page", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
 
       // Consumer should not be able to access the approval page
       // They should either get a 403 or be redirected
@@ -430,8 +443,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.read.own - consumer CAN see My API Keys page", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/my-api-keys");
 
       const heading = page
@@ -446,8 +458,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("kuadrant.apikey.delete.own - consumer sees My API Keys page with filters", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/my-api-keys");
 
       const heading = page
@@ -472,8 +483,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("owner2 CANNOT edit toystore API (owned by owner1)", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner2@kuadrant.local");
+      await loginAs(page, "owner2@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -503,8 +513,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("owner2 CANNOT delete toystore API (owned by owner1)", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("owner2@kuadrant.local");
+      await loginAs(page, "owner2@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -534,8 +543,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("admin CAN edit toystore API (has update.all permission)", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -563,42 +571,23 @@ test.describe("Kuadrant Permissions Matrix", () => {
 
     test("admin CAN approve requests for any owner's APIs", async ({
       page,
-      browser,
+      seedRequest,
     }) => {
-      // this test used to pass with nothing to approve. seed a request against
-      // an api the admin does not own, so the approval is exercised end to end
-      // and specifically across an ownership boundary.
-      await seedPendingApiKeyRequest(
-        browser,
-        `admin approves ${generateTestId()}`,
-        owner2Api,
-      );
+      // Seed a distinct request so parallel tests cannot change which row this
+      // test approves or checks afterward.
+      const useCase = `admin approves ${generateTestId()}`;
+      await seedRequest(useCase, owner2Api, "consumer1");
 
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-key-approval");
       await waitForApiKeysPageReady(page);
 
-      // the queue pages at 20 rows and requests accumulate across runs, so a
-      // freshly seeded one can land off the visible page. narrow with the
-      // table's own search first, then identify by count rather than by a
-      // single row: approving one should remove exactly one from the queue.
-      await narrowTable(page, owner2Api);
-
-      const pendingRows = page
-        .locator("tbody tr")
-        .filter({ hasText: owner2Api })
-        .filter({ has: page.getByRole("button", { name: /^approve$/i }) });
-
-      await expect(
-        pendingRows.first(),
-        "the seeded request should be waiting for the admin",
-      ).toBeVisible({ timeout: TIMEOUTS.VERY_SLOW });
-      const before = await pendingRows.count();
-
-      const approveButton = pendingRows
-        .first()
-        .getByRole("button", { name: /^approve$/i });
+      const requestRow = await waitForApiKeyRow(page, useCase, owner2Api);
+      await expect(requestRow).toContainText(owner2Api);
+      await expect(requestRow).toContainText("consumer1");
+      const approveButton = requestRow.getByRole("button", {
+        name: /^approve$/i,
+      });
       await expect(
         approveButton,
         "Admin approve button should be enabled",
@@ -619,22 +608,15 @@ test.describe("Kuadrant Permissions Matrix", () => {
         "the confirmation should close once the approval is accepted",
       ).toBeHidden({ timeout: TIMEOUTS.VERY_SLOW });
 
-      // approving takes that request out of the pending queue. the search is
-      // re-applied on each poll because the table clears it when it refetches,
-      // which would otherwise page the remaining rows back out of sight.
-      await expect
-        .poll(
-          async () => {
-            await narrowTable(page, owner2Api);
-            return pendingRows.count();
-          },
-          {
-            timeout: TIMEOUTS.VERY_SLOW,
-            message:
-              "approving should remove exactly one request from the pending queue",
-          },
-        )
-        .toBe(before - 1);
+      await expect(async () => {
+        const approvedRow = await waitForApiKeyRow(page, useCase, owner2Api);
+        await expect(
+          approvedRow.getByText("Approved", { exact: true }),
+        ).toBeVisible({ timeout: TIMEOUTS.QUICK });
+        await expect(
+          approvedRow.getByRole("button", { name: /^approve$/i }),
+        ).toHaveCount(0);
+      }).toPass({ timeout: TIMEOUTS.VERY_SLOW });
     });
   });
 
@@ -646,8 +628,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("consumer CANNOT see edit buttons on API products table", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -670,8 +651,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     test("consumer CANNOT see delete buttons on API products table", async ({
       page,
     }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -691,8 +671,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     });
 
     test("consumer CANNOT see approve/reject buttons", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -715,8 +694,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     });
 
     test("consumer CAN see Policy filter or column", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("consumer1@kuadrant.local");
+      await loginAs(page, "consumer1@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 
@@ -745,8 +723,7 @@ test.describe("Kuadrant Permissions Matrix", () => {
     });
 
     test("admin CAN see Policy filter and column", async ({ page }) => {
-      const common = new Common(page);
-      await common.dexQuickLogin("admin@kuadrant.local");
+      await loginAs(page, "admin@kuadrant.local");
       await page.goto("/kuadrant/api-products");
       await waitForKuadrantPageReady(page);
 

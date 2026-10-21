@@ -59,3 +59,14 @@ oauth2:
   skipApprovalScreen: true
   responseTypes: ["code", "token", "id_token"]
   grantTypes: ["authorization_code", "refresh_token"]
+
+# Refresh-token policy for e2e tests. By default dex rotates refresh tokens and
+# invalidates the previous one on first use, so a session saved to disk by the
+# Playwright global-setup can only bootstrap ONE browser context — every other
+# parallel worker restoring the same saved session gets a 401 from
+# /api/auth/oidc/refresh and lands back on the sign-in page. Disabling rotation
+# makes the saved refresh token reusable, which is what lets many parallel
+# workers share one pre-authenticated session per persona. Dev/test dex only.
+expiry:
+  refreshTokens:
+    disableRotation: true
