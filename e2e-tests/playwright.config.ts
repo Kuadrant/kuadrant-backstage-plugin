@@ -15,12 +15,20 @@ if (args.some((arg) => arg.includes("showcase-localization-fr"))) {
 export default defineConfig({
   timeout: 90 * 1000,
   testDir: "./playwright",
+  /* Pre-authenticate each persona once so specs skip the per-test popup login */
+  globalSetup: "./playwright/global-setup.ts",
   /* Fail the build on CI if you accidentally left test.only in the source code. */
   forbidOnly: !!process.env.CI,
   /* Retry on CI only */
   retries: process.env.CI ? 2 : 0,
-  /* Single worker to avoid DEX popup login race conditions */
-  workers: 1,
+  /* Run tests within a file in parallel, not just across files. Safe now that
+   * every spec authenticates from a pre-saved session (no per-test dex popup
+   * race) and shared-state specs opt back into serial with
+   * test.describe.configure({ mode: "serial" }) - e.g. the happy-path lifecycle. */
+  fullyParallel: true,
+  /* Matches kuadrant-console-plugin's e2e config: fullyParallel + 3 workers on a
+   * stock ubuntu-latest, no larger runner needed. */
+  workers: 3,
   /* Reporter to use. See https://playwright.dev/docs/test-reporters */
   reporter: [
     ["html"],
@@ -37,10 +45,7 @@ export default defineConfig({
     screenshot: "only-on-failure",
     ...devices["Desktop Chrome"],
     viewport: { width: 1920, height: 1080 },
-    video: {
-      mode: "on",
-      size: { width: 1920, height: 1080 },
-    },
+    video: "off",
     actionTimeout: 10 * 1000,
     navigationTimeout: 50 * 1000,
   },
@@ -59,7 +64,20 @@ export default defineConfig({
       name: "kuadrant",
       dependencies: ["smoke-test"],
       testMatch: "**/playwright/e2e/**/*.spec.ts",
-      testIgnore: "**/playwright/e2e/smoke-test.spec.ts",
+      // happy-path runs alone in its own project (below): it walks real shared
+      // state end-to-end and does exact-count asserts, so a concurrent spec
+      // creating/deleting keys or products breaks it. Exclude it here.
+      testIgnore: [
+        "**/playwright/e2e/smoke-test.spec.ts",
+        "**/playwright/e2e/kuadrant-happy-path.spec.ts",
+      ],
+    },
+    {
+      // Depends on "kuadrant" -> runs only after the whole suite finishes, so
+      // nothing else is mutating cluster state while it counts keys/products.
+      name: "kuadrant-happy-path",
+      dependencies: ["kuadrant"],
+      testMatch: "**/playwright/e2e/kuadrant-happy-path.spec.ts",
     },
   ],
 });

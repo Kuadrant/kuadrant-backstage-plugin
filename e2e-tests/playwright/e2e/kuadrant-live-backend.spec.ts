@@ -1,5 +1,5 @@
 import { test, expect, Page } from "../fixtures/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import { TIMEOUTS, waitForApiKeysPageReady } from "../utils/kuadrant-helpers";
 
 /**
@@ -60,8 +60,7 @@ test.describe.serial("Kuadrant against the live backend", () => {
   };
 
   test.beforeEach(async ({ page }) => {
-    const common = new Common(page);
-    await common.dexQuickLogin("admin@kuadrant.local");
+    await loginAs(page, "admin@kuadrant.local");
   });
 
   // guards the origin itself. on a non-secure origin these three are undefined,

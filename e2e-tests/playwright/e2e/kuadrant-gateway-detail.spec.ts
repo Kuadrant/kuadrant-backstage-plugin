@@ -1,5 +1,5 @@
 import { test, expect, Page } from "@playwright/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import { TIMEOUTS } from "../utils/kuadrant-helpers";
 
 // The read-only Gateway detail view (issue #369) is reached by clicking a
@@ -34,8 +34,6 @@ async function waitForGatewayDetailReady(page: Page): Promise<void> {
 }
 
 test.describe("Kuadrant Gateway detail view", () => {
-  let common: Common;
-
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
@@ -44,8 +42,7 @@ test.describe("Kuadrant Gateway detail view", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("owner1@kuadrant.local");
+    await loginAs(page, "owner1@kuadrant.local");
   });
 
   test("navigates from the MCP Gateways table and shows Details and YAML tabs", async ({

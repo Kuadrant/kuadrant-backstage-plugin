@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { Common } from "../utils/common";
+import { loginAs } from "../support/auth/login-as";
 import { TIMEOUTS, waitForMcpPageReady } from "../utils/kuadrant-helpers";
 
 // the host app has an "MCP Management" sidebar section; rhdh's dynamic menu
@@ -21,8 +21,6 @@ async function openMcpNav(page: Page) {
 }
 
 test.describe("Kuadrant MCP Management", () => {
-  let common: Common;
-
   test.beforeAll(async () => {
     test.info().annotations.push({
       type: "component",
@@ -31,8 +29,7 @@ test.describe("Kuadrant MCP Management", () => {
   });
 
   test.beforeEach(async ({ page }) => {
-    common = new Common(page);
-    await common.dexQuickLogin("owner1@kuadrant.local");
+    await loginAs(page, "owner1@kuadrant.local");
   });
 
   test("should display MCP Management section in sidebar", async ({ page }) => {
@@ -49,13 +46,19 @@ test.describe("Kuadrant MCP Management", () => {
   test("should open the MCP Inspector empty state", async ({ page }) => {
     await page.goto("/kuadrant/mcp-inspector");
 
-    await expect(page.getByRole("heading", { name: "MCP Inspector" })).toBeVisible({
+    await expect(
+      page.getByRole("heading", { name: "MCP Inspector" }),
+    ).toBeVisible({
       timeout: TIMEOUTS.SLOW,
     });
-    await expect(page.getByLabel("Select an MCP gateway extension")).toBeVisible({
+    await expect(
+      page.getByLabel("Select an MCP gateway extension"),
+    ).toBeVisible({
       timeout: TIMEOUTS.DEFAULT,
     });
-    await expect(page.getByText("No connection", { exact: true }).first()).toBeVisible();
+    await expect(
+      page.getByText("No connection", { exact: true }).first(),
+    ).toBeVisible();
   });
 
   test("should display MCP management page header", async ({ page }) => {

@@ -73,3 +73,6 @@ junit-results.xml
 **/app-config.test.yaml
 **/dynamic-plugins.test.yaml
 **/rbac.test.csv
+
+# pre-authenticated persona sessions written by global-setup
+playwright/.auth/
