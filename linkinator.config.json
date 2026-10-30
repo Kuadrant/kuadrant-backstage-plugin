@@ -1,0 +1,10 @@
+{
+  "skip": [
+    "^https?://(.*\\.)?localhost:(3000|9080|9000|7007)",
+    "^https://docs\\.redhat\\.com/en/documentation/red_hat_connectivity_link/1\\.4",
+    "^https://docs\\.redhat\\.com/en/documentation/red_hat_developer_hub/"
+  ],
+  "recurse": true,
+  "directoryListing": true,
+  "markdown": true
+} 
