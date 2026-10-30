@@ -23,7 +23,8 @@ env:
 
 jobs:
   e2e-rhdh-dynamic:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 cannot install Chromium on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
 
     steps:
