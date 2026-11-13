@@ -86,7 +86,7 @@
     "@mui/icons-material": "5.18.0",
     "@mui/material": "5.18.0",
     "async-retry": "^1.3.3",
-    "js-yaml": "^4.1.0",
+    "js-yaml": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
     "react-router-dom": "^6.0.0",
     "react-use": "^17.2.4"
   },
