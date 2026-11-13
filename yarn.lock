@@ -22684,13 +22684,6 @@ __metadata:
   languageName: node
   linkType: hard
 
-"argparse@npm:^3.0.3":
-  version: 3.0.4
-  resolution: "argparse@npm:3.0.4"
-  checksum: 10c0/845346e39e677b46f8558cece7c8dad1f7045f8b86af33356d8565b26a16940bf770a14a51d6da40ce76554a141e0e95b514d055d1da17a2f1b42df7d523fa0f
-  languageName: node
-  linkType: hard
-
 "aria-hidden@npm:^1.2.3, aria-hidden@npm:^1.2.4":
   version: 1.2.6
   resolution: "aria-hidden@npm:1.2.6"
@@ -32067,14 +32060,14 @@ __metadata:
   languageName: node
   linkType: hard
 
-"js-yaml@npm:5.5.0":
-  version: 5.5.0
-  resolution: "js-yaml@npm:5.5.0"
+"js-yaml@npm:4.3.2":
+  version: 4.3.2
+  resolution: "js-yaml@npm:4.3.2"
   dependencies:
-    argparse: "npm:^3.0.3"
+    argparse: "npm:^2.0.1"
   bin:
-    js-yaml: bin/js-yaml.mjs
-  checksum: 10c0/311619f44dd788657e9b81d4b5c60ff367441f364045e3796bc604a41f25819852748fb173ae82f2553d53cb609d7fdb79e0a74148892cb2c085eebe91839b53
+    js-yaml: bin/js-yaml.js
+  checksum: 10c0/dedd34c2e8fef1d504687f1bc94ed0ee1311a1f78770fa2800352c6d59c635ccf555009d74e9afe529ae62199da2b1ccef30e53dc84dcd8d2d8187c22574bc97
   languageName: node
   linkType: hard
 
