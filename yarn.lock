@@ -11075,7 +11075,7 @@ __metadata:
     "@types/async-retry": "npm:^1.4.9"
     "@types/js-yaml": "npm:^4.0.9"
     async-retry: "npm:^1.3.3"
-    js-yaml: "npm:^4.1.0"
+    js-yaml: "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch"
     msw: "npm:^1.0.0"
     react: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
     react-dom: "npm:^16.13.1 || ^17.0.0 || ^18.0.0"
@@ -32068,6 +32068,17 @@ __metadata:
   bin:
     js-yaml: bin/js-yaml.js
   checksum: 10c0/dedd34c2e8fef1d504687f1bc94ed0ee1311a1f78770fa2800352c6d59c635ccf555009d74e9afe529ae62199da2b1ccef30e53dc84dcd8d2d8187c22574bc97
+  languageName: node
+  linkType: hard
+
+"js-yaml@patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch":
+  version: 4.3.2
+  resolution: "js-yaml@patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch::version=4.3.2&hash=acbb5f"
+  dependencies:
+    argparse: "npm:^2.0.1"
+  bin:
+    js-yaml: bin/js-yaml.js
+  checksum: 10c0/739ae5a0c5c433d85a4ecc1cf18f1503869d506b6523cc6c7d31f34bc6777ea04c73ca6b62ce09f7c24c2d36c0edbd505bcc1d39e7a3059f2ec89f23f5d7c8fb
   languageName: node
   linkType: hard
 

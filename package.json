@@ -82,7 +82,15 @@
     "zod@^3.25 || ^4.0": "3.25.76",
     "infinispan": "0.13.0",
     "@protobufjs/inquire": "1.1.0",
-    "js-yaml": "4.3.2"
+    "js-yaml": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^4.1.0": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^3.10.0": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^3.6.1": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^3.8.3": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^4.1.1": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^3.13.1": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:=4.1.1": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch",
+    "js-yaml@npm:^4.2.0": "patch:js-yaml@npm%3A4.3.2#~/.yarn/patches/js-yaml-npm-4.3.2-d3b0efff68.patch"
   },
   "jest": {
     "testTimeout": 20000
