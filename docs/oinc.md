@@ -7,7 +7,7 @@ OpenShift-compatible cluster for testing the Kuadrant plugins in Red Hat Develop
 
 ## Prerequisites
 
-- [oinc](https://github.com/jasonmadigan/oinc) v0.5.3 or later
+- [oinc](https://github.com/jasonmadigan/oinc) v0.7.2 or later
 - kubectl
 - Helm (CI uses 4.3.0)
 - npm
@@ -30,7 +30,7 @@ available at `http://localhost:9000`.
 
 ## Cluster setup
 
-`oinc/setup-cluster.sh` requires oinc v0.5.3 or later, then runs:
+`oinc/setup-cluster.sh` requires oinc v0.7.2 or later, then runs:
 
 ```bash
 oinc create --version 4.22 \
