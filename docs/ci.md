@@ -7,6 +7,7 @@ GitHub Actions workflows live in `.github/workflows/`:
 | Workflow                     | Trigger                                     | Purpose                                                      |
 | ---------------------------- | ------------------------------------------- | ------------------------------------------------------------ |
 | `ci.yml`                     | PRs, merge queue, pushes to main, or manual | Build, lint, type-check, unit tests, static-plugin e2e tests |
+| `e2e-nightly.yaml`           | Nightly, or manual                          | Run `e2e-tests` on main; track failures in an issue          |
 | `e2e-dynamic.yml`            | Manual (`workflow_dispatch`)                | Full e2e suite against dynamic plugins in RHDH               |
 | `publish.yml`                | GitHub Release published, or manual         | Publish packages to npm                                      |
 | `contributor-governance.yml` | Issues and PRs                              | Run the shared contributor-governance checks                 |
@@ -89,7 +90,7 @@ before publication. Without this step, the frontend would be missing
 - **unittests**: Backend and frontend unit tests (no Kubernetes cluster)
 - **e2e-tests**: oinc cluster with Kuadrant + MCP Gateway, host `yarn dev:oinc`, Playwright
 
-E2e test artifacts (Playwright report, videos on failure) are uploaded and retained for 7 days. Playwright browsers are installed without `--with-deps`: that flag runs `apt-get update`, which has hung for nearly an hour on GitHub-hosted Azure Ubuntu mirrors and leaves no time for `yarn oinc:cluster`. Chromium is already fetched by `e2e-tests` postinstall; `ubuntu-latest` provides the system libraries.
+E2e test artifacts (Playwright report, results JSON, videos on failure) are uploaded and retained for 7 days. Playwright browsers are installed without `--with-deps`: that flag runs `apt-get update`, which has hung for nearly an hour on GitHub-hosted Azure Ubuntu mirrors and leaves no time for `yarn oinc:cluster`. Chromium is already fetched by `e2e-tests` postinstall; `ubuntu-latest` provides the system libraries.
 
 ### E2E cluster (oinc, not kind)
 
@@ -105,6 +106,12 @@ The `e2e-tests` job matches local loop 2 (`yarn oinc:cluster` then `yarn dev:oin
 oinc is installed like console-plugin, except the binary is downloaded to `/tmp` first: this repo has an `oinc/` directory, so `curl -o oinc` fails with “Is a directory”. Source is `oinc-linux-amd64` from the [oinc v0.5.3](https://github.com/jasonmadigan/oinc/releases/tag/v0.5.3) GitHub release, then `file` check, `oinc version`, and `mv` to `/usr/local/bin`. Helm is pinned to `v4.3.0` with `azure/setup-helm`. oinc v0.5.3 reuses the MCP Gateway controller and CRDs managed by Kuadrant Operator, avoiding a conflicting standalone Helm install. There is no extra Docker-in-Docker or privileged job; nested k8s uses the runner’s Docker, as in console-plugin. Kind is **not** used in CI e2e. It remains the lighter local fallback (loop 1). Unit tests do not start a cluster.
 
 The static path remains the default required PR check. The dynamic-plugin workflow is manual-only because it also builds an RHDH image and boots an oinc cluster. It runs the same full Playwright suite against the current branch's exported dynamic plugins. Its build and cluster commands are shared with the local Make targets; see [E2E Testing](e2e-testing.md#running-against-rhdh-dynamic-plugins).
+
+### Nightly e2e
+
+`e2e-nightly.yaml` runs the `e2e-tests` job from `ci.yml` against `main` every night. The cluster installs Kuadrant `latest`, so e2e can break without a commit here.
+
+A failing night opens an issue labelled `nightly-failure` (the tests failed) or `nightly-infrastructure` (anything before them), with the failed tests or a log excerpt. Later failures are added as comments, and the first passing night closes it.
 
 ## npm Trusted Publishing
 

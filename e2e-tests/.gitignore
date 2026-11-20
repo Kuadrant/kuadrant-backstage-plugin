@@ -68,6 +68,7 @@ site
 
 # e2e test results
 junit-results.xml
+playwright-results.json
 
 # auth-providers local runs files
 **/app-config.test.yaml
