@@ -7,7 +7,7 @@ OpenShift-compatible cluster for testing the Kuadrant plugins in Red Hat Develop
 
 ## Prerequisites
 
-- [oinc](https://github.com/jasonmadigan/oinc) v0.5.3 or later
+- [oinc](https://github.com/jasonmadigan/oinc) v0.7.2 or later
 - kubectl
 - Helm (CI uses 4.3.0)
 - npm
@@ -30,7 +30,7 @@ available at `http://localhost:9000`.
 
 ## Cluster setup
 
-`oinc/setup-cluster.sh` requires oinc v0.5.3 or later, then runs:
+`oinc/setup-cluster.sh` requires oinc v0.7.2 or later, then runs:
 
 ```bash
 oinc create --version 4.22 \
@@ -50,6 +50,10 @@ recreate it after saving anything you need. Gateway Service classes cannot be
 changed in place. See
 [oinc's migration instructions](https://github.com/jasonmadigan/oinc/blob/v0.5.3/docs/addons.md#migration-from-v043)
 to retain an existing cluster.
+
+Kuadrant `latest` exits at startup unless the `monitoring.coreos.com` CRDs are
+served. Clusters created before oinc v0.7.2 lack them; `oinc addon install` from
+v0.7.2 adds them, or recreate the cluster.
 
 Do not run kind and oinc together: both write host credentials to `.env`.
 The host app uses Dex on :5556; in-cluster RHDH uses Dex on :9080.
