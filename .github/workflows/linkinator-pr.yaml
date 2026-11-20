@@ -45,4 +45,6 @@ jobs:
         if: steps.changed.outputs.paths != ''
         with:
           paths: ${{ steps.changed.outputs.paths }}
+          # a lone file is otherwise served from its own directory, breaking ../ links
+          serverRoot: ${{ github.workspace }}
           
