@@ -34,6 +34,7 @@ export default defineConfig({
     ["html"],
     ["list"],
     ["junit", { outputFile: process.env.JUNIT_RESULTS || "junit-results.xml" }],
+    ["json", { outputFile: "playwright-results.json" }],
   ],
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
