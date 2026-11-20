@@ -1,4 +1,5 @@
-import { mockServices } from '@backstage/backend-test-utils';
+import { HttpAuthService } from '@backstage/backend-plugin-api';
+import { ConfigReader } from '@backstage/config';
 import { AuthorizeResult } from '@backstage/plugin-permission-common';
 import express from 'express';
 import request from 'supertest';
@@ -55,10 +56,19 @@ describe('createRouter', () => {
       authorizeConditional: jest.fn(),
     } as any;
 
+    // router only needs a principal; identity comes from mockUserInfo
+    const mockHttpAuth: jest.Mocked<HttpAuthService> = {
+      credentials: jest.fn().mockResolvedValue({
+        $$type: '@backstage/BackstageCredentials',
+        principal: { type: 'user', userEntityRef: mockUserEntityRef },
+      }),
+      issueUserCookie: jest.fn(),
+    };
+
     const router = await createRouter({
-      httpAuth: mockServices.httpAuth(),
+      httpAuth: mockHttpAuth,
       userInfo: mockUserInfo,
-      config: mockServices.rootConfig(),
+      config: new ConfigReader({}),
       permissions: mockPermissions,
     });
 
