@@ -1,4 +1,4 @@
-import { mockServices } from '@backstage/backend-test-utils';
+import { ConfigReader } from '@backstage/config';
 import { APIProductEntityProvider } from './APIProductEntityProvider';
 import { KuadrantK8sClient } from '../k8s-client';
 
@@ -47,7 +47,7 @@ describe('APIProductEntityProvider auth-apikey annotation', () => {
       listCustomResources: jest.fn(),
     } as unknown as jest.Mocked<KuadrantK8sClient>;
     (KuadrantK8sClient as jest.Mock).mockImplementation(() => mockK8sClient);
-    provider = new APIProductEntityProvider(mockServices.rootConfig());
+    provider = new APIProductEntityProvider(new ConfigReader({}));
     (provider as unknown as { connection: unknown }).connection = { applyMutation };
   });
 

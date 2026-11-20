@@ -51,7 +51,7 @@ For specific topics, refer to these focused guides:
 | [docs/ui-patterns.md](docs/ui-patterns.md) | Table patterns, delete dialogs, frontend permissions, sidebar menu config |
 | [docs/api-reference.md](docs/api-reference.md) | Backend REST API endpoints, request/response shapes, auth requirements |
 | [docs/e2e-testing.md](docs/e2e-testing.md) | E2E test setup, Playwright configuration, test structure |
-| [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, static vs dynamic plugins |
+| [docs/ci.md](docs/ci.md) | CI/CD pipelines, release flow, npm publishing, plugin dependencies, static vs dynamic plugins |
 | [docs/oinc.md](docs/oinc.md) | Development loops: kind or oinc host app, and RHDH with published or locally built dynamic plugins |
 
 ## Prerequisites
