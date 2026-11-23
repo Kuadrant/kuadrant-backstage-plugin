@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  OINC_VERSION: v0.5.3
+  OINC_VERSION: v0.7.2
   OCP_VERSION: "4.22"
   KUADRANT_VERSION: "latest"
   RHDH_BASE_IMAGE: quay.io/rhdh-community/rhdh:next-1.10
@@ -23,7 +23,8 @@ env:
 
 jobs:
   e2e-rhdh-dynamic:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 cannot install Chromium on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
 
     steps:

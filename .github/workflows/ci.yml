@@ -116,12 +116,13 @@ jobs:
 
   # CI e2e cluster is oinc (same addons as `yarn oinc:cluster` / kuadrant-console-plugin),
   # not kind. Based on kuadrant-console-plugin `.github/workflows/e2e-common.yaml`:
-  # ubuntu-latest (no larger runner), 60m timeout, oinc v0.5.3 from GitHub releases,
+  # ubuntu-24.04 (no larger runner), 60m timeout, oinc v0.7.2 from GitHub releases,
   # Helm, Docker on the hosted runner (no extra DinD/privileged job). oinc create is
   # nested k8s (~6+ min; Istio + Kuadrant + MCP Gateway). Kind stays local loop 1;
   # unit tests do not need a cluster.
   e2e-tests:
-    runs-on: ubuntu-latest
+    # Playwright 1.56.1 cannot install Chromium on Ubuntu 26.04.
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     steps:
@@ -140,8 +141,8 @@ jobs:
       # with "Is a directory" (console-plugin does not have that path).
       - name: Install oinc
         run: |
-          OINC_VERSION="${OINC_VERSION:-v0.5.3}"
-          curl -fL -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
+          OINC_VERSION="${OINC_VERSION:-v0.7.2}"
+          curl -fL --retry 3 --retry-delay 5 --retry-all-errors -o /tmp/oinc "https://github.com/jasonmadigan/oinc/releases/download/${OINC_VERSION}/oinc-linux-amd64"
           chmod +x /tmp/oinc
           file /tmp/oinc | grep -q ELF || { echo "downloaded file is not a valid binary"; exit 1; }
           /tmp/oinc version
@@ -163,7 +164,7 @@ jobs:
 
       # Skip --with-deps: it runs apt-get update, which hung ~56m on
       # azure.archive.ubuntu.com (Ign mirrors) and exhausted the 60m job.
-      # e2e-tests postinstall already fetches Chromium; ubuntu-latest ships
+      # e2e-tests postinstall already fetches Chromium; ubuntu-24.04 ships
       # Chrome and the shared libs Playwright needs.
       - name: Install Playwright browsers
         run: |

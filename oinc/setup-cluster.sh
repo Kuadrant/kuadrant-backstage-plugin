@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Create an oinc v0.5.3+ cluster, then add demos and the host-side SA.
+# Create an oinc v0.7.2+ cluster, then add demos and the host-side SA.
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
@@ -9,20 +9,21 @@ REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 # shellcheck source=lib.sh
 source "${SCRIPT_DIR}/lib.sh"
 
-check_command oinc "Install v0.5.3 or newer from https://github.com/jasonmadigan/oinc/releases"
+check_command oinc "Install v0.7.2 or newer from https://github.com/jasonmadigan/oinc/releases"
 check_command kubectl "Install from https://kubernetes.io/docs/tasks/tools/"
 
-# oinc before v0.5.3 creates the MCP Gateway's Service without its scoped
-# MetalLB class, so the Gateway never gets an address yet setup succeeds.
-# source builds report git describe versions such as v0.5.3-2-gabc1234.
+# kuadrant latest exits at startup unless monitoring.coreos.com is served, which
+# oinc does from v0.7.2. before v0.5.3 the MCP Gateway's Service also lacked its
+# scoped MetalLB class, so the Gateway never got an address yet setup succeeded.
+# source builds report git describe versions such as v0.7.2-2-gabc1234.
 if ! oinc_version="$(oinc version)"; then
   echo "error: could not determine the oinc version" >&2
   exit 1
 fi
 if [[ ! "${oinc_version}" =~ oinc[[:space:]]v([0-9]+)\.([0-9]+)\.([0-9]+) ]] ||
-  (( 10#${BASH_REMATCH[1]} == 0 && (10#${BASH_REMATCH[2]} < 5 ||
-    (10#${BASH_REMATCH[2]} == 5 && 10#${BASH_REMATCH[3]} < 3)) )); then
-  echo "error: oinc v0.5.3 or newer is required, found ${BASH_REMATCH[0]:-an unversioned build}." >&2
+  (( 10#${BASH_REMATCH[1]} == 0 && (10#${BASH_REMATCH[2]} < 7 ||
+    (10#${BASH_REMATCH[2]} == 7 && 10#${BASH_REMATCH[3]} < 2)) )); then
+  echo "error: oinc v0.7.2 or newer is required, found ${BASH_REMATCH[0]:-an unversioned build}." >&2
   echo "       upgrade from https://github.com/jasonmadigan/oinc/releases and recreate clusters built by older releases." >&2
   exit 1
 fi
