@@ -35,6 +35,17 @@ Manual `workflow_dispatch` on `publish.yml` publishes with a `dev` dist-tag usin
 | [`@kuadrant/kuadrant-backstage-plugin-backend`](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend)                 | `plugins/kuadrant-backend`              | Backend plugin (static install)                            |
 | [`@kuadrant/kuadrant-backstage-plugin-backend-dynamic`](https://www.npmjs.com/package/@kuadrant/kuadrant-backstage-plugin-backend-dynamic) | `plugins/kuadrant-backend/dist-dynamic` | Backend plugin (dynamic, for RHDH)                         |
 
+## Plugin Dependencies
+
+Anyone building the two plugins installs everything in their `package.json`
+files, `devDependencies` included, so a test-only dependency adds its whole tree
+to every build and every dependency scan. Keep both manifests lean.
+
+`plugins/kuadrant-backend` therefore avoids `@backstage/backend-defaults` and
+`@backstage/backend-test-utils`, which pull in a few hundred packages the plugin
+never loads. Its ESLint config rejects both; tests use hand-written service
+doubles.
+
 ## Static vs Dynamic Plugins
 
 Standard Backstage plugins are **static**: they're installed as npm dependencies and linked at build time. This is how most Backstage deployments work.
