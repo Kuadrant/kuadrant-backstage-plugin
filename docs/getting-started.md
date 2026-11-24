@@ -298,7 +298,7 @@ You should receive a response from the toystore API.
 
 ## Cleanup
 
-Delete the tutorial APIKey from Backstage and remove its consumer Secret (see [Deletion Flow](kuadrant-resources.md#deletion-flow)). Then remove the API infrastructure namespace:
+Delete the tutorial APIKey from Backstage and remove its consumer Secret (see [Deletion Flow](https://github.com/Kuadrant/kuadrant-backstage-plugin/blob/main/docs/kuadrant-resources.md#deletion-flow)). Then remove the API infrastructure namespace:
 
 ```bash
 kubectl delete namespace getting-started-tutorial
